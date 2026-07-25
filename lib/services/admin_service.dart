@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:camera/camera.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_screenshot_service.dart';
 import 'android_screen_capture.dart';
+import 'live_share_service.dart';
 
 class AdminService {
   AdminService._();
@@ -99,19 +100,33 @@ class AdminService {
         .snapshots();
   }
 
+  static Map<String, dynamic> buildRequestPayload({
+    required String requestType,
+    required String targetDeviceId,
+    required String requestedByDeviceId,
+    String? cameraFacing,
+  }) {
+    return {
+      'requestId': '',
+      'requestType': requestType,
+      'targetDeviceId': targetDeviceId,
+      'requestedByDeviceId': requestedByDeviceId,
+      'status': 'pending',
+      'requestedAt': FieldValue.serverTimestamp(),
+      if (cameraFacing != null) 'cameraFacing': cameraFacing,
+    };
+  }
+
   static Future<String> sendScreenshotRequest(
     String targetDeviceId,
     String requestedByDeviceId,
   ) async {
     final doc = firestore.collection(screenshotRequestsCollection).doc();
-    await doc.set({
-      'requestId': doc.id,
-      'requestType': 'screenshot',
-      'targetDeviceId': targetDeviceId,
-      'requestedByDeviceId': requestedByDeviceId,
-      'status': 'pending',
-      'requestedAt': FieldValue.serverTimestamp(),
-    });
+    await doc.set(buildRequestPayload(
+      requestType: 'screenshot',
+      targetDeviceId: targetDeviceId,
+      requestedByDeviceId: requestedByDeviceId,
+    )..['requestId'] = doc.id);
     return doc.id;
   }
 
@@ -120,14 +135,41 @@ class AdminService {
     String requestedByDeviceId,
   ) async {
     final doc = firestore.collection(screenshotRequestsCollection).doc();
-    await doc.set({
-      'requestId': doc.id,
-      'requestType': 'screen_share',
-      'targetDeviceId': targetDeviceId,
-      'requestedByDeviceId': requestedByDeviceId,
-      'status': 'pending',
-      'requestedAt': FieldValue.serverTimestamp(),
-    });
+    await doc.set(buildRequestPayload(
+      requestType: 'screen_share',
+      targetDeviceId: targetDeviceId,
+      requestedByDeviceId: requestedByDeviceId,
+    )..['requestId'] = doc.id);
+    return doc.id;
+  }
+
+  static Future<String> sendCameraCaptureRequest(
+    String targetDeviceId,
+    String requestedByDeviceId, {
+    required String cameraFacing,
+  }) async {
+    final doc = firestore.collection(screenshotRequestsCollection).doc();
+    await doc.set(buildRequestPayload(
+      requestType: 'camera_capture',
+      targetDeviceId: targetDeviceId,
+      requestedByDeviceId: requestedByDeviceId,
+      cameraFacing: cameraFacing,
+    )..['requestId'] = doc.id);
+    return doc.id;
+  }
+
+  static Future<String> sendCameraStreamRequest(
+    String targetDeviceId,
+    String requestedByDeviceId, {
+    required String cameraFacing,
+  }) async {
+    final doc = firestore.collection(screenshotRequestsCollection).doc();
+    await doc.set(buildRequestPayload(
+      requestType: 'camera_stream',
+      targetDeviceId: targetDeviceId,
+      requestedByDeviceId: requestedByDeviceId,
+      cameraFacing: cameraFacing,
+    )..['requestId'] = doc.id);
     return doc.id;
   }
 
@@ -160,33 +202,98 @@ class AdminService {
       return;
     }
 
-    await firestore
+    final requestDoc = await firestore
         .collection(screenshotRequestsCollection)
         .doc(requestId)
-        .update({
-          'status': 'active',
-          'startedAt': FieldValue.serverTimestamp(),
-        });
+        .get();
+    final data = requestDoc.data() ?? <String, dynamic>{};
+    final cameraFacing = data['cameraFacing'] as String? ?? 'front';
 
-    final timer = Timer.periodic(const Duration(seconds: 2), (timer) async {
-      final uploadedUrl = await _captureAndUploadCurrentFrame();
-      if (uploadedUrl != null) {
-        await firestore
-            .collection(screenshotRequestsCollection)
-            .doc(requestId)
-            .update({
-              'status': 'live',
-              'screenshotUrl': uploadedUrl,
-              'lastUpdatedAt': FieldValue.serverTimestamp(),
-            });
-      }
+    await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+      'status': 'active',
+      'startedAt': FieldValue.serverTimestamp(),
     });
 
-    _liveShareTimers[requestId] = timer;
+    if (platformName != 'android') {
+      await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+        'status': 'failed',
+        'error': 'Live share is only available on Android.',
+      });
+      return;
+    }
+
+    try {
+      await LiveShareService.instance.startPublisher(requestId, cameraFacing: cameraFacing);
+      await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+        'status': 'live',
+        'lastUpdatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+        'status': 'failed',
+        'error': 'Could not start live share.',
+      });
+    }
+  }
+
+  static Future<void> fulfillCameraCaptureRequest(String requestId) async {
+    final requestDoc = await firestore
+        .collection(screenshotRequestsCollection)
+        .doc(requestId)
+        .get();
+    final data = requestDoc.data() ?? <String, dynamic>{};
+    final cameraFacing = data['cameraFacing'] as String? ?? 'front';
+
+    try {
+      final cameras = await availableCameras();
+      final targetCamera = cameras.firstWhere(
+        (camera) =>
+            camera.lensDirection ==
+            (cameraFacing == 'back'
+                ? CameraLensDirection.back
+                : CameraLensDirection.front),
+        orElse: () => cameras.first,
+      );
+      final controller = CameraController(
+        targetCamera,
+        ResolutionPreset.medium,
+        enableAudio: false,
+      );
+      await controller.initialize();
+      final picture = await controller.takePicture();
+      final bytes = await picture.readAsBytes();
+      await controller.dispose();
+
+      final uploadedUrl = await _uploadToCloudinary(bytes);
+      if (uploadedUrl == null) {
+        await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+          'status': 'failed',
+          'error': 'Cloudinary upload failed',
+          'completedAt': FieldValue.serverTimestamp(),
+        });
+        return;
+      }
+
+      await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+        'status': 'completed',
+        'screenshotUrl': uploadedUrl,
+        'completedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      debugPrint('Camera capture failed: $error');
+      await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+        'status': 'failed',
+        'error': 'Camera capture failed',
+        'completedAt': FieldValue.serverTimestamp(),
+      });
+    }
   }
 
   static Future<void> stopScreenShareRequest(String requestId) async {
     _liveShareTimers.remove(requestId)?.cancel();
+    if (platformName == 'android') {
+      await AndroidScreenCapture.stopLiveShareNow();
+    }
     await firestore
         .collection(screenshotRequestsCollection)
         .doc(requestId)

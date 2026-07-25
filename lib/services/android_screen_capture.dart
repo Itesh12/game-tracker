@@ -33,6 +33,24 @@ class AndroidScreenCapture {
     }
   }
 
+  static Future<bool> startLiveShareNow(String requestId) async {
+    try {
+      final res = await _channel.invokeMethod('startLiveShareNow', {'requestId': requestId});
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<bool> stopLiveShareNow() async {
+    try {
+      final res = await _channel.invokeMethod('stopLiveShareNow');
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static void setOnCaptureComplete(void Function(String? path) handler) {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'onCaptureComplete') {

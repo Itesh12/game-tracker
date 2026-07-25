@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.ImageFormat
+import android.graphics.PixelFormat
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
@@ -63,7 +64,7 @@ class ScreenCaptureService : Service() {
         val height = metrics.heightPixels
         val density = metrics.densityDpi
 
-        imageReader = ImageReader.newInstance(width, height, ImageFormat.RGBA_8888, 2)
+        imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
 
         val handlerThread = HandlerThread("screencap")
         handlerThread.start()

@@ -4,13 +4,75 @@ import '../controllers/admin_controller.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/theme_controller.dart';
 import 'home_screen.dart';
+import '../widgets/live_share_view.dart';
 
-class AdminPanelScreen extends StatelessWidget {
+class AdminPanelScreen extends StatefulWidget {
   const AdminPanelScreen({super.key});
+
+  @override
+  State<AdminPanelScreen> createState() => _AdminPanelScreenState();
+}
+
+class _AdminPanelScreenState extends State<AdminPanelScreen> {
+  String _cameraFacing = 'front';
+  bool _isFullscreenStreamVisible = false;
+  String? _openedFullscreenRequestId;
+
+  void _openFullscreenStream(String requestId, String requestType) {
+    if (!mounted || _isFullscreenStreamVisible) return;
+
+    _isFullscreenStreamVisible = true;
+    _openedFullscreenRequestId = requestId;
+
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (_) => FullScreenLiveStreamPage(
+              requestId: requestId,
+              requestType: requestType,
+            ),
+          ),
+        )
+        .then((_) {
+          if (mounted) {
+            setState(() => _isFullscreenStreamVisible = false);
+          }
+        });
+  }
 
   @override
   Widget build(BuildContext context) {
     final adminCtrl = Get.find<AdminController>();
+
+    ScreenshotRequestItem? activeLiveRequest;
+    for (final request in adminCtrl.screenshotRequests) {
+      if ((request.requestType == 'screen_share' ||
+              request.requestType == 'camera_stream') &&
+          (request.status == 'active' ||
+              request.status == 'live' ||
+              request.status == 'offer_created')) {
+        activeLiveRequest = request;
+        break;
+      }
+    }
+
+    final activeRequestId = activeLiveRequest?.requestId;
+    final activeRequestType = activeLiveRequest?.requestType;
+
+    if (activeLiveRequest != null &&
+        !_isFullscreenStreamVisible &&
+        _openedFullscreenRequestId != activeRequestId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && activeRequestId != null && activeRequestType != null) {
+          _openFullscreenStream(
+            activeRequestId,
+            activeRequestType,
+          );
+        }
+      });
+    } else if (activeLiveRequest == null) {
+      _openedFullscreenRequestId = null;
+    }
 
     return GetBuilder<ThemeController>(
       builder: (themeState) {
@@ -81,6 +143,46 @@ class AdminPanelScreen extends StatelessWidget {
                             fontSize: 12,
                             color: theme.textSecondary,
                           ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Card(
+                  color: theme.cardBg,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Camera Settings',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: theme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          initialValue: _cameraFacing,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            labelText: 'Camera Facing',
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'front', child: Text('Front Camera')),
+                            DropdownMenuItem(value: 'back', child: Text('Back Camera')),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _cameraFacing = value);
+                            }
+                          },
                         ),
                       ],
                     ),
@@ -274,12 +376,66 @@ class AdminPanelScreen extends StatelessWidget {
                                   ),
                                 ],
                               ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      onPressed: isSelf
+                                          ? null
+                                          : () async {
+                                              await adminCtrl.requestCameraCapture(
+                                                device.deviceId,
+                                                cameraFacing: _cameraFacing,
+                                              );
+                                              Get.snackbar(
+                                                'Camera Capture Requested',
+                                                'The target device will capture a photo from the selected camera.',
+                                                snackPosition:
+                                                    SnackPosition.BOTTOM,
+                                              );
+                                            },
+                                      icon: const Icon(Icons.camera_alt),
+                                      label: const Text('Capture Camera'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: isSelf
+                                            ? Colors.grey
+                                            : theme.blue,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: isSelf
+                                          ? null
+                                          : () async {
+                                              await adminCtrl.requestCameraStream(
+                                                device.deviceId,
+                                                cameraFacing: _cameraFacing,
+                                              );
+                                              Get.snackbar(
+                                                'Camera Stream Requested',
+                                                'The target device will start a live camera stream.',
+                                                snackPosition:
+                                                    SnackPosition.BOTTOM,
+                                              );
+                                            },
+                                      icon: const Icon(Icons.videocam),
+                                      label: const Text('Live Camera'),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: theme.blue,
+                                        side: BorderSide(color: theme.blue),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ],
                           ),
                         ),
                       );
-                    })
-                    .toList(),
+                    }),
                 if (adminCtrl.screenshotRequests.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Text(
@@ -317,7 +473,7 @@ class AdminPanelScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Type: ${request.requestType == 'screen_share' ? 'Live Share' : 'Screenshot'}',
+                              'Type: ${request.requestType == 'screen_share' ? 'Live Share' : request.requestType == 'camera_capture' ? 'Camera Capture' : request.requestType == 'camera_stream' ? 'Camera Stream' : 'Screenshot'}',
                               style: TextStyle(color: theme.textSecondary),
                             ),
                             const SizedBox(height: 4),
@@ -325,24 +481,36 @@ class AdminPanelScreen extends StatelessWidget {
                               'Status: ${request.status}',
                               style: TextStyle(color: theme.textSecondary),
                             ),
-                            if (request.requestType == 'screen_share' &&
+                            if ((request.requestType == 'screen_share' ||
+                                    request.requestType == 'camera_stream') &&
                                 (request.status == 'active' ||
-                                    request.status == 'live')) ...[
+                                    request.status == 'live' ||
+                                    request.status == 'offer_created')) ...[
                               const SizedBox(height: 8),
                               ElevatedButton.icon(
-                                onPressed: () async {
-                                  await adminCtrl.stopScreenShare(
-                                    request.requestId,
-                                  );
-                                  Get.snackbar(
-                                    'Live Share Stopped',
-                                    'The live share session was stopped.',
-                                    snackPosition: SnackPosition.BOTTOM,
-                                  );
-                                },
-                                icon: const Icon(Icons.stop_circle_outlined),
-                                label: const Text('Stop Live Share'),
+                                onPressed: () => _openFullscreenStream(
+                                  request.requestId,
+                                  request.requestType,
+                                ),
+                                icon: const Icon(Icons.fullscreen),
+                                label: const Text('Open Full Screen'),
                               ),
+                              const SizedBox(height: 8),
+                              if (request.requestType == 'screen_share')
+                                ElevatedButton.icon(
+                                  onPressed: () async {
+                                    await adminCtrl.stopScreenShare(
+                                      request.requestId,
+                                    );
+                                    Get.snackbar(
+                                      'Live Share Stopped',
+                                      'The live share session was stopped.',
+                                      snackPosition: SnackPosition.BOTTOM,
+                                    );
+                                  },
+                                  icon: const Icon(Icons.stop_circle_outlined),
+                                  label: const Text('Stop Live Share'),
+                                ),
                             ],
                             if (request.screenshotUrl != null) ...[
                               const SizedBox(height: 10),

