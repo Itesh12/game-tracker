@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +8,7 @@ import 'controllers/theme_controller.dart';
 import 'controllers/ludo_controller.dart';
 import 'controllers/auth_controller.dart';
 import 'controllers/admin_controller.dart';
+import 'screens/admin_panel_screen.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
 import 'services/app_screenshot_service.dart';
@@ -48,8 +50,37 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(AppScreenshotService.captureAndCacheCurrentFrame());
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.resumed) {
+      unawaited(AppScreenshotService.captureAndCacheCurrentFrame());
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,9 +94,12 @@ class MyApp extends StatelessWidget {
             theme: ctrl.themeData,
             home: Obx(() {
               final authCtrl = Get.find<AuthController>();
-              return authCtrl.isSignedIn
-                  ? const HomeScreen()
-                  : const AuthScreen();
+              if (!authCtrl.isSignedIn) {
+                return const AuthScreen();
+              }
+              return authCtrl.isAdmin
+                  ? const AdminPanelScreen()
+                  : const HomeScreen();
             }),
           ),
         );

@@ -49,6 +49,12 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
+        <service
+            android:name=".ScreenCaptureService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
+
         <!-- Boot Receiver for Auto-Starting App on Device Startup -->
         <receiver
             android:name=".BootReceiver"

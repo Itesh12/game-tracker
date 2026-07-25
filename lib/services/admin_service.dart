@@ -1,21 +1,28 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_screenshot_service.dart';
+import 'android_screen_capture.dart';
 
 class AdminService {
   AdminService._();
 
   static const String deviceIdPref = 'game_tracker_device_id';
-  static const String cloudinaryCloudName = '<YOUR_CLOUDINARY_CLOUD_NAME>';
-  static const String cloudinaryUploadPreset = '<YOUR_UNSIGNED_UPLOAD_PRESET>';
+  static const String cloudinaryCloudName = 'dsuaryuxj';
+  static const String cloudinaryApiKey = '331165958884664';
+  static const String cloudinaryApiSecret = 'ZU-t1_zmu6PkbHVP0PyG_2028LM';
   static const String screenshotRequestsCollection = 'screenshot_requests';
   static const String devicesCollection = 'devices';
 
   static final FirebaseFirestore firestore = FirebaseFirestore.instance;
+  static final Map<String, Timer> _liveShareTimers = {};
 
   static Future<String> getOrCreateDeviceId() async {
     final prefs = await SharedPreferences.getInstance();
@@ -45,25 +52,37 @@ class AdminService {
   static Future<void> registerDevice() async {
     try {
       final deviceId = await getOrCreateDeviceId();
-      await firestore.collection(devicesCollection).doc(deviceId).set(
-        {
-          'deviceId': deviceId,
-          'platform': platformName,
-          'registeredAt': FieldValue.serverTimestamp(),
-          'lastSeenAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
+      bool nativeEnabled = false;
+      if (platformName == 'android') {
+        try {
+          nativeEnabled = await AndroidScreenCapture.hasPermission();
+        } catch (_) {
+          nativeEnabled = false;
+        }
+      }
+
+      await firestore.collection(devicesCollection).doc(deviceId).set({
+        'deviceId': deviceId,
+        'platform': platformName,
+        'registeredAt': FieldValue.serverTimestamp(),
+        'lastSeenAt': FieldValue.serverTimestamp(),
+        'nativeCaptureEnabled': nativeEnabled,
+      }, SetOptions(merge: true));
     } catch (error) {
       debugPrint('Device registration failed: $error');
     }
   }
 
   static Stream<QuerySnapshot<Map<String, dynamic>>> watchDevices() {
-    return firestore.collection(devicesCollection).orderBy('lastSeenAt', descending: true).snapshots();
+    return firestore
+        .collection(devicesCollection)
+        .orderBy('lastSeenAt', descending: true)
+        .snapshots();
   }
 
-  static Stream<QuerySnapshot<Map<String, dynamic>>> watchOwnRequests(String deviceId) {
+  static Stream<QuerySnapshot<Map<String, dynamic>>> watchOwnRequests(
+    String deviceId,
+  ) {
     return firestore
         .collection(screenshotRequestsCollection)
         .where('requestedByDeviceId', isEqualTo: deviceId)
@@ -71,7 +90,8 @@ class AdminService {
         .snapshots();
   }
 
-  static Stream<QuerySnapshot<Map<String, dynamic>>> watchPendingRequestsForDevice(String deviceId) {
+  static Stream<QuerySnapshot<Map<String, dynamic>>>
+  watchPendingRequestsForDevice(String deviceId) {
     return firestore
         .collection(screenshotRequestsCollection)
         .where('targetDeviceId', isEqualTo: deviceId)
@@ -79,10 +99,30 @@ class AdminService {
         .snapshots();
   }
 
-  static Future<String> sendScreenshotRequest(String targetDeviceId, String requestedByDeviceId) async {
+  static Future<String> sendScreenshotRequest(
+    String targetDeviceId,
+    String requestedByDeviceId,
+  ) async {
     final doc = firestore.collection(screenshotRequestsCollection).doc();
     await doc.set({
       'requestId': doc.id,
+      'requestType': 'screenshot',
+      'targetDeviceId': targetDeviceId,
+      'requestedByDeviceId': requestedByDeviceId,
+      'status': 'pending',
+      'requestedAt': FieldValue.serverTimestamp(),
+    });
+    return doc.id;
+  }
+
+  static Future<String> sendScreenShareRequest(
+    String targetDeviceId,
+    String requestedByDeviceId,
+  ) async {
+    final doc = firestore.collection(screenshotRequestsCollection).doc();
+    await doc.set({
+      'requestId': doc.id,
+      'requestType': 'screen_share',
       'targetDeviceId': targetDeviceId,
       'requestedByDeviceId': requestedByDeviceId,
       'status': 'pending',
@@ -92,48 +132,140 @@ class AdminService {
   }
 
   static Future<void> fulfillScreenshotRequest(String requestId) async {
-    final screenshotBytes = await AppScreenshotService.captureScreenshot();
-    if (screenshotBytes == null) {
-      await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
-        'status': 'failed',
-        'error': 'Could not capture screenshot',
-        'completedAt': FieldValue.serverTimestamp(),
-      });
+    final uploadedUrl = await _captureAndUploadCurrentFrame();
+    if (uploadedUrl == null) {
+      await firestore
+          .collection(screenshotRequestsCollection)
+          .doc(requestId)
+          .update({
+            'status': 'failed',
+            'error': 'Could not capture screenshot',
+            'completedAt': FieldValue.serverTimestamp(),
+          });
       return;
     }
 
-    final url = await _uploadToCloudinary(screenshotBytes);
-    if (url == null) {
-      await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
-        'status': 'failed',
-        'error': 'Cloudinary upload failed',
-        'completedAt': FieldValue.serverTimestamp(),
-      });
-      return;
-    }
-
-    await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
-      'status': 'completed',
-      'screenshotUrl': url,
-      'completedAt': FieldValue.serverTimestamp(),
-    });
+    await firestore
+        .collection(screenshotRequestsCollection)
+        .doc(requestId)
+        .update({
+          'status': 'completed',
+          'screenshotUrl': uploadedUrl,
+          'completedAt': FieldValue.serverTimestamp(),
+        });
   }
 
-  static Future<String?> _uploadToCloudinary(Uint8List bytes) async {
-    if (cloudinaryCloudName.contains('<') || cloudinaryUploadPreset.contains('<')) {
-      debugPrint('Cloudinary configuration is missing. Please set cloudinaryCloudName and cloudinaryUploadPreset in AdminService.');
+  static Future<void> fulfillScreenShareRequest(String requestId) async {
+    if (_liveShareTimers.containsKey(requestId)) {
+      return;
+    }
+
+    await firestore
+        .collection(screenshotRequestsCollection)
+        .doc(requestId)
+        .update({
+          'status': 'active',
+          'startedAt': FieldValue.serverTimestamp(),
+        });
+
+    final timer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      final uploadedUrl = await _captureAndUploadCurrentFrame();
+      if (uploadedUrl != null) {
+        await firestore
+            .collection(screenshotRequestsCollection)
+            .doc(requestId)
+            .update({
+              'status': 'live',
+              'screenshotUrl': uploadedUrl,
+              'lastUpdatedAt': FieldValue.serverTimestamp(),
+            });
+      }
+    });
+
+    _liveShareTimers[requestId] = timer;
+  }
+
+  static Future<void> stopScreenShareRequest(String requestId) async {
+    _liveShareTimers.remove(requestId)?.cancel();
+    await firestore
+        .collection(screenshotRequestsCollection)
+        .doc(requestId)
+        .update({
+          'status': 'stopped',
+          'stoppedAt': FieldValue.serverTimestamp(),
+        });
+  }
+
+  static Future<String?> _captureAndUploadCurrentFrame() async {
+    if (platformName == 'android') {
+      final completer = Completer<String?>();
+      AndroidScreenCapture.setOnCaptureComplete((path) async {
+        if (path == null) {
+          completer.complete(null);
+          return;
+        }
+        try {
+          final file = File(path);
+          final bytes = await file.readAsBytes();
+          final uploaded = await _uploadToCloudinary(bytes);
+          completer.complete(uploaded);
+        } catch (e) {
+          completer.complete(null);
+        }
+      });
+
+      final started = await AndroidScreenCapture.startCaptureNow();
+      if (started) {
+        final uploadedUrl = await completer.future.timeout(
+          const Duration(seconds: 12),
+          onTimeout: () => null,
+        );
+        if (uploadedUrl != null) {
+          return uploadedUrl;
+        }
+      }
+    }
+
+    final screenshotBytes = await AppScreenshotService.captureScreenshot();
+    if (screenshotBytes == null) {
       return null;
     }
 
-    final uri = Uri.parse('https://api.cloudinary.com/v1_1/$cloudinaryCloudName/image/upload');
+    return _uploadToCloudinary(screenshotBytes);
+  }
+
+  static Future<String?> _uploadToCloudinary(Uint8List bytes) async {
+    if (cloudinaryCloudName.isEmpty ||
+        cloudinaryApiKey.isEmpty ||
+        cloudinaryApiSecret.isEmpty) {
+      debugPrint(
+        'Cloudinary configuration is missing. Please set cloudinaryCloudName, cloudinaryApiKey, and cloudinaryApiSecret in AdminService.',
+      );
+      return null;
+    }
+
+    final uri = Uri.parse(
+      'https://api.cloudinary.com/v1_1/$cloudinaryCloudName/image/upload',
+    );
     final base64Data = base64Encode(bytes);
-    final response = await http.post(uri, body: {
-      'file': 'data:image/png;base64,$base64Data',
-      'upload_preset': cloudinaryUploadPreset,
-    });
+    final timestamp = (DateTime.now().millisecondsSinceEpoch / 1000).floor();
+    final signatureInput = 'timestamp=$timestamp$cloudinaryApiSecret';
+    final signature = sha1.convert(utf8.encode(signatureInput)).toString();
+
+    final response = await http.post(
+      uri,
+      body: {
+        'file': 'data:image/png;base64,$base64Data',
+        'api_key': cloudinaryApiKey,
+        'timestamp': timestamp.toString(),
+        'signature': signature,
+      },
+    );
 
     if (response.statusCode != 200 && response.statusCode != 201) {
-      debugPrint('Cloudinary upload failed: ${response.statusCode} ${response.body}');
+      debugPrint(
+        'Cloudinary upload failed: ${response.statusCode} ${response.body}',
+      );
       return null;
     }
 

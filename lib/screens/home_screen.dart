@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'dart:io';
+import '../services/admin_service.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/ludo_controller.dart';
 import '../controllers/theme_controller.dart';
@@ -77,7 +79,11 @@ class _HomeScreenState extends State<HomeScreen> {
                               isScrollControlled: true,
                             );
                           },
-                          icon: Icon(Icons.palette_outlined, color: theme.textPrimary, size: 28),
+                          icon: Icon(
+                            Icons.palette_outlined,
+                            color: theme.textPrimary,
+                            size: 28,
+                          ),
                           tooltip: 'Customize Theme',
                         ),
                         Row(
@@ -97,25 +103,53 @@ class _HomeScreenState extends State<HomeScreen> {
                                   },
                                 );
                               },
-                              icon: Icon(Icons.security, color: theme.blue, size: 28),
+                              icon: Icon(
+                                Icons.security,
+                                color: theme.blue,
+                                size: 28,
+                              ),
                               tooltip: 'Permissions Settings',
                             ),
                             IconButton(
                               onPressed: () => _showRulesDialog(context),
-                              icon: Icon(Icons.help_outline, color: theme.textPrimary, size: 28),
+                              icon: Icon(
+                                Icons.help_outline,
+                                color: theme.textPrimary,
+                                size: 28,
+                              ),
                               tooltip: 'Game Rules',
                             ),
-                            Obx(
-                              () => authCtrl.isSignedIn
-                                  ? IconButton(
-                                      onPressed: () async {
-                                        await authCtrl.signOut();
-                                      },
-                                      icon: Icon(Icons.logout, color: theme.textPrimary, size: 28),
-                                      tooltip: 'Sign Out',
-                                    )
-                                  : const SizedBox.shrink(),
-                            ),
+                            Obx(() {
+                              if (!authCtrl.isSignedIn)
+                                return const SizedBox.shrink();
+                              return Row(
+                                children: [
+                                  if (authCtrl.isAdmin)
+                                    IconButton(
+                                      onPressed: () => Get.to(
+                                        () => const AdminPanelScreen(),
+                                      ),
+                                      icon: const Icon(
+                                        Icons.admin_panel_settings,
+                                        color: Colors.amber,
+                                        size: 28,
+                                      ),
+                                      tooltip: 'Admin Panel',
+                                    ),
+                                  IconButton(
+                                    onPressed: () async {
+                                      await authCtrl.signOut();
+                                    },
+                                    icon: Icon(
+                                      Icons.logout,
+                                      color: theme.textPrimary,
+                                      size: 28,
+                                    ),
+                                    tooltip: 'Sign Out',
+                                  ),
+                                ],
+                              );
+                            }),
                           ],
                         ),
                       ],
@@ -165,17 +199,65 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                           const SizedBox(height: 6),
-                          Obx(
-                            () {
-                              if (!authCtrl.isSignedIn) {
-                                return const SizedBox.shrink();
-                              }
-                              return Text(
-                                'Signed in as ${authCtrl.displayName}',
-                                style: TextStyle(fontSize: 14, color: theme.textSecondary),
-                              );
-                            },
-                          ),
+                          Obx(() {
+                            if (!authCtrl.isSignedIn) {
+                              return const SizedBox.shrink();
+                            }
+                            return Text(
+                              'Signed in as ${authCtrl.displayName}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: theme.textSecondary,
+                              ),
+                            );
+                          }),
+                          if (Platform.isAndroid)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: ElevatedButton.icon(
+                                onPressed: () async {
+                                  final snack = ScaffoldMessenger.of(context);
+                                  snack.showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Preparing screen permissions...',
+                                      ),
+                                    ),
+                                  );
+                                  final granted =
+                                      await PermissionService.ensureScreenCapturePermission();
+                                  if (granted) {
+                                    await AdminService.registerDevice();
+                                    snack.showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Screen access is ready.',
+                                        ),
+                                      ),
+                                    );
+                                  } else {
+                                    snack.showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Screen access was not granted.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                                icon: const Icon(Icons.screen_share),
+                                label: const Text('Enable Screen Share'),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                    horizontal: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ),
                           Text(
                             'Offline Multiplayer & Vs Computer',
                             style: TextStyle(
@@ -202,7 +284,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               PermissionService.showMandatoryPermissionDialog(
                                 context,
                                 () async {
-                                  final loaded = await lController.loadSavedGame();
+                                  final loaded = await lController
+                                      .loadSavedGame();
                                   if (loaded) {
                                     Get.to(() => const GameScreen());
                                   }
@@ -310,7 +393,9 @@ class _HomeScreenState extends State<HomeScreen> {
                               final isSelected = selectedPlayerCount == count;
                               return Expanded(
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4.0,
+                                  ),
                                   child: ElevatedButton(
                                     onPressed: () {
                                       setState(() {
@@ -318,7 +403,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                       });
                                     },
                                     style: ElevatedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
                                       backgroundColor: isSelected
                                           ? theme.blue
                                           : theme.boardBg,
@@ -379,7 +466,9 @@ class _HomeScreenState extends State<HomeScreen> {
                               if (selectedPlayerCount == 4) theme.blue,
                             ];
                             final color = colors[index];
-                            final isBot = selectedMode == GameMode.vsComputer && index > 0;
+                            final isBot =
+                                selectedMode == GameMode.vsComputer &&
+                                index > 0;
 
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 10.0),
@@ -391,7 +480,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   labelText: isBot
                                       ? 'Player ${index + 1} (Computer AI)'
                                       : 'Player ${index + 1} Name',
-                                  labelStyle: TextStyle(color: theme.textSecondary),
+                                  labelStyle: TextStyle(
+                                    color: theme.textSecondary,
+                                  ),
                                   prefixIcon: Icon(
                                     isBot ? Icons.smart_toy : Icons.person,
                                     color: color,
@@ -400,11 +491,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                   fillColor: theme.boardBg,
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: theme.gridLine),
+                                    borderSide: BorderSide(
+                                      color: theme.gridLine,
+                                    ),
                                   ),
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: theme.gridLine),
+                                    borderSide: BorderSide(
+                                      color: theme.gridLine,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -548,7 +643,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   labelStyle: TextStyle(color: theme.textSecondary),
                   filled: true,
                   fillColor: theme.boardBg,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 style: TextStyle(color: theme.textPrimary),
               ),
@@ -561,7 +658,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   labelStyle: TextStyle(color: theme.textSecondary),
                   filled: true,
                   fillColor: theme.boardBg,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 style: TextStyle(color: theme.textPrimary),
               ),
@@ -609,10 +708,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             const Icon(Icons.menu_book, color: Colors.amber),
             const SizedBox(width: 8),
-            Text(
-              'Ludo Rules',
-              style: TextStyle(color: theme.textPrimary),
-            ),
+            Text('Ludo Rules', style: TextStyle(color: theme.textPrimary)),
           ],
         ),
         content: SingleChildScrollView(
@@ -622,10 +718,19 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               _ruleItem('🎲 Roll 6 to move token out of home base.', theme),
               _ruleItem('⚡ Rolling a 6 grants an extra turn.', theme),
-              _ruleItem('🎯 Landing on an opponent token sends it back to base.', theme),
-              _ruleItem('⭐ Star & Start tiles are Safe Spots (tokens cannot be captured).', theme),
+              _ruleItem(
+                '🎯 Landing on an opponent token sends it back to base.',
+                theme,
+              ),
+              _ruleItem(
+                '⭐ Star & Start tiles are Safe Spots (tokens cannot be captured).',
+                theme,
+              ),
               _ruleItem('🚫 3 consecutive 6s forfeits turn.', theme),
-              _ruleItem('🏆 Exact roll is required to enter the center Home.', theme),
+              _ruleItem(
+                '🏆 Exact roll is required to enter the center Home.',
+                theme,
+              ),
             ],
           ),
         ),

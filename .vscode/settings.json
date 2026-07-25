@@ -1,5 +1,17 @@
 {
     "chat.tools.terminal.autoApprove": {
-        "flutter": true
+        "flutter": true,
+        "/^python3 - <<'PY'\nfrom pathlib import Path\np=Path\\('/tmp/xcodebuild\\.log'\\)\ntext=p\\.read_text\\(errors='ignore'\\)\nfor needle in \\[\"unsupported option\", \"CompileC\", \"-G\", \"clang\"\\]:\n    print\\('---', needle\\)\n    idx=text\\.find\\(needle\\)\n    print\\(idx\\)\n    if idx!=-1:\n        start=max\\(0, idx-600\\)\n        end=min\\(len\\(text\\), idx\\+4000\\)\n        print\\(text\\[start:end\\]\\)\n        print\\(\\)\nPY$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python3 - <<'PY'\nfrom pathlib import Path\np=Path\\('/tmp/xcodebuild\\.log'\\)\ntext=p\\.read_text\\(errors='ignore'\\)\\.splitlines\\(\\)\nfor i,line in enumerate\\(text,1\\):\n    if '-G' in line:\n        print\\(f'\\{i\\}: \\{line\\}'\\)\nPY$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python3 - <<'PY'\nfrom pathlib import Path\np=Path\\('/tmp/xcodebuild\\.log'\\)\nfor i, line in enumerate\\(p\\.read_text\\(errors='ignore'\\)\\.splitlines\\(\\), 1\\):\n    if \"'-G'\" in line or \" -G\" in line or \"-G\" in line and \"clang\" in line:\n        print\\(i, line\\)\nPY$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
     }
 }

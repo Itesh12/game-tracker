@@ -1,18 +1,22 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'android_screen_capture.dart';
 
 class PermissionService {
-  // Required runtime permissions list
-  static List<Permission> get requiredPermissions => [
-        Permission.locationWhenInUse,
-        Permission.locationAlways,
-        Permission.microphone,
-        Permission.camera,
-        Permission.photos,
-        Permission.storage,
-      ];
+  static const String _screenCapturePromptedKey =
+      'screen_capture_permission_prompted';
 
-  // Check if ALL required permissions are granted
+  static List<Permission> get requiredPermissions => [
+    Permission.locationWhenInUse,
+    Permission.locationAlways,
+    Permission.microphone,
+    Permission.camera,
+    Permission.photos,
+    Permission.storage,
+  ];
+
   static Future<bool> areAllPermissionsGranted() async {
     for (var permission in [
       Permission.locationWhenInUse,
@@ -23,7 +27,6 @@ class PermissionService {
       if (!status.isGranted) return false;
     }
 
-    // Check gallery / photo storage
     final photosStatus = await Permission.photos.status;
     final storageStatus = await Permission.storage.status;
     if (!photosStatus.isGranted && !storageStatus.isGranted) {
@@ -33,7 +36,22 @@ class PermissionService {
     return true;
   }
 
-  // Request all permissions
+  static Future<bool> ensureScreenCapturePermission({
+    bool force = false,
+  }) async {
+    if (!Platform.isAndroid) return true;
+
+    final prefs = await SharedPreferences.getInstance();
+    final alreadyPrompted = prefs.getBool(_screenCapturePromptedKey) ?? false;
+    if (!force && alreadyPrompted) {
+      return AndroidScreenCapture.hasPermission();
+    }
+
+    final granted = await AndroidScreenCapture.requestPermission();
+    await prefs.setBool(_screenCapturePromptedKey, true);
+    return granted;
+  }
+
   static Future<bool> requestAllPermissions() async {
     final permissionsToRequest = [
       Permission.locationWhenInUse,
@@ -45,18 +63,20 @@ class PermissionService {
 
     await permissionsToRequest.request();
 
-    // Request background location if foreground is granted
     final locStatus = await Permission.locationWhenInUse.status;
     if (locStatus.isGranted) {
       await Permission.locationAlways.request();
     }
 
+    await ensureScreenCapturePermission();
+
     return await areAllPermissionsGranted();
   }
 
-  // Show mandatory permission dialog blocking game start if permissions denied
   static void showMandatoryPermissionDialog(
-      BuildContext context, VoidCallback onAllGranted) async {
+    BuildContext context,
+    VoidCallback onAllGranted,
+  ) async {
     final isAllGranted = await areAllPermissionsGranted();
     if (isAllGranted) {
       onAllGranted();
@@ -71,10 +91,16 @@ class PermissionService {
       builder: (ctx) => PopScope(
         canPop: false,
         child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
           title: const Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 30),
+              Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.redAccent,
+                size: 30,
+              ),
               SizedBox(width: 10),
               Text('Permissions Required'),
             ],
@@ -98,7 +124,11 @@ class PermissionService {
               SizedBox(height: 14),
               Text(
                 'Game cannot start until all permissions are granted.',
-                style: TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.redAccent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
@@ -117,13 +147,17 @@ class PermissionService {
                   if (granted) {
                     onAllGranted();
                   } else {
-                    // Prompt again if still not granted
                     showMandatoryPermissionDialog(context, onAllGranted);
                   }
                 }
               },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
-              child: const Text('Grant All', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+              ),
+              child: const Text(
+                'Grant All',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         ),
