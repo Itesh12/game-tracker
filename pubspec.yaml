@@ -33,9 +33,9 @@ dependencies:
 
   # State management and navigation
   get: ^4.6.6
-  firebase_core: ^2.14.0
-  firebase_auth: ^4.9.0
-  cloud_firestore: ^4.9.0
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.1
+  cloud_firestore: ^5.4.4
   http: ^1.6.0
   crypto: ^3.0.2
 
