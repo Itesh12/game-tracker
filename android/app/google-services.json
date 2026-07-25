@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "699704230231",
+    "project_id": "hikeitup-7e03c",
+    "storage_bucket": "hikeitup-7e03c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:699704230231:android:4fa4bf584a740456d2fe12",
+        "android_client_info": {
+          "package_name": "com.example.game_tracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDMUv8iR6-rhCtfXRbKMbnKq1f03gPJ9wM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:699704230231:android:978b584d4b377f8dd2fe12",
+        "android_client_info": {
+          "package_name": "com.example.hike_it_up"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDMUv8iR6-rhCtfXRbKMbnKq1f03gPJ9wM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:699704230231:android:c7957308a00297ced2fe12",
+        "android_client_info": {
+          "package_name": "com.example.practicaltask"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDMUv8iR6-rhCtfXRbKMbnKq1f03gPJ9wM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

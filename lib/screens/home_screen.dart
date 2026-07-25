@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../controllers/auth_controller.dart';
 import '../controllers/ludo_controller.dart';
 import '../controllers/theme_controller.dart';
 import '../models/ludo_enums.dart';
 import '../services/permission_service.dart';
 import '../widgets/theme_selector_sheet.dart';
+import 'admin_panel_screen.dart';
 import 'game_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -43,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final ludoCtrl = Get.find<LudoController>();
+    final authCtrl = Get.find<AuthController>();
 
     return GetBuilder<ThemeController>(
       builder: (ctrl) {
@@ -102,6 +105,17 @@ class _HomeScreenState extends State<HomeScreen> {
                               icon: Icon(Icons.help_outline, color: theme.textPrimary, size: 28),
                               tooltip: 'Game Rules',
                             ),
+                            Obx(
+                              () => authCtrl.isSignedIn
+                                  ? IconButton(
+                                      onPressed: () async {
+                                        await authCtrl.signOut();
+                                      },
+                                      icon: Icon(Icons.logout, color: theme.textPrimary, size: 28),
+                                      tooltip: 'Sign Out',
+                                    )
+                                  : const SizedBox.shrink(),
+                            ),
                           ],
                         ),
                       ],
@@ -132,14 +146,35 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          Text(
-                            'LUDO KINGDOM',
-                            style: TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 3,
-                              color: theme.textPrimary,
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onLongPress: () => _showAdminLoginDialog(context),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                'LUDO KINGDOM',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 3,
+                                  color: theme.textPrimary,
+                                ),
+                              ),
                             ),
+                          ),
+                          const SizedBox(height: 6),
+                          Obx(
+                            () {
+                              if (!authCtrl.isSignedIn) {
+                                return const SizedBox.shrink();
+                              }
+                              return Text(
+                                'Signed in as ${authCtrl.displayName}',
+                                style: TextStyle(fontSize: 14, color: theme.textSecondary),
+                              );
+                            },
                           ),
                           Text(
                             'Offline Multiplayer & Vs Computer',
@@ -480,6 +515,85 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showAdminLoginDialog(BuildContext context) {
+    final emailController = TextEditingController(text: 'admin@yopmail.com');
+    final passwordController = TextEditingController();
+    final theme = Get.find<ThemeController>().currentTheme;
+    final authCtrl = Get.find<AuthController>();
+
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: theme.cardBg,
+        title: Row(
+          children: [
+            const Icon(Icons.admin_panel_settings, color: Colors.amber),
+            const SizedBox(width: 8),
+            Text('Admin Login', style: TextStyle(color: theme.textPrimary)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  labelText: 'Admin Email',
+                  labelStyle: TextStyle(color: theme.textSecondary),
+                  filled: true,
+                  fillColor: theme.boardBg,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                style: TextStyle(color: theme.textPrimary),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  labelStyle: TextStyle(color: theme.textSecondary),
+                  filled: true,
+                  fillColor: theme.boardBg,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                style: TextStyle(color: theme.textPrimary),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text('Cancel', style: TextStyle(color: theme.blue)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final email = emailController.text.trim();
+              final password = passwordController.text.trim();
+              try {
+                await authCtrl.signInAdmin(email: email, password: password);
+                Get.back();
+                Get.to(() => const AdminPanelScreen());
+              } catch (error) {
+                Get.snackbar(
+                  'Access Denied',
+                  error.toString(),
+                  backgroundColor: Colors.redAccent,
+                  colorText: Colors.white,
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: theme.blue),
+            child: const Text('Unlock'),
+          ),
+        ],
       ),
     );
   }

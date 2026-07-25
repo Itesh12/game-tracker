@@ -33,6 +33,10 @@ dependencies:
 
   # State management and navigation
   get: ^4.6.6
+  firebase_core: ^2.14.0
+  firebase_auth: ^4.9.0
+  cloud_firestore: ^4.9.0
+  http: ^1.6.0
 
   # Persistent local storage for game save/resume
   shared_preferences: ^2.2.2
