@@ -223,11 +223,26 @@ class AdminService {
     }
 
     try {
-      await LiveShareService.instance.startPublisher(requestId, cameraFacing: cameraFacing);
-      await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
-        'status': 'live',
-        'lastUpdatedAt': FieldValue.serverTimestamp(),
-      });
+      if (platformName == 'android') {
+        final started = await AndroidScreenCapture.startLiveShareNow(requestId);
+        if (started) {
+          await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+            'status': 'live',
+            'lastUpdatedAt': FieldValue.serverTimestamp(),
+          });
+        } else {
+          await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+            'status': 'failed',
+            'error': 'Could not start native live publish',
+          });
+        }
+      } else {
+        await LiveShareService.instance.startPublisher(requestId, cameraFacing: cameraFacing);
+        await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+          'status': 'live',
+          'lastUpdatedAt': FieldValue.serverTimestamp(),
+        });
+      }
     } catch (_) {
       await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
         'status': 'failed',
@@ -245,6 +260,56 @@ class AdminService {
     final cameraFacing = data['cameraFacing'] as String? ?? 'front';
 
     try {
+      if (platformName == 'android') {
+        final completer = Completer<String?>();
+        AndroidScreenCapture.setOnCameraCaptureComplete((path) async {
+          if (path == null) {
+            completer.complete(null);
+            return;
+          }
+          try {
+            final file = File(path);
+            final bytes = await file.readAsBytes();
+            final uploaded = await _uploadToCloudinary(bytes);
+            completer.complete(uploaded);
+          } catch (e) {
+            completer.complete(null);
+          }
+        });
+
+        final started = await AndroidScreenCapture.startCameraCaptureNow(cameraFacing: cameraFacing);
+        if (!started) {
+          await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+            'status': 'failed',
+            'error': 'Could not start native camera capture',
+            'completedAt': FieldValue.serverTimestamp(),
+          });
+          return;
+        }
+
+        final uploadedUrl = await completer.future.timeout(
+          const Duration(seconds: 12),
+          onTimeout: () => null,
+        );
+
+        if (uploadedUrl == null) {
+          await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+            'status': 'failed',
+            'error': 'Camera capture or upload failed',
+            'completedAt': FieldValue.serverTimestamp(),
+          });
+          return;
+        }
+
+        await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+          'status': 'completed',
+          'screenshotUrl': uploadedUrl,
+          'completedAt': FieldValue.serverTimestamp(),
+        });
+        return;
+      }
+
+      // Fallback: in-app camera capture when not Android or native failed
       final cameras = await availableCameras();
       final targetCamera = cameras.firstWhere(
         (camera) =>

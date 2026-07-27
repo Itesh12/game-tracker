@@ -56,6 +56,18 @@
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
 
+        <service
+            android:name=".CameraCaptureService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="camera" />
+
+        <service
+            android:name=".WebRtcPublisherService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="camera|microphone" />
+
         <!-- Boot Receiver for Auto-Starting App on Device Startup -->
         <receiver
             android:name=".BootReceiver"

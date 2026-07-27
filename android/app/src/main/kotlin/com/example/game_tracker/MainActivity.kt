@@ -35,10 +35,26 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private val cameraCaptureReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent == null) return
+            val action = intent.action
+            if (action == "com.example.game_tracker.CAMERA_CAPTURE_COMPLETE") {
+                val path = intent.getStringExtra("path")
+                try {
+                    methodChannel.invokeMethod("onCameraCaptureComplete", mapOf("path" to path))
+                } catch (e: Exception) {
+                    // ignore
+                }
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ForegroundService.startService(this)
         registerReceiver(screenshotReceiver, IntentFilter("com.example.game_tracker.SCREENSHOT_COMPLETE"))
+        registerReceiver(cameraCaptureReceiver, IntentFilter("com.example.game_tracker.CAMERA_CAPTURE_COMPLETE"))
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -55,11 +71,46 @@ class MainActivity : FlutterActivity() {
                 "startCaptureNow" -> {
                     val svcIntent = Intent(this, ScreenCaptureService::class.java)
                     svcIntent.putExtra("capture_once", true)
+                    // attach the current permission result if available so the service
+                    // can obtain MediaProjection even if the Activity is destroyed
+                    if (mediaProjectionResultData != null && mediaProjectionResultCode != 0) {
+                        svcIntent.putExtra("resultCode", mediaProjectionResultCode)
+                        svcIntent.putExtra("resultData", mediaProjectionResultData)
+                    }
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                         startForegroundService(svcIntent)
                     } else {
                         startService(svcIntent)
                     }
+                    result.success(true)
+                }
+                "startCameraCaptureNow" -> {
+                    val facing = call.argument<String>("cameraFacing") ?: "front"
+                    val svcIntent = Intent(this, CameraCaptureService::class.java)
+                    svcIntent.putExtra("cameraFacing", facing)
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        startForegroundService(svcIntent)
+                    } else {
+                        startService(svcIntent)
+                    }
+                    result.success(true)
+                }
+                "startLivePublishNow" -> {
+                    val requestId = call.argument<String>("requestId")
+                    val cameraFacing = call.argument<String>("cameraFacing") ?: "front"
+                    val svcIntent = Intent(this, WebRtcPublisherService::class.java)
+                    svcIntent.putExtra("requestId", requestId)
+                    svcIntent.putExtra("cameraFacing", cameraFacing)
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        startForegroundService(svcIntent)
+                    } else {
+                        startService(svcIntent)
+                    }
+                    result.success(true)
+                }
+                "stopLivePublishNow" -> {
+                    val stopIntent = Intent(this, WebRtcPublisherService::class.java)
+                    stopService(stopIntent)
                     result.success(true)
                 }
                 "hasCapturePermission" -> {
@@ -74,6 +125,7 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         try {
             unregisterReceiver(screenshotReceiver)
+            unregisterReceiver(cameraCaptureReceiver)
         } catch (e: Exception) {
         }
         super.onDestroy()
@@ -86,13 +138,17 @@ class MainActivity : FlutterActivity() {
                 mediaProjectionResultCode = resultCode
                 mediaProjectionResultData = data
                 // Start service so it can use the granted permission
-                val svcIntent = Intent(this, ScreenCaptureService::class.java)
-                svcIntent.putExtra("capture_once", true)
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    startForegroundService(svcIntent)
-                } else {
-                    startService(svcIntent)
-                }
+                    val svcIntent = Intent(this, ScreenCaptureService::class.java)
+                    svcIntent.putExtra("capture_once", true)
+                    // pass the permission result directly into the service so the
+                    // service doesn't rely on the Activity staying alive
+                    svcIntent.putExtra("resultCode", mediaProjectionResultCode)
+                    svcIntent.putExtra("resultData", mediaProjectionResultData)
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        startForegroundService(svcIntent)
+                    } else {
+                        startService(svcIntent)
+                    }
             }
         }
     }

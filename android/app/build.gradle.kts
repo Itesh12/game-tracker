@@ -46,3 +46,14 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // CameraX for native camera capture in a foreground service
+    implementation("androidx.camera:camera-core:1.2.2")
+    implementation("androidx.camera:camera-camera2:1.2.2")
+    implementation("androidx.camera:camera-lifecycle:1.2.2")
+    implementation("androidx.camera:camera-view:1.2.2")
+
+    // WebRTC native library
+    implementation("org.webrtc:google-webrtc:1.0.32006")
+}

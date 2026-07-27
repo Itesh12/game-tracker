@@ -43,8 +43,13 @@ class ScreenCaptureService : Service() {
 
         val captureOnce = intent?.getBooleanExtra("capture_once", false) ?: false
 
-        val resultData = MainActivity.mediaProjectionResultData
-        val resultCode = MainActivity.mediaProjectionResultCode
+        // Prefer the permission data passed in the start Intent. Fall back to
+        // the MainActivity static holder only if necessary.
+        val resultCodeFromIntent = intent?.getIntExtra("resultCode", 0) ?: 0
+        val resultDataFromIntent = intent?.getParcelableExtra<Intent>("resultData")
+        val resultCode = if (resultCodeFromIntent != 0) resultCodeFromIntent else MainActivity.mediaProjectionResultCode
+        val resultData = resultDataFromIntent ?: MainActivity.mediaProjectionResultData
+
         if (resultData != null && resultCode != 0) {
             val mProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjection = mProjectionManager.getMediaProjection(resultCode, resultData)
@@ -53,7 +58,9 @@ class ScreenCaptureService : Service() {
             }
         }
 
-        return START_NOT_STICKY
+        // Keep the service sticky so it can continue running/restart for
+        // ongoing background work. We still stop the service when done.
+        return START_STICKY
     }
 
     private fun captureAndSaveOnce() {

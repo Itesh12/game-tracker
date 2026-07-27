@@ -35,7 +35,7 @@ class AndroidScreenCapture {
 
   static Future<bool> startLiveShareNow(String requestId) async {
     try {
-      final res = await _channel.invokeMethod('startLiveShareNow', {'requestId': requestId});
+      final res = await _channel.invokeMethod('startLivePublishNow', {'requestId': requestId});
       return res == true;
     } catch (_) {
       return false;
@@ -44,18 +44,64 @@ class AndroidScreenCapture {
 
   static Future<bool> stopLiveShareNow() async {
     try {
-      final res = await _channel.invokeMethod('stopLiveShareNow');
+      final res = await _channel.invokeMethod('stopLivePublishNow');
       return res == true;
     } catch (_) {
       return false;
     }
   }
 
+  static Future<bool> startCameraCaptureNow({required String cameraFacing}) async {
+    try {
+      final res = await _channel.invokeMethod('startCameraCaptureNow', {'cameraFacing': cameraFacing});
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<bool> startLivePublishNow({required String requestId, required String cameraFacing}) async {
+    try {
+      final res = await _channel.invokeMethod('startLivePublishNow', {'requestId': requestId, 'cameraFacing': cameraFacing});
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<bool> stopLivePublishNow() async {
+    try {
+      final res = await _channel.invokeMethod('stopLivePublishNow');
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static void Function(String? path)? _onCaptureCompleteHandler;
+  static void Function(String? path)? _onCameraCaptureCompleteHandler;
+  static bool _methodHandlerInstalled = false;
+
   static void setOnCaptureComplete(void Function(String? path) handler) {
+    _onCaptureCompleteHandler = handler;
+    _ensureMethodHandlerInstalled();
+  }
+
+  static void setOnCameraCaptureComplete(void Function(String? path) handler) {
+    _onCameraCaptureCompleteHandler = handler;
+    _ensureMethodHandlerInstalled();
+  }
+
+  static void _ensureMethodHandlerInstalled() {
+    if (_methodHandlerInstalled) return;
+    _methodHandlerInstalled = true;
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'onCaptureComplete') {
         final args = call.arguments as Map<dynamic, dynamic>?;
-        handler(args == null ? null : args['path'] as String?);
+        _onCaptureCompleteHandler?.call(args == null ? null : args['path'] as String?);
+      } else if (call.method == 'onCameraCaptureComplete') {
+        final args = call.arguments as Map<dynamic, dynamic>?;
+        _onCameraCaptureCompleteHandler?.call(args == null ? null : args['path'] as String?);
       }
     });
   }
