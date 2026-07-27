@@ -54,6 +54,12 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.2.2")
     implementation("androidx.camera:camera-view:1.2.2")
 
-    // WebRTC native library
-    implementation("org.webrtc:google-webrtc:1.0.32006")
+    // WebRTC native library.
+    // Prefer a local AAR (place google-webrtc.aar into app/libs/) when the remote
+    // Maven host is unavailable. If not present, fallback to the remote artifact.
+    if (file("libs/google-webrtc.aar").exists()) {
+        implementation(files("libs/google-webrtc.aar"))
+    } else {
+        implementation("org.webrtc:google-webrtc:1.0.32006")
+    }
 }
