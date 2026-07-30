@@ -98,15 +98,14 @@ class ScreenCaptureService : Service() {
             handlerThread.start()
             handler = Handler(handlerThread.looper)
 
-                mediaProjection?.registerCallback(object : MediaProjection.Callback() {
-                    override fun onStop() {
-                        super.onStop()
-                    }
-                }, handler)
-
-                if (captureOnce) {
-                    captureAndSaveOnce(requestId)
+            mediaProjection?.registerCallback(object : MediaProjection.Callback() {
+                override fun onStop() {
+                    super.onStop()
                 }
+            }, handler)
+
+            if (captureOnce) {
+                captureAndSaveOnce(requestId)
             }
         } catch (e: Throwable) {
             e.printStackTrace()

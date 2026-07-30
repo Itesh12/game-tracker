@@ -151,6 +151,16 @@ class ForegroundService : Service() {
         }
     }
 
+    private fun markBackgroundAttempt(requestId: String) {
+        try {
+            FirebaseFirestore.getInstance().collection("screenshot_requests").document(requestId).update(
+                mapOf("backgroundAttemptedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp())
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     private fun setupFirestoreRequestListener() {
         if (firestoreListener != null) return
 
