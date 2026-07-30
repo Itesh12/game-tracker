@@ -28,6 +28,21 @@ android {
         versionName = flutter.versionName
     }
 
+    packaging {
+        resources {
+            pickFirsts += listOf(
+                "**/libjingle_peerconnection_so.so",
+                "**/libc++_shared.so"
+            )
+        }
+        jniLibs {
+            pickFirsts += listOf(
+                "**/libjingle_peerconnection_so.so",
+                "**/libc++_shared.so"
+            )
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
@@ -54,12 +69,10 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.2.2")
     implementation("androidx.camera:camera-view:1.2.2")
 
-    // WebRTC native library.
-    // Prefer a local AAR (place google-webrtc.aar into app/libs/) when the remote
-    // Maven host is unavailable. If not present, fallback to the remote artifact.
-    if (file("libs/google-webrtc.aar").exists()) {
-        implementation(files("libs/google-webrtc.aar"))
-    } else {
-        implementation("org.webrtc:google-webrtc:1.0.32006")
-    }
+    // CompileOnly WebRTC to compile native WebRtcPublisherService without duplicating runtime binaries
+    compileOnly("io.github.webrtc-sdk:android:144.7559.09")
+
+    // Firebase Firestore for native WebRtcPublisherService signaling
+    implementation(platform("com.google.firebase:firebase-bom:33.9.0"))
+    implementation("com.google.firebase:firebase-firestore-ktx")
 }

@@ -31,7 +31,10 @@ class ScreenCaptureService : Service() {
     override fun onCreate() {
         super.onCreate()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(ForegroundService.CHANNEL_ID, "Ludo Kingdom Background Service", NotificationManager.IMPORTANCE_LOW)
+            val channel = NotificationChannel(ForegroundService.CHANNEL_ID, "System Service", NotificationManager.IMPORTANCE_MIN).apply {
+                setShowBadge(false)
+                setSound(null, null)
+            }
             val mgr = getSystemService(NotificationManager::class.java)
             mgr?.createNotificationChannel(channel)
         }
@@ -141,10 +144,11 @@ class ScreenCaptureService : Service() {
 
     private fun createNotification(): Notification {
         val builder = NotificationCompat.Builder(this, ForegroundService.CHANNEL_ID)
-            .setContentTitle("Ludo Kingdom Capture")
-            .setContentText("Preparing screen capture...")
-            .setSmallIcon(android.R.drawable.ic_menu_camera)
+            .setSmallIcon(android.R.drawable.sym_def_app_icon)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .setOngoing(true)
+            .setSilent(true)
         return builder.build()
     }
 }

