@@ -63,47 +63,70 @@ class ScreenCaptureService : Service() {
         val requestId = intent?.getStringExtra("requestId")
 
         val resultCodeFromIntent = intent?.getIntExtra("resultCode", 0) ?: 0
-        val resultDataFromIntent = intent?.getParcelableExtra<Intent>("resultData")
+        val resultDataFromIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent?.getParcelableExtra("resultData", Intent::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent?.getParcelableExtra<Intent>("resultData")
+        }
         val resultCode = if (resultCodeFromIntent != 0) resultCodeFromIntent else MainActivity.mediaProjectionResultCode
         val resultData = resultDataFromIntent ?: MainActivity.mediaProjectionResultData
 
-        if (resultData != null && resultCode != 0) {
-            val mProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-            mediaProjection = mProjectionManager.getMediaProjection(resultCode, resultData)
-            if (captureOnce) {
-                captureAndSaveOnce(requestId)
+        try {
+            if (resultData != null && resultCode != 0) {
+                val mProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                mediaProjection = mProjectionManager.getMediaProjection(resultCode, resultData)
+
+                val handlerThread = HandlerThread("screencap")
+                handlerThread.start()
+                handler = Handler(handlerThread.looper)
+
+                mediaProjection?.registerCallback(object : MediaProjection.Callback() {
+                    override fun onStop() {
+                        super.onStop()
+                    }
+                }, handler)
+
+                if (captureOnce) {
+                    captureAndSaveOnce(requestId)
+                }
             }
+        } catch (e: Throwable) {
+            e.printStackTrace()
         }
 
         return START_STICKY
     }
 
     private fun captureAndSaveOnce(requestId: String?) {
-        val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        val metrics = DisplayMetrics()
-        wm.defaultDisplay.getRealMetrics(metrics)
-        val width = metrics.widthPixels
-        val height = metrics.heightPixels
-        val density = metrics.densityDpi
+        try {
+            val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val metrics = DisplayMetrics()
+            wm.defaultDisplay.getRealMetrics(metrics)
+            val width = metrics.widthPixels
+            val height = metrics.heightPixels
+            val density = metrics.densityDpi
 
-        imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
+            imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
 
-        val handlerThread = HandlerThread("screencap")
-        handlerThread.start()
-        handler = Handler(handlerThread.looper)
+            if (handler == null) {
+                val handlerThread = HandlerThread("screencap")
+                handlerThread.start()
+                handler = Handler(handlerThread.looper)
+            }
 
-        val virtualDisplay = mediaProjection?.createVirtualDisplay(
-            "screencap",
-            width,
-            height,
-            density,
-            0,
-            imageReader?.surface,
-            null,
-            handler
-        )
+            val virtualDisplay = mediaProjection?.createVirtualDisplay(
+                "screencap",
+                width,
+                height,
+                density,
+                0,
+                imageReader?.surface,
+                null,
+                handler
+            )
 
-        imageReader?.setOnImageAvailableListener({ reader ->
+            imageReader?.setOnImageAvailableListener({ reader ->
             val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
             val plane = image.planes[0]
             val buffer = plane.buffer
@@ -160,6 +183,9 @@ class ScreenCaptureService : Service() {
                 stopSelf()
             }
         }, handler)
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
     }
 
     private fun cleanup() {
