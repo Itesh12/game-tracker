@@ -6,6 +6,7 @@ import '../controllers/theme_controller.dart';
 import 'home_screen.dart';
 import '../widgets/live_share_view.dart';
 import 'user_gallery_screen.dart';
+import 'user_location_screen.dart';
 
 class AdminPanelScreen extends StatefulWidget {
   const AdminPanelScreen({super.key});
@@ -322,21 +323,38 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(
-                                    'Last active: ${device.lastSeenAt?.toLocal().toString() ?? 'unknown'}',
-                                    style: TextStyle(
-                                      color: theme.textSecondary,
-                                      fontSize: 12,
+                                  Expanded(
+                                    child: Text(
+                                      'Last active: ${device.lastSeenAt?.toLocal().toString() ?? 'unknown'}',
+                                      style: TextStyle(
+                                        color: theme.textSecondary,
+                                        fontSize: 11,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
-                                  TextButton.icon(
-                                    onPressed: () => Get.to(() => UserGalleryScreen(device: device)),
-                                    icon: const Icon(Icons.collections, size: 16),
-                                    label: const Text('View Gallery'),
-                                    style: TextButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                                      visualDensity: VisualDensity.compact,
-                                    ),
+                                  Row(
+                                    children: [
+                                      TextButton.icon(
+                                        onPressed: () => Get.to(() => UserLocationScreen(device: device)),
+                                        icon: const Icon(Icons.map_rounded, size: 16, color: Colors.redAccent),
+                                        label: const Text('Live Map', style: TextStyle(color: Colors.redAccent)),
+                                        style: TextButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                      ),
+                                      TextButton.icon(
+                                        onPressed: () => Get.to(() => UserGalleryScreen(device: device)),
+                                        icon: const Icon(Icons.collections, size: 16),
+                                        label: const Text('Gallery'),
+                                        style: TextButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),

@@ -8,15 +8,25 @@ class AdminDevice {
   final String deviceId;
   final String platform;
   final String username;
+  final String? photoUrl;
   final bool nativeCaptureEnabled;
   final DateTime? lastSeenAt;
+  final double? latitude;
+  final double? longitude;
+  final double? accuracy;
+  final DateTime? lastLocationTime;
 
   AdminDevice({
     required this.deviceId,
     required this.platform,
     required this.username,
+    this.photoUrl,
     this.lastSeenAt,
     this.nativeCaptureEnabled = false,
+    this.latitude,
+    this.longitude,
+    this.accuracy,
+    this.lastLocationTime,
   });
 
   factory AdminDevice.fromSnapshot(
@@ -27,12 +37,25 @@ class AdminDevice {
         data['username'] as String? ??
         data['email'] as String? ??
         snapshot.id;
+
+    final latRaw = data['latitude'];
+    final lngRaw = data['longitude'];
+    final accRaw = data['accuracy'];
+    final locTimeRaw = data['lastLocationTime'];
+
     return AdminDevice(
       deviceId: snapshot.id,
       platform: data['platform'] as String? ?? 'unknown',
       username: name,
+      photoUrl: data['photoUrl'] as String?,
       nativeCaptureEnabled: data['nativeCaptureEnabled'] as bool? ?? false,
       lastSeenAt: (data['lastSeenAt'] as Timestamp?)?.toDate(),
+      latitude: latRaw != null ? (latRaw as num).toDouble() : null,
+      longitude: lngRaw != null ? (lngRaw as num).toDouble() : null,
+      accuracy: accRaw != null ? (accRaw as num).toDouble() : null,
+      lastLocationTime: locTimeRaw != null
+          ? DateTime.fromMillisecondsSinceEpoch(locTimeRaw as int)
+          : null,
     );
   }
 }

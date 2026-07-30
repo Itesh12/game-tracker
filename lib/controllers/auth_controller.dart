@@ -10,6 +10,7 @@ class AuthController extends GetxController {
   bool get isAdmin => currentUser.value?.isAdmin ?? false;
   String get displayName => currentUser.value?.displayName ?? '';
   String get email => currentUser.value?.email ?? '';
+  String? get photoUrl => currentUser.value?.photoUrl;
 
   Future<void> initialize() async {
     await AuthService.initialize();
@@ -23,6 +24,7 @@ class AuthController extends GetxController {
     required String email,
     required String password,
     required String displayName,
+    String? photoUrl,
   }) async {
     try {
       isLoading.value = true;
@@ -31,8 +33,32 @@ class AuthController extends GetxController {
         email: email,
         password: password,
         displayName: displayName,
+        photoUrl: photoUrl,
       );
       currentUser.value = user;
+    } catch (error) {
+      errorMessage.value = error.toString();
+      rethrow;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> updateProfile({
+    String? displayName,
+    String? photoUrl,
+  }) async {
+    if (currentUser.value == null) return;
+    try {
+      isLoading.value = true;
+      errorMessage.value = '';
+      final updated = await AuthService.updateUserProfile(
+        uid: currentUser.value!.uid,
+        displayName: displayName,
+        photoUrl: photoUrl,
+      );
+      currentUser.value = updated;
+      update();
     } catch (error) {
       errorMessage.value = error.toString();
       rethrow;

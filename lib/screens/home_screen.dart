@@ -12,6 +12,7 @@ import '../widgets/theme_selector_sheet.dart';
 import 'admin_panel_screen.dart';
 import 'game_screen.dart';
 import 'room_lobby_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -127,6 +128,17 @@ class _HomeScreenState extends State<HomeScreen> {
                               }
                               return Row(
                                 children: [
+                                  IconButton(
+                                    onPressed: () => Get.to(
+                                      () => const ProfileScreen(),
+                                    ),
+                                    icon: Icon(
+                                      Icons.account_circle,
+                                      color: theme.blue,
+                                      size: 28,
+                                    ),
+                                    tooltip: 'My Profile',
+                                  ),
                                   if (authCtrl.isAdmin)
                                     IconButton(
                                       onPressed: () => Get.to(

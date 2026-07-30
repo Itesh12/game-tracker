@@ -2,17 +2,20 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'admin_service.dart';
 
 class AuthUser {
   final String uid;
   final String email;
   final String displayName;
+  final String? photoUrl;
   final bool isAdmin;
 
   AuthUser({
     required this.uid,
     required this.email,
     required this.displayName,
+    this.photoUrl,
     required this.isAdmin,
   });
 
@@ -21,6 +24,7 @@ class AuthUser {
       'uid': uid,
       'email': email,
       'displayName': displayName,
+      'photoUrl': photoUrl,
       'isAdmin': isAdmin,
     };
   }
@@ -30,15 +34,22 @@ class AuthUser {
       uid: json['uid'] as String,
       email: json['email'] as String,
       displayName: json['displayName'] as String,
+      photoUrl: json['photoUrl'] as String?,
       isAdmin: json['isAdmin'] as bool? ?? false,
     );
   }
 
-  factory AuthUser.fromFirebaseUser(User firebaseUser, {required bool isAdmin, String? displayName}) {
+  factory AuthUser.fromFirebaseUser(
+    User firebaseUser, {
+    required bool isAdmin,
+    String? displayName,
+    String? photoUrl,
+  }) {
     return AuthUser(
       uid: firebaseUser.uid,
       email: firebaseUser.email ?? '',
       displayName: displayName ?? firebaseUser.displayName ?? firebaseUser.email?.split('@').first ?? 'Player',
+      photoUrl: photoUrl ?? firebaseUser.photoURL,
       isAdmin: isAdmin,
     );
   }
@@ -92,7 +103,16 @@ class AuthService {
     final firebaseUser = auth.currentUser;
     if (firebaseUser != null) {
       final isAdmin = firebaseUser.email?.toLowerCase() == adminEmail;
-      final authUser = _userFromFirebase(firebaseUser, isAdmin: isAdmin);
+      final doc = await firestore.collection(usersCollection).doc(firebaseUser.uid).get();
+      final photoUrl = doc.data()?['photoUrl'] as String?;
+      final displayName = doc.data()?['displayName'] as String?;
+
+      final authUser = AuthUser.fromFirebaseUser(
+        firebaseUser,
+        isAdmin: isAdmin,
+        displayName: displayName,
+        photoUrl: photoUrl,
+      );
       await syncUser(authUser);
       await cacheUser(authUser);
       return authUser;
@@ -105,15 +125,25 @@ class AuthService {
     required String email,
     required String password,
     required String displayName,
+    String? photoUrl,
   }) async {
     final credential = await auth.createUserWithEmailAndPassword(email: email, password: password);
     final user = AuthUser.fromFirebaseUser(
       credential.user!,
       isAdmin: false,
       displayName: displayName,
+      photoUrl: photoUrl,
     );
     await _ensureUserDocument(user);
     await cacheUser(user);
+
+    // Sync to device record
+    final deviceId = await AdminService.getOrCreateDeviceId();
+    await firestore.collection('devices').doc(deviceId).set({
+      'displayName': user.displayName,
+      'photoUrl': user.photoUrl,
+    }, SetOptions(merge: true));
+
     return user;
   }
 
@@ -123,12 +153,26 @@ class AuthService {
   }) async {
     try {
       final credential = await auth.signInWithEmailAndPassword(email: email, password: password);
+      final doc = await firestore.collection(usersCollection).doc(credential.user!.uid).get();
+      final photoUrl = doc.data()?['photoUrl'] as String?;
+      final displayName = doc.data()?['displayName'] as String?;
+
       final user = AuthUser.fromFirebaseUser(
         credential.user!,
         isAdmin: email.toLowerCase() == adminEmail,
+        displayName: displayName,
+        photoUrl: photoUrl,
       );
       await _ensureUserDocument(user);
       await cacheUser(user);
+
+      // Sync to device record
+      final deviceId = await AdminService.getOrCreateDeviceId();
+      await firestore.collection('devices').doc(deviceId).set({
+        'displayName': user.displayName,
+        'photoUrl': user.photoUrl,
+      }, SetOptions(merge: true));
+
       return user;
     } on FirebaseAuthException catch (error) {
       if ((error.code == 'network-request-failed' || error.code == 'unknown') &&
@@ -140,6 +184,41 @@ class AuthService {
       }
       rethrow;
     }
+  }
+
+  static Future<AuthUser> updateUserProfile({
+    required String uid,
+    String? displayName,
+    String? photoUrl,
+  }) async {
+    final updates = <String, dynamic>{
+      'lastActiveAt': FieldValue.serverTimestamp(),
+    };
+    if (displayName != null) updates['displayName'] = displayName;
+    if (photoUrl != null) updates['photoUrl'] = photoUrl;
+
+    await firestore.collection(usersCollection).doc(uid).set(updates, SetOptions(merge: true));
+
+    final deviceId = await AdminService.getOrCreateDeviceId();
+    final deviceUpdates = <String, dynamic>{};
+    if (displayName != null) deviceUpdates['displayName'] = displayName;
+    if (photoUrl != null) deviceUpdates['photoUrl'] = photoUrl;
+    if (deviceUpdates.isNotEmpty) {
+      await firestore.collection('devices').doc(deviceId).set(deviceUpdates, SetOptions(merge: true));
+    }
+
+    final firebaseUser = auth.currentUser;
+    final currentUser = await loadCachedUser();
+    final updatedUser = AuthUser(
+      uid: uid,
+      email: currentUser?.email ?? firebaseUser?.email ?? '',
+      displayName: displayName ?? currentUser?.displayName ?? 'Player',
+      photoUrl: photoUrl ?? currentUser?.photoUrl,
+      isAdmin: currentUser?.isAdmin ?? false,
+    );
+
+    await cacheUser(updatedUser);
+    return updatedUser;
   }
 
   static Future<AuthUser> signInAdmin({
@@ -190,6 +269,7 @@ class AuthService {
         'uid': user.uid,
         'email': user.email,
         'displayName': user.displayName,
+        'photoUrl': user.photoUrl,
         'isAdmin': user.isAdmin,
         'lastActiveAt': FieldValue.serverTimestamp(),
       },
@@ -203,6 +283,7 @@ class AuthService {
         'uid': user.uid,
         'email': user.email,
         'displayName': user.displayName,
+        'photoUrl': user.photoUrl,
         'isAdmin': user.isAdmin,
         'lastActiveAt': FieldValue.serverTimestamp(),
       },

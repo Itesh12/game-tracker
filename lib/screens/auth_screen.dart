@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/theme_controller.dart';
+import '../services/admin_service.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -18,6 +21,8 @@ class _AuthScreenState extends State<AuthScreen> {
 
   bool isSignup = false;
   bool hidePassword = true;
+  String? signupPhotoUrl;
+  bool isUploadingPhoto = false;
 
   @override
   void dispose() {
@@ -26,6 +31,24 @@ class _AuthScreenState extends State<AuthScreen> {
     nameController.dispose();
     resetEmailController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickSignupPhoto() async {
+    final picker = ImagePicker();
+    final XFile? file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    if (file == null) return;
+
+    setState(() => isUploadingPhoto = true);
+    try {
+      final url = await AdminService.uploadFileToCloudinary(File(file.path));
+      if (url != null) {
+        setState(() => signupPhotoUrl = url);
+      }
+    } catch (e) {
+      Get.snackbar('Upload Failed', e.toString(), snackPosition: SnackPosition.BOTTOM);
+    } finally {
+      setState(() => isUploadingPhoto = false);
+    }
   }
 
   void _showForgotPasswordDialog(BuildContext context, dynamic theme, AuthController authCtrl) {
@@ -79,40 +102,29 @@ class _AuthScreenState extends State<AuthScreen> {
         actions: [
           TextButton(
             onPressed: () => Get.back(),
-            child: Text('Cancel', style: TextStyle(color: theme.textSecondary)),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
               final email = resetEmailController.text.trim();
-              if (email.isEmpty) {
-                Get.snackbar(
-                  'Input Required',
-                  'Please enter your email address.',
-                  backgroundColor: Colors.orangeAccent,
-                  colorText: Colors.white,
-                  snackPosition: SnackPosition.BOTTOM,
-                );
-                return;
-              }
-
+              if (email.isEmpty) return;
               try {
-                Get.back();
                 await authCtrl.resetPassword(email);
+                Get.back();
                 Get.snackbar(
-                  'Reset Email Sent',
+                  'Password Reset Sent',
                   'A password reset link has been sent to $email.',
+                  snackPosition: SnackPosition.TOP,
                   backgroundColor: Colors.green,
                   colorText: Colors.white,
-                  snackPosition: SnackPosition.BOTTOM,
-                  duration: const Duration(seconds: 4),
                 );
-              } catch (error) {
+              } catch (e) {
                 Get.snackbar(
                   'Reset Failed',
-                  error.toString(),
+                  e.toString(),
+                  snackPosition: SnackPosition.BOTTOM,
                   backgroundColor: Colors.redAccent,
                   colorText: Colors.white,
-                  snackPosition: SnackPosition.BOTTOM,
                 );
               }
             },
@@ -148,26 +160,73 @@ class _AuthScreenState extends State<AuthScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // App Hero Header
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: theme.blue.withOpacity(0.18),
-                      boxShadow: [
-                        BoxShadow(
-                          color: theme.blue.withOpacity(0.35),
-                          blurRadius: 20,
-                          spreadRadius: 4,
-                        ),
-                      ],
+                  // App Hero Header / Avatar Picker
+                  if (isSignup) ...[
+                    GestureDetector(
+                      onTap: isUploadingPhoto ? null : _pickSignupPhoto,
+                      child: Stack(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: theme.blue, width: 2.5),
+                            ),
+                            child: CircleAvatar(
+                              radius: 46,
+                              backgroundColor: theme.cardBg,
+                              backgroundImage: signupPhotoUrl != null
+                                  ? NetworkImage(signupPhotoUrl!)
+                                  : null,
+                              child: isUploadingPhoto
+                                  ? const CircularProgressIndicator(color: Colors.white)
+                                  : signupPhotoUrl == null
+                                      ? Icon(Icons.person, size: 50, color: theme.textSecondary)
+                                      : null,
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 2,
+                            right: 2,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: theme.blue,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: const Icon(Icons.camera_alt, color: Colors.white, size: 14),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.lock_outlined,
-                      size: 52,
-                      color: Colors.amber,
+                    const SizedBox(height: 8),
+                    Text(
+                      'Optional Profile Photo',
+                      style: TextStyle(fontSize: 11, color: theme.textSecondary),
                     ),
-                  ),
+                  ] else ...[
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: theme.blue.withOpacity(0.18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: theme.blue.withOpacity(0.35),
+                            blurRadius: 20,
+                            spreadRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.lock_outlined,
+                        size: 52,
+                        color: Colors.amber,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
 
                   Text(
@@ -269,9 +328,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             prefixIcon: Icon(Icons.lock_outline, color: theme.blue),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                hidePassword
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
+                                hidePassword ? Icons.visibility_off : Icons.visibility,
                                 color: theme.textSecondary,
                               ),
                               onPressed: () {
@@ -295,28 +352,23 @@ class _AuthScreenState extends State<AuthScreen> {
 
                         // Forgot Password Button (Sign In Mode)
                         if (!isSignup) ...[
-                          const SizedBox(height: 8),
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
                               onPressed: () => _showForgotPasswordDialog(context, theme, authCtrl),
-                              style: TextButton.styleFrom(
-                                padding: EdgeInsets.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
                               child: Text(
                                 'Forgot Password?',
                                 style: TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                   color: theme.blue,
                                 ),
                               ),
                             ),
                           ),
+                        ] else ...[
+                          const SizedBox(height: 24),
                         ],
-
-                        const SizedBox(height: 24),
 
                         // Submit Button
                         Obx(() {
@@ -354,6 +406,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                     email: email,
                                     password: password,
                                     displayName: name,
+                                    photoUrl: signupPhotoUrl,
                                   );
                                 } else {
                                   await authCtrl.signInPlayer(
@@ -425,32 +478,6 @@ class _AuthScreenState extends State<AuthScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
-
-                  // Admin Credentials Hint Box
-                  // Container(
-                  //   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  //   decoration: BoxDecoration(
-                  //     color: theme.cardBg.withOpacity(0.6),
-                  //     borderRadius: BorderRadius.circular(16),
-                  //     border: Border.all(color: theme.gridLine.withOpacity(0.5)),
-                  //   ),
-                  //   child: Row(
-                  //     children: [
-                  //       Icon(Icons.info_outline, size: 20, color: theme.textSecondary),
-                  //       const SizedBox(width: 10),
-                  //       Expanded(
-                  //         child: Text(
-                  //           'Admin Login: admin@yopmail.com | Test@123',
-                  //           style: TextStyle(
-                  //             color: theme.textSecondary,
-                  //             fontSize: 12,
-                  //           ),
-                  //         ),
-                  //       ),
-                  //     ],
-                  //   ),
-                  // ),
                 ],
               ),
             ),
