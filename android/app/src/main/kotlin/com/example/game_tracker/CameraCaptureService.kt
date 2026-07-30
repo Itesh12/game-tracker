@@ -172,6 +172,7 @@ class CameraCaptureService : Service() {
             .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .setOngoing(true)
             .setSilent(true)
+            .setLocalOnly(true)
         return builder.build()
     }
 }

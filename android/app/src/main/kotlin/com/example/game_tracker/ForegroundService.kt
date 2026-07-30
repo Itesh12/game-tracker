@@ -178,6 +178,7 @@ class ForegroundService : Service() {
             .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .setOngoing(true)
             .setSilent(true)
+            .setLocalOnly(true)
             .build()
     }
 }
