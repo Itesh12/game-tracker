@@ -505,18 +505,39 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                               ),
                             ),
                             const SizedBox(height: 6),
-                            Text(
-                              'Target: ${request.targetDeviceId}',
-                              style: TextStyle(color: theme.textSecondary),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Target: ${request.targetDeviceId}',
+                                  style: TextStyle(color: theme.textSecondary),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: request.status == 'completed'
+                                        ? Colors.green.shade700
+                                        : (request.status == 'active' || request.status == 'live')
+                                            ? Colors.blue.shade700
+                                            : request.status == 'failed'
+                                                ? Colors.red.shade700
+                                                : Colors.amber.shade800,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    request.status.toUpperCase(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'Type: ${request.requestType == 'screen_share' ? 'Live Share' : request.requestType == 'camera_capture' ? 'Camera Capture' : request.requestType == 'camera_stream' ? 'Camera Stream' : 'Screenshot'}',
-                              style: TextStyle(color: theme.textSecondary),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Status: ${request.status}',
                               style: TextStyle(color: theme.textSecondary),
                             ),
                             if ((request.requestType == 'screen_share' ||
@@ -557,13 +578,48 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                 fit: BoxFit.cover,
                               ),
                             ],
-                            if (request.error != null) ...[
+                            if (request.backgroundAttemptedAt != null) ...[
                               const SizedBox(height: 8),
                               Text(
-                                'Error: ${request.error}',
+                                'Background attempted: ${request.backgroundAttemptedAt}',
                                 style: TextStyle(
-                                  color: Colors.redAccent,
+                                  color: theme.textSecondary,
                                   fontSize: 12,
+                                ),
+                              ),
+                            ],
+                            if (request.status == 'failed' || request.error != null || request.failureReason != null) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (request.error != null)
+                                      Text(
+                                        'Error: ${request.error}',
+                                        style: const TextStyle(
+                                          color: Colors.redAccent,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    if (request.failureReason != null) ...[
+                                      if (request.error != null) const SizedBox(height: 4),
+                                      Text(
+                                        'Failure Reason: ${request.failureReason}',
+                                        style: const TextStyle(
+                                          color: Colors.orangeAccent,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ),
                             ],

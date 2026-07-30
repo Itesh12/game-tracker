@@ -69,7 +69,9 @@ class ScreenshotRequestItem {
   final String? screenshotUrl;
   final DateTime? requestedAt;
   final DateTime? completedAt;
+  final DateTime? backgroundAttemptedAt;
   final String? error;
+  final String? failureReason;
 
   ScreenshotRequestItem({
     required this.requestId,
@@ -80,7 +82,9 @@ class ScreenshotRequestItem {
     this.screenshotUrl,
     this.requestedAt,
     this.completedAt,
+    this.backgroundAttemptedAt,
     this.error,
+    this.failureReason,
   });
 
   factory ScreenshotRequestItem.fromSnapshot(
@@ -96,7 +100,9 @@ class ScreenshotRequestItem {
       screenshotUrl: data['screenshotUrl'] as String?,
       requestedAt: (data['requestedAt'] as Timestamp?)?.toDate(),
       completedAt: (data['completedAt'] as Timestamp?)?.toDate(),
+      backgroundAttemptedAt: (data['backgroundAttemptedAt'] as Timestamp?)?.toDate(),
       error: data['error'] as String?,
+      failureReason: data['failureReason'] as String?,
     );
   }
 }

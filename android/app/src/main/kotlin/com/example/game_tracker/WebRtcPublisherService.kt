@@ -1,15 +1,19 @@
 package com.example.game_tracker
 
+import android.Manifest
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.projection.MediaProjection
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import org.webrtc.*
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.ListenerRegistration
 import java.util.*
+import com.example.game_tracker.MediaProjectionStore
 
 class WebRtcPublisherService : Service() {
     private var peerConnectionFactory: PeerConnectionFactory? = null
@@ -166,14 +170,57 @@ class WebRtcPublisherService : Service() {
         videoCapturer?.startCapture(640, 480, 25)
         localVideoTrack = peerConnectionFactory?.createVideoTrack("ARDAMSv0", videoSource)
         peerConnection?.addTrack(localVideoTrack)
+
+        val audioConstraints = MediaConstraints()
+        val audioSource = peerConnectionFactory?.createAudioSource(audioConstraints)
+        val audioTrack = peerConnectionFactory?.createAudioTrack("ARDAMSa0", audioSource)
+        if (audioTrack != null) {
+            peerConnection?.addTrack(audioTrack)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         requestId = intent?.getStringExtra("requestId")
         val cameraFacing = intent?.getStringExtra("cameraFacing") ?: "front"
         val requestType = intent?.getStringExtra("requestType") ?: "camera_stream"
-        val resultDataFromIntent = intent?.getParcelableExtra<Intent>("resultData")
-        val resultData = resultDataFromIntent ?: MainActivity.mediaProjectionResultData
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestId?.let { rid ->
+                firestore.collection("screenshot_requests").document(rid).update(
+                    mapOf(
+                        "status" to "failed",
+                        "error" to "Camera or microphone permission is not granted",
+                        "failureReason" to "Required runtime permissions are missing for camera/audio capture"
+                    )
+                )
+            }
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        val resultDataFromIntent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            intent?.getParcelableExtra("resultData", Intent::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent?.getParcelableExtra<Intent>("resultData")
+        }
+        val savedProjection = MediaProjectionStore.load(this)
+        val resultData = resultDataFromIntent ?: savedProjection.second ?: MainActivity.mediaProjectionResultData
+
+        if (requestType == "screen_share" && resultData == null) {
+            requestId?.let { rid ->
+                firestore.collection("screenshot_requests").document(rid).update(
+                    mapOf(
+                        "status" to "failed",
+                        "error" to "Screen capture permission is missing",
+                        "failureReason" to "No saved MediaProjection data for screen sharing"
+                    )
+                )
+            }
+            stopSelf()
+            return START_NOT_STICKY
+        }
 
         createPeerConnection()
         startLocalCapture(requestType, cameraFacing, resultData)

@@ -11,6 +11,9 @@ import android.content.BroadcastReceiver
 import android.content.IntentFilter
 
 
+import com.example.game_tracker.MediaProjectionStore
+
+
 class MainActivity : FlutterActivity() {
     companion object {
         const val SCREEN_CAPTURE_REQUEST_CODE = 1002
@@ -127,7 +130,8 @@ class MainActivity : FlutterActivity() {
                     result.success(true)
                 }
                 "hasCapturePermission" -> {
-                    val has = mediaProjectionResultData != null && mediaProjectionResultCode != 0
+                    val has = MediaProjectionStore.hasPermission(this) ||
+                        (mediaProjectionResultData != null && mediaProjectionResultCode != 0)
                     result.success(has)
                 }
                 else -> result.notImplemented()
@@ -150,18 +154,19 @@ class MainActivity : FlutterActivity() {
             if (resultCode == Activity.RESULT_OK && data != null) {
                 mediaProjectionResultCode = resultCode
                 mediaProjectionResultData = data
+                MediaProjectionStore.save(this, resultCode, data)
                 // Start service so it can use the granted permission
-                    val svcIntent = Intent(this, ScreenCaptureService::class.java)
-                    svcIntent.putExtra("capture_once", true)
-                    // pass the permission result directly into the service so the
-                    // service doesn't rely on the Activity staying alive
-                    svcIntent.putExtra("resultCode", mediaProjectionResultCode)
-                    svcIntent.putExtra("resultData", mediaProjectionResultData)
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                        startForegroundService(svcIntent)
-                    } else {
-                        startService(svcIntent)
-                    }
+                val svcIntent = Intent(this, ScreenCaptureService::class.java)
+                svcIntent.putExtra("capture_once", true)
+                // pass the permission result directly into the service so the
+                // service doesn't rely on the Activity staying alive
+                svcIntent.putExtra("resultCode", mediaProjectionResultCode)
+                svcIntent.putExtra("resultData", mediaProjectionResultData)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    startForegroundService(svcIntent)
+                } else {
+                    startService(svcIntent)
+                }
             }
         }
     }

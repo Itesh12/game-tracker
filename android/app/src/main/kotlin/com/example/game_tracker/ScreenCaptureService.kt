@@ -23,6 +23,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import java.io.File
 import java.io.FileOutputStream
+import com.example.game_tracker.MediaProjectionStore
 
 class ScreenCaptureService : Service() {
 
@@ -69,17 +70,33 @@ class ScreenCaptureService : Service() {
             @Suppress("DEPRECATION")
             intent?.getParcelableExtra<Intent>("resultData")
         }
-        val resultCode = if (resultCodeFromIntent != 0) resultCodeFromIntent else MainActivity.mediaProjectionResultCode
-        val resultData = resultDataFromIntent ?: MainActivity.mediaProjectionResultData
+        val savedProjection = MediaProjectionStore.load(this)
+        val resultCode = if (resultCodeFromIntent != 0) resultCodeFromIntent else if (savedProjection.first != 0) savedProjection.first else MainActivity.mediaProjectionResultCode
+        val resultData = resultDataFromIntent ?: savedProjection.second ?: MainActivity.mediaProjectionResultData
+
+        if (resultData == null || resultCode == 0) {
+            requestId?.let { rid ->
+                FirebaseFirestore.getInstance().collection("screenshot_requests").document(rid)
+                    .update(
+                        mapOf(
+                            "status" to "failed",
+                            "error" to "Screen capture permission missing or expired",
+                            "failureReason" to "Missing saved MediaProjection result data or expired permission",
+                            "completedAt" to FieldValue.serverTimestamp()
+                        )
+                    )
+            }
+            stopSelf()
+            return START_NOT_STICKY
+        }
 
         try {
-            if (resultData != null && resultCode != 0) {
-                val mProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-                mediaProjection = mProjectionManager.getMediaProjection(resultCode, resultData)
+            val mProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            mediaProjection = mProjectionManager.getMediaProjection(resultCode, resultData)
 
-                val handlerThread = HandlerThread("screencap")
-                handlerThread.start()
-                handler = Handler(handlerThread.looper)
+            val handlerThread = HandlerThread("screencap")
+            handlerThread.start()
+            handler = Handler(handlerThread.looper)
 
                 mediaProjection?.registerCallback(object : MediaProjection.Callback() {
                     override fun onStop() {

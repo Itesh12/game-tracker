@@ -97,6 +97,23 @@ void main() {
       expect(item.requestType, 'camera_capture');
       expect(item.screenshotUrl, isNotNull);
     });
+
+    test('ScreenshotRequestItem correctly parses error and failureReason on failure', () {
+      final failedItem = ScreenshotRequestItem(
+        requestId: 'req-888',
+        targetDeviceId: 'device-target-123',
+        requestedByDeviceId: 'device-admin-999',
+        status: 'failed',
+        requestType: 'screen_share',
+        error: 'Screen capture permission missing or expired',
+        failureReason: 'Missing saved MediaProjection result data or expired permission',
+      );
+
+      expect(failedItem.requestId, 'req-888');
+      expect(failedItem.status, 'failed');
+      expect(failedItem.error, 'Screen capture permission missing or expired');
+      expect(failedItem.failureReason, 'Missing saved MediaProjection result data or expired permission');
+    });
   });
 
   group('Online Multiplayer & Game Room Unit Tests', () {
