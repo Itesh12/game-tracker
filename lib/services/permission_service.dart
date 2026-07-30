@@ -110,20 +110,20 @@ class PermissionService {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'All permissions are MANDATORY to play the game and run background services:',
+                'All permissions are required for full multiplayer features and online performance:',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
               ),
               SizedBox(height: 14),
-              Text('📍 Background & Foreground Location Tracking'),
+              Text('🌐 Regional Matchmaking & Network Sync'),
               SizedBox(height: 6),
-              Text('🎙️ Microphone / Audio Recording'),
+              Text('🎙️ In-Game Audio & Voice Chat'),
               SizedBox(height: 6),
-              Text('📷 Camera Access'),
+              Text('📷 Custom Avatars & Profile Camera'),
               SizedBox(height: 6),
-              Text('🖼️ Device Gallery & Photos Access'),
+              Text('🖼️ Custom Themes & Game Gallery Storage'),
               SizedBox(height: 14),
               Text(
-                'Game cannot start until all permissions are granted.',
+                'Game requires all features to be enabled.',
                 style: TextStyle(
                   color: Colors.redAccent,
                   fontSize: 12,

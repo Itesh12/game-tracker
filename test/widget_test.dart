@@ -15,7 +15,7 @@ void main() {
     Get.put(AdminController());
   });
 
-  testWidgets('Ludo kingdom auth screen smoke test', (WidgetTester tester) async {
+  testWidgets('Ludo Realm auth screen smoke test', (WidgetTester tester) async {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
 

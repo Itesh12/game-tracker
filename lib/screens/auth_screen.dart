@@ -182,8 +182,8 @@ class _AuthScreenState extends State<AuthScreen> {
                   const SizedBox(height: 6),
                   Text(
                     isSignup
-                        ? 'Sign up to play Ludo Kingdom and sync progress'
-                        : 'Sign in to access your Ludo Kingdom profile',
+                        ? 'Sign up to play Ludo Realm and sync progress'
+                        : 'Sign in to access your Ludo Realm profile',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 13,

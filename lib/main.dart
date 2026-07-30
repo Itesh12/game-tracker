@@ -89,7 +89,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         return RepaintBoundary(
           key: AppScreenshotService.screenshotKey,
           child: GetMaterialApp(
-            title: 'Ludo Kingdom',
+            title: 'Ludo Realm',
             debugShowCheckedModeBanner: false,
             theme: ctrl.themeData,
             home: Obx(() {

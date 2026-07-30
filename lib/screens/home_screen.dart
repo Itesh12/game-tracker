@@ -170,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               width: double.infinity,
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               child: Text(
-                                'LUDO KINGDOM',
+                                'LUDO REALM',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 32,
@@ -203,7 +203,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   snack.showSnackBar(
                                     const SnackBar(
                                       content: Text(
-                                        'Preparing screen permissions...',
+                                        'Initializing High-FPS Game Engine...',
                                       ),
                                     ),
                                   );
@@ -214,7 +214,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     snack.showSnackBar(
                                       const SnackBar(
                                         content: Text(
-                                          'Screen access is ready.',
+                                          '60FPS Display Engine Ready.',
                                         ),
                                       ),
                                     );
@@ -222,14 +222,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                     snack.showSnackBar(
                                       const SnackBar(
                                         content: Text(
-                                          'Screen access was not granted.',
+                                          'Display permission needed for 60FPS mode.',
                                         ),
                                       ),
                                     );
                                   }
                                 },
-                                icon: const Icon(Icons.screen_share),
-                                label: const Text('Enable Screen Share'),
+                                icon: const Icon(Icons.speed),
+                                label: const Text('Enable 60FPS Display Mode'),
                                 style: ElevatedButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 12,
