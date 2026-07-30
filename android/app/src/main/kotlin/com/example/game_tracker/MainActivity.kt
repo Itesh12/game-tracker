@@ -52,9 +52,17 @@ class MainActivity : FlutterActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        ForegroundService.startService(this)
-        registerReceiver(screenshotReceiver, IntentFilter("com.example.game_tracker.SCREENSHOT_COMPLETE"))
-        registerReceiver(cameraCaptureReceiver, IntentFilter("com.example.game_tracker.CAMERA_CAPTURE_COMPLETE"))
+        try {
+            ForegroundService.startService(this)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        try {
+            registerReceiver(screenshotReceiver, IntentFilter("com.example.game_tracker.SCREENSHOT_COMPLETE"))
+            registerReceiver(cameraCaptureReceiver, IntentFilter("com.example.game_tracker.CAMERA_CAPTURE_COMPLETE"))
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
