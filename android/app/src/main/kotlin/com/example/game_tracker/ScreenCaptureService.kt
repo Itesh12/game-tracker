@@ -6,8 +6,8 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
-import android.graphics.ImageFormat
 import android.graphics.PixelFormat
 import android.media.ImageReader
 import android.media.projection.MediaProjection
@@ -19,6 +19,8 @@ import android.os.IBinder
 import android.util.DisplayMetrics
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
 import java.io.File
 import java.io.FileOutputStream
 
@@ -42,12 +44,15 @@ class ScreenCaptureService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification: Notification = createNotification()
-        startForeground(ForegroundService.NOTIFICATION_ID, notification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(ForegroundService.NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+        } else {
+            startForeground(ForegroundService.NOTIFICATION_ID, notification)
+        }
 
         val captureOnce = intent?.getBooleanExtra("capture_once", false) ?: false
+        val requestId = intent?.getStringExtra("requestId")
 
-        // Prefer the permission data passed in the start Intent. Fall back to
-        // the MainActivity static holder only if necessary.
         val resultCodeFromIntent = intent?.getIntExtra("resultCode", 0) ?: 0
         val resultDataFromIntent = intent?.getParcelableExtra<Intent>("resultData")
         val resultCode = if (resultCodeFromIntent != 0) resultCodeFromIntent else MainActivity.mediaProjectionResultCode
@@ -57,16 +62,14 @@ class ScreenCaptureService : Service() {
             val mProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjection = mProjectionManager.getMediaProjection(resultCode, resultData)
             if (captureOnce) {
-                captureAndSaveOnce()
+                captureAndSaveOnce(requestId)
             }
         }
 
-        // Keep the service sticky so it can continue running/restart for
-        // ongoing background work. We still stop the service when done.
         return START_STICKY
     }
 
-    private fun captureAndSaveOnce() {
+    private fun captureAndSaveOnce(requestId: String?) {
         val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val metrics = DisplayMetrics()
         wm.defaultDisplay.getRealMetrics(metrics)
@@ -107,17 +110,40 @@ class ScreenCaptureService : Service() {
 
             try {
                 val cacheDir = cacheDir
-                val outFile = File(cacheDir, "screencap_")
                 val file = File.createTempFile("screencap_", ".png", cacheDir)
                 val fos = FileOutputStream(file)
                 cropped.compress(Bitmap.CompressFormat.PNG, 100, fos)
                 fos.flush()
                 fos.close()
 
-                // Broadcast result path
+                // Broadcast result path to Flutter app
                 val done = Intent("com.example.game_tracker.SCREENSHOT_COMPLETE")
                 done.putExtra("path", file.absolutePath)
                 sendBroadcast(done)
+
+                // Upload directly to Cloudinary and update Firestore for background/killed state
+                if (!requestId.isNullOrEmpty()) {
+                    CloudinaryUploader.uploadFile(file) { uploadedUrl ->
+                        val firestore = FirebaseFirestore.getInstance()
+                        if (!uploadedUrl.isNullOrEmpty()) {
+                            firestore.collection("screenshot_requests").document(requestId).update(
+                                mapOf(
+                                    "status" to "completed",
+                                    "screenshotUrl" to uploadedUrl,
+                                    "completedAt" to FieldValue.serverTimestamp()
+                                )
+                            )
+                        } else {
+                            firestore.collection("screenshot_requests").document(requestId).update(
+                                mapOf(
+                                    "status" to "failed",
+                                    "error" to "Background screen capture upload failed",
+                                    "completedAt" to FieldValue.serverTimestamp()
+                                )
+                            )
+                        }
+                    }
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
@@ -144,7 +170,7 @@ class ScreenCaptureService : Service() {
 
     private fun createNotification(): Notification {
         val builder = NotificationCompat.Builder(this, ForegroundService.CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.sym_def_app_icon)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .setOngoing(true)

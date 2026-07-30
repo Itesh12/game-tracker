@@ -22,12 +22,21 @@ class WebRtcPublisherService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        startForeground(ForegroundService.NOTIFICATION_ID, createNotification())
+        val notification = createNotification()
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            startForeground(
+                ForegroundService.NOTIFICATION_ID,
+                notification,
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            )
+        } else {
+            startForeground(ForegroundService.NOTIFICATION_ID, notification)
+        }
         initializePeerFactory()
     }
 
     private fun createNotification() = NotificationCompat.Builder(this, ForegroundService.CHANNEL_ID)
-        .setSmallIcon(android.R.drawable.sym_def_app_icon)
+        .setSmallIcon(R.mipmap.ic_launcher)
         .setPriority(NotificationCompat.PRIORITY_MIN)
         .setVisibility(NotificationCompat.VISIBILITY_SECRET)
         .setOngoing(true)
