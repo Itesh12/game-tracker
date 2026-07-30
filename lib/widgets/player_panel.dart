@@ -49,12 +49,20 @@ class PlayerPanel extends StatelessWidget {
               shape: BoxShape.circle,
               color: playerColor,
               border: Border.all(color: Colors.white, width: 1.5),
+              image: player.photoUrl != null && player.photoUrl!.isNotEmpty
+                  ? DecorationImage(
+                      image: NetworkImage(player.photoUrl!),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
             ),
-            child: Icon(
-              player.isBot ? Icons.smart_toy : Icons.person,
-              size: 18,
-              color: Colors.white,
-            ),
+            child: (player.photoUrl == null || player.photoUrl!.isEmpty)
+                ? Icon(
+                    player.isBot ? Icons.smart_toy : Icons.person,
+                    size: 18,
+                    color: Colors.white,
+                  )
+                : null,
           ),
           const SizedBox(width: 8),
 

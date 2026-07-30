@@ -288,6 +288,7 @@ class LudoController extends GetxController {
         Player(
           color: color,
           name: roomP.name,
+          photoUrl: roomP.photoUrl,
           isBot: false,
         ),
       );
@@ -339,6 +340,7 @@ class LudoController extends GetxController {
       if (playerList != null && playerList.length == _players.length) {
         for (int i = 0; i < _players.length; i++) {
           _players[i].name = playerList[i].name;
+          _players[i].photoUrl = playerList[i].photoUrl;
           _players[i].rank = playerList[i].rank;
           for (int j = 0; j < _players[i].pawns.length; j++) {
             _players[i].pawns[j].step = playerList[i].pawns[j].step;

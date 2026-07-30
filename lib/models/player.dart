@@ -4,6 +4,7 @@ import 'pawn.dart';
 class Player {
   final PlayerColor color;
   String name;
+  String? photoUrl;
   final bool isBot;
   final List<Pawn> pawns;
   int? rank; // 1, 2, 3, 4 when finished
@@ -12,6 +13,7 @@ class Player {
   Player({
     required this.color,
     required this.name,
+    this.photoUrl,
     this.isBot = false,
     this.isActiveInGame = true,
     List<Pawn>? pawns,
@@ -33,6 +35,7 @@ class Player {
     return {
       'color': color.index,
       'name': name,
+      'photoUrl': photoUrl,
       'isBot': isBot,
       'isActiveInGame': isActiveInGame,
       'rank': rank,
@@ -44,6 +47,7 @@ class Player {
     return Player(
       color: PlayerColor.values[json['color'] as int],
       name: json['name'] as String,
+      photoUrl: json['photoUrl'] as String?,
       isBot: json['isBot'] as bool? ?? false,
       isActiveInGame: json['isActiveInGame'] as bool? ?? true,
       rank: json['rank'] as int?,

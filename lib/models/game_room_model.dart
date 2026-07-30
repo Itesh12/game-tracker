@@ -3,12 +3,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class GameRoomPlayer {
   final String uid;
   final String name;
+  final String? photoUrl;
   final int colorIndex;
   final bool isHost;
 
   GameRoomPlayer({
     required this.uid,
     required this.name,
+    this.photoUrl,
     required this.colorIndex,
     this.isHost = false,
   });
@@ -16,6 +18,7 @@ class GameRoomPlayer {
   Map<String, dynamic> toJson() => {
         'uid': uid,
         'name': name,
+        'photoUrl': photoUrl,
         'colorIndex': colorIndex,
         'isHost': isHost,
       };
@@ -23,6 +26,7 @@ class GameRoomPlayer {
   factory GameRoomPlayer.fromJson(Map<String, dynamic> json) => GameRoomPlayer(
         uid: json['uid'] as String? ?? '',
         name: json['name'] as String? ?? 'Player',
+        photoUrl: json['photoUrl'] as String?,
         colorIndex: json['colorIndex'] as int? ?? 0,
         isHost: json['isHost'] as bool? ?? false,
       );

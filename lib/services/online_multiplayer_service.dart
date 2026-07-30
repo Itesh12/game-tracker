@@ -20,6 +20,7 @@ class OnlineMultiplayerService {
     required int maxPlayers,
     required String hostName,
     required String hostUid,
+    String? hostPhotoUrl,
   }) async {
     String roomCode = generate6DigitCode();
     int attempts = 0;
@@ -34,6 +35,7 @@ class OnlineMultiplayerService {
     final hostPlayer = GameRoomPlayer(
       uid: hostUid,
       name: hostName.isEmpty ? 'Host' : hostName,
+      photoUrl: hostPhotoUrl,
       colorIndex: 0,
       isHost: true,
     );
@@ -72,6 +74,7 @@ class OnlineMultiplayerService {
     required String roomCode,
     required String playerName,
     required String playerUid,
+    String? photoUrl,
   }) async {
     final roomDocRef = _firestore.collection(roomCollection).doc(roomCode);
     final snapshot = await roomDocRef.get();
@@ -108,6 +111,7 @@ class OnlineMultiplayerService {
     final newPlayer = GameRoomPlayer(
       uid: playerUid,
       name: playerName.isEmpty ? 'Player ${room.players.length + 1}' : playerName,
+      photoUrl: photoUrl,
       colorIndex: nextColorIndex,
       isHost: false,
     );

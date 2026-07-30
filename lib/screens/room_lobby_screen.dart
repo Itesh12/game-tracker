@@ -232,11 +232,16 @@ class RoomLobbyScreen extends StatelessWidget {
                                   CircleAvatar(
                                     radius: 26,
                                     backgroundColor: hasPlayer ? slotColor : Colors.grey.shade800,
-                                    child: Icon(
-                                      hasPlayer ? Icons.person : Icons.person_outline,
-                                      color: Colors.white,
-                                      size: 28,
-                                    ),
+                                    backgroundImage: hasPlayer && player!.photoUrl != null && player.photoUrl!.isNotEmpty
+                                        ? NetworkImage(player.photoUrl!)
+                                        : null,
+                                    child: (!hasPlayer || player!.photoUrl == null || player.photoUrl!.isEmpty)
+                                        ? Icon(
+                                            hasPlayer ? Icons.person : Icons.person_outline,
+                                            color: Colors.white,
+                                            size: 28,
+                                          )
+                                        : null,
                                   ),
                                   const SizedBox(height: 10),
                                   Text(

@@ -765,10 +765,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
 
                   try {
+                    final photoUrl = Get.find<AuthController>().photoUrl;
                     final code = await OnlineMultiplayerService.createRoom(
                       maxPlayers: roomMaxPlayers,
                       hostName: name,
                       hostUid: uid,
+                      hostPhotoUrl: photoUrl,
                     );
                     Get.back();
                     Get.to(() => RoomLobbyScreen(roomCode: code, currentUid: uid));
@@ -884,10 +886,12 @@ class _HomeScreenState extends State<HomeScreen> {
               );
 
               try {
+                final photoUrl = Get.find<AuthController>().photoUrl;
                 await OnlineMultiplayerService.joinRoom(
                   roomCode: code,
                   playerName: name,
                   playerUid: uid,
+                  photoUrl: photoUrl,
                 );
                 Get.back();
                 Get.to(() => RoomLobbyScreen(roomCode: code, currentUid: uid));

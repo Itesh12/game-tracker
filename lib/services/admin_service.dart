@@ -407,6 +407,11 @@ class AdminService {
     return _uploadToCloudinary(screenshotBytes);
   }
 
+  static Future<String?> uploadFileToCloudinary(File file) async {
+    final bytes = await file.readAsBytes();
+    return _uploadToCloudinary(bytes);
+  }
+
   static Future<String?> _uploadToCloudinary(Uint8List bytes) async {
     if (cloudinaryCloudName.isEmpty ||
         cloudinaryApiKey.isEmpty ||
