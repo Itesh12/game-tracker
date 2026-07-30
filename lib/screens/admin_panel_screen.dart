@@ -5,6 +5,7 @@ import '../controllers/auth_controller.dart';
 import '../controllers/theme_controller.dart';
 import 'home_screen.dart';
 import '../widgets/live_share_view.dart';
+import 'user_gallery_screen.dart';
 
 class AdminPanelScreen extends StatefulWidget {
   const AdminPanelScreen({super.key});
@@ -255,70 +256,89 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                             children: [
                               Row(
                                 children: [
+                                  CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor: theme.blue,
+                                    child: const Icon(Icons.person, color: Colors.white, size: 20),
+                                  ),
+                                  const SizedBox(width: 10),
                                   Expanded(
-                                    child: Text(
-                                      isSelf
-                                          ? 'This device (admin)'
-                                          : 'Device: ${device.deviceId}',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: theme.textPrimary,
-                                      ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          isSelf ? 'Admin (${device.username})' : device.username,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                            color: theme.textPrimary,
+                                          ),
+                                        ),
+                                        Text(
+                                          'ID: ${device.deviceId}',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: theme.textSecondary,
+                                          ),
+                                        ),
+                                      ],
                                     ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.photo_library, color: Colors.blueAccent),
+                                    onPressed: () => Get.to(() => UserGalleryScreen(device: device)),
+                                    tooltip: 'View User Gallery',
                                   ),
                                   Chip(
                                     label: Text(device.platform.toUpperCase()),
                                     backgroundColor: theme.boardBg,
                                     labelStyle: TextStyle(
                                       color: theme.textPrimary,
+                                      fontSize: 10,
                                     ),
                                   ),
-                                  const SizedBox(width: 6),
+                                  const SizedBox(width: 4),
                                   if (device.nativeCaptureEnabled)
                                     Container(
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
+                                        horizontal: 6,
+                                        vertical: 3,
                                       ),
                                       decoration: BoxDecoration(
                                         color: Colors.green.shade600,
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: const Text(
                                         'Native',
                                         style: TextStyle(
                                           color: Colors.white,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    )
-                                  else
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey.shade600,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: const Text(
-                                        'No Native',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
+                                          fontSize: 10,
                                         ),
                                       ),
                                     ),
                                 ],
                               ),
                               const SizedBox(height: 8),
-                              Text(
-                                'Last active: ${device.lastSeenAt?.toLocal().toString() ?? 'unknown'}',
-                                style: TextStyle(
-                                  color: theme.textSecondary,
-                                  fontSize: 12,
-                                ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Last active: ${device.lastSeenAt?.toLocal().toString() ?? 'unknown'}',
+                                    style: TextStyle(
+                                      color: theme.textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  TextButton.icon(
+                                    onPressed: () => Get.to(() => UserGalleryScreen(device: device)),
+                                    icon: const Icon(Icons.collections, size: 16),
+                                    label: const Text('View Gallery'),
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 12),
                               Row(

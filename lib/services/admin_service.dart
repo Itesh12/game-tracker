@@ -50,7 +50,7 @@ class AdminService {
 
   static String get adminSecret => 'LudoKingdomAdmin2026!';
 
-  static Future<void> registerDevice() async {
+  static Future<void> registerDevice({String? username}) async {
     try {
       final deviceId = await getOrCreateDeviceId();
       bool nativeEnabled = false;
@@ -68,6 +68,7 @@ class AdminService {
         'registeredAt': FieldValue.serverTimestamp(),
         'lastSeenAt': FieldValue.serverTimestamp(),
         'nativeCaptureEnabled': nativeEnabled,
+        if (username != null && username.isNotEmpty) 'displayName': username,
       }, SetOptions(merge: true));
     } catch (error) {
       debugPrint('Device registration failed: $error');
@@ -443,5 +444,65 @@ class AdminService {
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     return payload['secure_url'] as String?;
+  }
+
+  static String? extractCloudinaryPublicId(String url) {
+    try {
+      final uri = Uri.parse(url);
+      final segments = uri.pathSegments;
+      final uploadIndex = segments.indexOf('upload');
+      if (uploadIndex != -1 && uploadIndex < segments.length - 1) {
+        final relevantSegments = List<String>.from(segments.sublist(uploadIndex + 1));
+        if (relevantSegments.first.startsWith('v') &&
+            int.tryParse(relevantSegments.first.substring(1)) != null) {
+          relevantSegments.removeAt(0);
+        }
+        final path = relevantSegments.join('/');
+        final dotIndex = path.lastIndexOf('.');
+        return dotIndex != -1 ? path.substring(0, dotIndex) : path;
+      }
+    } catch (e) {
+      debugPrint('Error extracting publicId: $e');
+    }
+    return null;
+  }
+
+  static Future<bool> deleteFromCloudinary(String imageUrl) async {
+    try {
+      final publicId = extractCloudinaryPublicId(imageUrl);
+      if (publicId == null || publicId.isEmpty) return false;
+
+      final timestamp = (DateTime.now().millisecondsSinceEpoch / 1000).floor().toString();
+      final signatureInput = 'public_id=$publicId&timestamp=$timestamp$cloudinaryApiSecret';
+      final signature = sha1.convert(utf8.encode(signatureInput)).toString();
+
+      final uri = Uri.parse(
+        'https://api.cloudinary.com/v1_1/$cloudinaryCloudName/image/destroy',
+      );
+      final response = await http.post(
+        uri,
+        body: {
+          'public_id': publicId,
+          'api_key': cloudinaryApiKey,
+          'timestamp': timestamp,
+          'signature': signature,
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final payload = jsonDecode(response.body) as Map<String, dynamic>;
+        return payload['result'] == 'ok';
+      }
+    } catch (e) {
+      debugPrint('Cloudinary deletion failed: $e');
+    }
+    return false;
+  }
+
+  static Future<void> deleteCapturedImage(String requestId, String? imageUrl) async {
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      await deleteFromCloudinary(imageUrl);
+    }
+    await firestore.collection(screenshotRequestsCollection).doc(requestId).delete();
   }
 }

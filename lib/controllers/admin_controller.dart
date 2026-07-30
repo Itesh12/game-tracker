@@ -7,12 +7,14 @@ import '../services/admin_service.dart';
 class AdminDevice {
   final String deviceId;
   final String platform;
+  final String username;
   final bool nativeCaptureEnabled;
   final DateTime? lastSeenAt;
 
   AdminDevice({
     required this.deviceId,
     required this.platform,
+    required this.username,
     this.lastSeenAt,
     this.nativeCaptureEnabled = false,
   });
@@ -21,9 +23,14 @@ class AdminDevice {
     DocumentSnapshot<Map<String, dynamic>> snapshot,
   ) {
     final data = snapshot.data() ?? <String, dynamic>{};
+    final name = data['displayName'] as String? ??
+        data['username'] as String? ??
+        data['email'] as String? ??
+        snapshot.id;
     return AdminDevice(
       deviceId: snapshot.id,
       platform: data['platform'] as String? ?? 'unknown',
+      username: name,
       nativeCaptureEnabled: data['nativeCaptureEnabled'] as bool? ?? false,
       lastSeenAt: (data['lastSeenAt'] as Timestamp?)?.toDate(),
     );
