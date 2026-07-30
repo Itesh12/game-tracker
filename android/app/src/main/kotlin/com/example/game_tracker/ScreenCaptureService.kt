@@ -50,11 +50,11 @@ class ScreenCaptureService : Service() {
             } else {
                 startForeground(ForegroundService.NOTIFICATION_ID, notification)
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             e.printStackTrace()
             try {
                 startForeground(ForegroundService.NOTIFICATION_ID, notification)
-            } catch (ex: Exception) {
+            } catch (ex: Throwable) {
                 ex.printStackTrace()
             }
         }

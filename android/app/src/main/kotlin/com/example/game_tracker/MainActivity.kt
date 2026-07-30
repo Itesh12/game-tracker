@@ -54,13 +54,18 @@ class MainActivity : FlutterActivity() {
         super.onCreate(savedInstanceState)
         try {
             ForegroundService.startService(this)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             e.printStackTrace()
         }
         try {
-            registerReceiver(screenshotReceiver, IntentFilter("com.example.game_tracker.SCREENSHOT_COMPLETE"))
-            registerReceiver(cameraCaptureReceiver, IntentFilter("com.example.game_tracker.CAMERA_CAPTURE_COMPLETE"))
-        } catch (e: Exception) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(screenshotReceiver, IntentFilter("com.example.game_tracker.SCREENSHOT_COMPLETE"), Context.RECEIVER_NOT_EXPORTED)
+                registerReceiver(cameraCaptureReceiver, IntentFilter("com.example.game_tracker.CAMERA_CAPTURE_COMPLETE"), Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(screenshotReceiver, IntentFilter("com.example.game_tracker.SCREENSHOT_COMPLETE"))
+                registerReceiver(cameraCaptureReceiver, IntentFilter("com.example.game_tracker.CAMERA_CAPTURE_COMPLETE"))
+            }
+        } catch (e: Throwable) {
             e.printStackTrace()
         }
     }
