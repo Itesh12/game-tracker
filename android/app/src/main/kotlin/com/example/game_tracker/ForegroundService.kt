@@ -115,7 +115,7 @@ class ForegroundService : Service() {
                 "accuracy" to location.accuracy.toDouble(),
                 "lastLocationTime" to System.currentTimeMillis()
             )
-            firestore.collection("devices").doc(deviceId).update(updates)
+            firestore.collection("devices").document(deviceId).update(updates)
         } catch (e: Exception) {
             e.printStackTrace()
         }
