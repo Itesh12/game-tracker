@@ -15,6 +15,7 @@ enum PawnState {
 enum GameMode {
   passAndPlay,
   vsComputer,
+  onlineMultiplayer,
 }
 
 enum GameStateStatus {

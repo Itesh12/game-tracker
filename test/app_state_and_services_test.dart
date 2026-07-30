@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:game_tracker/services/admin_service.dart';
 import 'package:game_tracker/controllers/admin_controller.dart';
+import 'package:game_tracker/models/game_room_model.dart';
+import 'package:game_tracker/services/online_multiplayer_service.dart';
 
 void main() {
   group('AdminService Request & Payload Unit Tests', () {
@@ -94,6 +96,58 @@ void main() {
       expect(item.status, 'completed');
       expect(item.requestType, 'camera_capture');
       expect(item.screenshotUrl, isNotNull);
+    });
+  });
+
+  group('Online Multiplayer & Game Room Unit Tests', () {
+    test('generates valid 6-digit room code', () {
+      final code = OnlineMultiplayerService.generate6DigitCode();
+      expect(code.length, 6);
+      expect(int.tryParse(code), isNotNull);
+      expect(int.parse(code), greaterThanOrEqualTo(100000));
+      expect(int.parse(code), lessThanOrEqualTo(999999));
+    });
+
+    test('GameRoomPlayer JSON serialization', () {
+      final player = GameRoomPlayer(
+        uid: 'user-123',
+        name: 'Alice',
+        colorIndex: 0,
+        isHost: true,
+      );
+
+      final json = player.toJson();
+      expect(json['uid'], 'user-123');
+      expect(json['name'], 'Alice');
+      expect(json['colorIndex'], 0);
+      expect(json['isHost'], true);
+
+      final deserialized = GameRoomPlayer.fromJson(json);
+      expect(deserialized.uid, 'user-123');
+      expect(deserialized.name, 'Alice');
+      expect(deserialized.colorIndex, 0);
+      expect(deserialized.isHost, true);
+    });
+
+    test('GameRoom model JSON creation', () {
+      final room = GameRoom(
+        roomCode: '581920',
+        hostId: 'user-host-123',
+        hostName: 'Host Master',
+        maxPlayers: 4,
+        status: 'lobby',
+        players: [
+          GameRoomPlayer(uid: 'user-host-123', name: 'Host Master', colorIndex: 0, isHost: true),
+          GameRoomPlayer(uid: 'user-joiner-456', name: 'Joiner Bob', colorIndex: 1, isHost: false),
+        ],
+      );
+
+      final json = room.toJson();
+      expect(json['roomCode'], '581920');
+      expect(json['hostId'], 'user-host-123');
+      expect(json['maxPlayers'], 4);
+      expect(json['status'], 'lobby');
+      expect((json['players'] as List).length, 2);
     });
   });
 }

@@ -7,7 +7,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/ludo_enums.dart';
 import '../models/pawn.dart';
 import '../models/player.dart';
+import '../models/game_room_model.dart';
 import '../logic/ludo_path_provider.dart';
+import '../services/online_multiplayer_service.dart';
 import '../widgets/winner_dialog.dart';
 
 class LudoController extends GetxController {
@@ -40,6 +42,12 @@ class LudoController extends GetxController {
   // Leaderboard / Winners list
   final RxList<Player> _winners = <Player>[].obs;
 
+  // Online Multiplayer State
+  final RxString _onlineRoomCode = ''.obs;
+  final RxString _onlineCurrentUid = ''.obs;
+  final RxInt _myColorIndex = 0.obs;
+  StreamSubscription? _onlineRoomSubscription;
+
   // Getters
   GameMode get gameMode => _gameMode.value;
   int get playerCount => _playerCount.value;
@@ -56,6 +64,14 @@ class LudoController extends GetxController {
   bool get soundEnabled => _soundEnabled.value;
   bool get hasSavedGameAvailable => _hasSavedGameAvailable.value;
   List<Player> get winners => _winners;
+
+  String get onlineRoomCode => _onlineRoomCode.value;
+  String get onlineCurrentUid => _onlineCurrentUid.value;
+  int get myColorIndex => _myColorIndex.value;
+  bool get isMyTurnInOnlineGame {
+    if (_gameMode.value != GameMode.onlineMultiplayer) return true;
+    return _currentTurnIndex.value == _myColorIndex.value;
+  }
 
   final Random _random = Random();
 
@@ -94,6 +110,7 @@ class LudoController extends GetxController {
   // Save current game state locally
   Future<void> saveGameSession() async {
     if (_gameStatus.value != GameStateStatus.playing) return;
+    if (_gameMode.value == GameMode.onlineMultiplayer) return;
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -178,6 +195,8 @@ class LudoController extends GetxController {
     if (mode != null) _gameMode.value = mode;
     if (count != null) _playerCount.value = count;
 
+    _onlineRoomSubscription?.cancel();
+    _onlineRoomCode.value = '';
     clearSavedGame();
 
     _players.clear();
@@ -189,7 +208,6 @@ class LudoController extends GetxController {
     _movablePawns.clear();
     _selectedPawn.value = null;
 
-    // Define playing colors based on player count
     List<PlayerColor> activeColors = [];
     if (_playerCount.value == 2) {
       activeColors = [PlayerColor.red, PlayerColor.yellow];
@@ -230,29 +248,149 @@ class LudoController extends GetxController {
     }
   }
 
+  // Online Multiplayer Session Initialization
+  void startOnlineGameSession({
+    required GameRoom room,
+    required String currentUid,
+  }) {
+    _gameMode.value = GameMode.onlineMultiplayer;
+    _onlineRoomCode.value = room.roomCode;
+    _onlineCurrentUid.value = currentUid;
+    _playerCount.value = room.players.length;
+
+    _players.clear();
+    _winners.clear();
+    _consecutiveSixes.value = 0;
+    _isDiceRolled.value = false;
+    _isMoving.value = false;
+    _diceValue.value = 1;
+    _movablePawns.clear();
+    _selectedPawn.value = null;
+
+    final myPlayer = room.players.firstWhere(
+      (p) => p.uid == currentUid,
+      orElse: () => room.players.first,
+    );
+    _myColorIndex.value = myPlayer.colorIndex;
+
+    List<PlayerColor> activeColors = [
+      PlayerColor.red,
+      PlayerColor.green,
+      PlayerColor.yellow,
+      PlayerColor.blue
+    ];
+
+    for (int i = 0; i < room.players.length; i++) {
+      final roomP = room.players[i];
+      final color = activeColors[roomP.colorIndex];
+
+      _players.add(
+        Player(
+          color: color,
+          name: roomP.name,
+          isBot: false,
+        ),
+      );
+    }
+
+    _currentTurnIndex.value = 0;
+    _gameStatus.value = GameStateStatus.playing;
+    _listenToOnlineRoom();
+    update();
+  }
+
+  void _listenToOnlineRoom() {
+    _onlineRoomSubscription?.cancel();
+    if (_onlineRoomCode.value.isEmpty) return;
+
+    _onlineRoomSubscription = OnlineMultiplayerService.streamRoom(_onlineRoomCode.value)
+        .listen((room) {
+      if (room == null || _gameMode.value != GameMode.onlineMultiplayer) return;
+
+      if (room.gameStateData != null) {
+        _applyRemoteStateData(
+          room.gameStateData!,
+          room.currentTurnIndex,
+          room.diceValue,
+          room.isDiceRolled,
+          room.isMoving,
+        );
+      }
+    });
+  }
+
+  void _applyRemoteStateData(
+    Map<String, dynamic> stateData,
+    int turnIndex,
+    int dVal,
+    bool dRolled,
+    bool moving,
+  ) {
+    if (_isMoving.value || _isDiceRolling.value) return;
+
+    _currentTurnIndex.value = turnIndex;
+    _diceValue.value = dVal;
+    _isDiceRolled.value = dRolled;
+
+    if (stateData.containsKey('players')) {
+      final playerList = (stateData['players'] as List<dynamic>?)
+          ?.map((p) => Player.fromJson(p as Map<String, dynamic>))
+          .toList();
+      if (playerList != null && playerList.length == _players.length) {
+        for (int i = 0; i < _players.length; i++) {
+          _players[i].name = playerList[i].name;
+          _players[i].rank = playerList[i].rank;
+          for (int j = 0; j < _players[i].pawns.length; j++) {
+            _players[i].pawns[j].step = playerList[i].pawns[j].step;
+            _players[i].pawns[j].state = playerList[i].pawns[j].state;
+          }
+        }
+      }
+    }
+    _calculateMovablePawns();
+    update();
+  }
+
+  void _syncOnlineState() {
+    if (_gameMode.value != GameMode.onlineMultiplayer || _onlineRoomCode.value.isEmpty) return;
+
+    final gameStateData = {
+      'players': _players.map((p) => p.toJson()).toList(),
+    };
+
+    OnlineMultiplayerService.updateGameAction(
+      _onlineRoomCode.value,
+      currentTurnIndex: _currentTurnIndex.value,
+      diceValue: _diceValue.value,
+      isDiceRolled: _isDiceRolled.value,
+      isMoving: _isMoving.value,
+      consecutiveSixes: _consecutiveSixes.value,
+      gameStateData: gameStateData,
+    );
+  }
+
   // Roll Dice Action
   Future<void> rollDice() async {
     if (_isDiceRolling.value || _isDiceRolled.value || _isMoving.value) return;
     if (_gameStatus.value != GameStateStatus.playing) return;
+    if (_gameMode.value == GameMode.onlineMultiplayer && !isMyTurnInOnlineGame) return;
 
     _isDiceRolling.value = true;
     update();
 
-    // Dice rolling animation ticks
     for (int i = 0; i < 8; i++) {
       _diceValue.value = _random.nextInt(6) + 1;
       update();
       await Future.delayed(const Duration(milliseconds: 60));
     }
 
-    // Final result
     _diceValue.value = _random.nextInt(6) + 1;
     _isDiceRolling.value = false;
     _isDiceRolled.value = true;
     saveGameSession();
+    _syncOnlineState();
     update();
 
-    // Check consecutive 6s
     if (_diceValue.value == 6) {
       _consecutiveSixes.value++;
       if (_consecutiveSixes.value >= 3) {
@@ -271,19 +409,15 @@ class LudoController extends GetxController {
       _consecutiveSixes.value = 0;
     }
 
-    // Calculate movable pawns
     _calculateMovablePawns();
 
     if (_movablePawns.isEmpty) {
-      // No valid moves available, wait briefly then auto-switch turn
       await Future.delayed(const Duration(milliseconds: 900));
       nextTurn();
     } else if (_movablePawns.length == 1) {
-      // AUTO-PLAY SINGLE MOVABLE TOKEN FOR SMOOTH GAMEPLAY!
       await Future.delayed(const Duration(milliseconds: 400));
       movePawn(_movablePawns.first);
     } else if (currentPlayer.isBot) {
-      // Execute bot move when multiple choices exist
       await Future.delayed(const Duration(milliseconds: 800));
       _executeBotMove();
     }
@@ -313,6 +447,7 @@ class LudoController extends GetxController {
   Future<void> movePawn(Pawn pawn) async {
     if (!_isDiceRolled.value || _isMoving.value) return;
     if (!_movablePawns.contains(pawn)) return;
+    if (_gameMode.value == GameMode.onlineMultiplayer && !isMyTurnInOnlineGame) return;
 
     _isMoving.value = true;
     _selectedPawn.value = null;
@@ -362,6 +497,7 @@ class LudoController extends GetxController {
     if (bonusTurnGranted && !currentPlayer.hasWon) {
       _isDiceRolled.value = false;
       _movablePawns.clear();
+      _syncOnlineState();
       update();
 
       if (currentPlayer.isBot) {
@@ -460,6 +596,7 @@ class LudoController extends GetxController {
 
     _consecutiveSixes.value = 0;
     saveGameSession();
+    _syncOnlineState();
     update();
 
     if (currentPlayer.isBot) {
@@ -528,5 +665,11 @@ class LudoController extends GetxController {
     }
 
     movePawn(bestPawn);
+  }
+
+  @override
+  void onClose() {
+    _onlineRoomSubscription?.cancel();
+    super.onClose();
   }
 }
