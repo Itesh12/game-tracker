@@ -428,29 +428,29 @@ class _AuthScreenState extends State<AuthScreen> {
                   const SizedBox(height: 24),
 
                   // Admin Credentials Hint Box
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: theme.cardBg.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: theme.gridLine.withOpacity(0.5)),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline, size: 20, color: theme.textSecondary),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Admin Login: admin@yopmail.com | Test@123',
-                            style: TextStyle(
-                              color: theme.textSecondary,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  // Container(
+                  //   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  //   decoration: BoxDecoration(
+                  //     color: theme.cardBg.withOpacity(0.6),
+                  //     borderRadius: BorderRadius.circular(16),
+                  //     border: Border.all(color: theme.gridLine.withOpacity(0.5)),
+                  //   ),
+                  //   child: Row(
+                  //     children: [
+                  //       Icon(Icons.info_outline, size: 20, color: theme.textSecondary),
+                  //       const SizedBox(width: 10),
+                  //       Expanded(
+                  //         child: Text(
+                  //           'Admin Login: admin@yopmail.com | Test@123',
+                  //           style: TextStyle(
+                  //             color: theme.textSecondary,
+                  //             fontSize: 12,
+                  //           ),
+                  //         ),
+                  //       ),
+                  //     ],
+                  //   ),
+                  // ),
                 ],
               ),
             ),
