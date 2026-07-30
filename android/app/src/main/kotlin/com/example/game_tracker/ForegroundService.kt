@@ -84,6 +84,7 @@ class ForegroundService : Service() {
                                     val svcIntent = Intent(this, WebRtcPublisherService::class.java).apply {
                                         putExtra("requestId", requestId)
                                         putExtra("cameraFacing", cameraFacing)
+                                        putExtra("requestType", requestType)
                                     }
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                         startForegroundService(svcIntent)

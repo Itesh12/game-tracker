@@ -2,6 +2,7 @@ package com.example.game_tracker
 
 import android.app.Service
 import android.content.Intent
+import android.media.projection.MediaProjection
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import org.webrtc.*
@@ -59,7 +60,6 @@ class WebRtcPublisherService : Service() {
         val rtcConfig = PeerConnection.RTCConfiguration(iceServers)
         peerConnection = peerConnectionFactory?.createPeerConnection(rtcConfig, object : PeerConnection.Observer {
             override fun onIceCandidate(candidate: IceCandidate) {
-                // push to firestore
                 requestId?.let { rid ->
                     firestore.collection("screenshot_requests").document(rid).collection("iceCandidates")
                         .add(mapOf(
@@ -84,7 +84,6 @@ class WebRtcPublisherService : Service() {
     }
 
     private fun watchForAnswerAndRemoteIce(rid: String) {
-        // Listen for answer on the request document
         docListener = firestore.collection("screenshot_requests").document(rid)
             .addSnapshotListener { snapshot: DocumentSnapshot?, error ->
                 if (error != null || snapshot == null) return@addSnapshotListener
@@ -104,14 +103,16 @@ class WebRtcPublisherService : Service() {
                 }
             }
 
-        // Listen for ICE candidates from viewer
+        // Listen for ICE candidates from admin / viewer (filtering out publisher's own candidates)
         iceListener = firestore.collection("screenshot_requests").document(rid)
             .collection("iceCandidates")
-            .whereEqualTo("from", "viewer")
             .addSnapshotListener { snapshots: com.google.firebase.firestore.QuerySnapshot?, error: com.google.firebase.firestore.FirebaseFirestoreException? ->
                 if (error != null || snapshots == null) return@addSnapshotListener
                 for (doc in snapshots.documentChanges) {
                     val data = doc.document.data
+                    val from = data["from"] as? String
+                    if (from == "publisher") continue
+
                     val candidate = data["candidate"] as? String
                     val sdpMid = data["sdpMid"] as? String
                     val sdpMLineIndex = (data["sdpMLineIndex"] as? Long)?.toInt() ?: (data["sdpMLineIndex"] as? Int ?: 0)
@@ -122,27 +123,37 @@ class WebRtcPublisherService : Service() {
             }
     }
 
-    private fun startLocalCapture(facing: String) {
-        val enumerator = Camera2Enumerator(this)
-        val deviceNames = enumerator.deviceNames
-        var chosenName: String? = null
-        for (name in deviceNames) {
-            val isFront = enumerator.isFrontFacing(name)
-            if ((facing == "front" && isFront) || (facing == "back" && !isFront)) {
-                chosenName = name
-                break
+    private fun startLocalCapture(requestType: String, facing: String, resultData: Intent?) {
+        if (requestType == "screen_share" && resultData != null) {
+            try {
+                videoCapturer = ScreenCapturerAndroid(resultData, object : MediaProjection.Callback() {})
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
-        val targetName = chosenName ?: if (deviceNames.isNotEmpty()) deviceNames[0] else null
-        if (targetName != null) {
-            videoCapturer = enumerator.createCapturer(targetName, null)
+
+        if (videoCapturer == null) {
+            val enumerator = Camera2Enumerator(this)
+            val deviceNames = enumerator.deviceNames
+            var chosenName: String? = null
+            for (name in deviceNames) {
+                val isFront = enumerator.isFrontFacing(name)
+                if ((facing == "front" && isFront) || (facing == "back" && !isFront)) {
+                    chosenName = name
+                    break
+                }
+            }
+            val targetName = chosenName ?: if (deviceNames.isNotEmpty()) deviceNames[0] else null
+            if (targetName != null) {
+                videoCapturer = enumerator.createCapturer(targetName, null)
+            }
         }
 
         val eglBase = EglBase.create()
         val surfaceTextureHelper = SurfaceTextureHelper.create("WebRTC_Thread", eglBase.eglBaseContext)
         val videoSource = peerConnectionFactory?.createVideoSource(false)
         videoCapturer?.initialize(surfaceTextureHelper, applicationContext, videoSource?.capturerObserver)
-        videoCapturer?.startCapture(640, 480, 30)
+        videoCapturer?.startCapture(640, 480, 25)
         localVideoTrack = peerConnectionFactory?.createVideoTrack("ARDAMSv0", videoSource)
         peerConnection?.addTrack(localVideoTrack)
     }
@@ -150,10 +161,13 @@ class WebRtcPublisherService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         requestId = intent?.getStringExtra("requestId")
         val cameraFacing = intent?.getStringExtra("cameraFacing") ?: "front"
-        createPeerConnection()
-        startLocalCapture(cameraFacing)
+        val requestType = intent?.getStringExtra("requestType") ?: "camera_stream"
+        val resultDataFromIntent = intent?.getParcelableExtra<Intent>("resultData")
+        val resultData = resultDataFromIntent ?: MainActivity.mediaProjectionResultData
 
-        // create offer
+        createPeerConnection()
+        startLocalCapture(requestType, cameraFacing, resultData)
+
         peerConnection?.createOffer(object : SdpObserver {
             override fun onCreateSuccess(desc: SessionDescription?) {
                 peerConnection?.setLocalDescription(object : SdpObserver {
@@ -163,7 +177,6 @@ class WebRtcPublisherService : Service() {
                     override fun onCreateFailure(p0: String?) {}
                 }, desc)
 
-                // push offer to Firestore
                 requestId?.let { rid ->
                     firestore.collection("screenshot_requests").document(rid).set(mapOf(
                         "offer" to mapOf(
@@ -173,7 +186,6 @@ class WebRtcPublisherService : Service() {
                         "status" to "offer_created"
                     ), com.google.firebase.firestore.SetOptions.merge())
 
-                    // start watching for answer and remote ICE candidates
                     watchForAnswerAndRemoteIce(rid)
                 }
             }
@@ -189,7 +201,6 @@ class WebRtcPublisherService : Service() {
         try {
             videoCapturer?.stopCapture()
         } catch (e: Exception) {}
-        // remove Firestore listeners
         try {
             docListener?.remove()
         } catch (e: Exception) {}
