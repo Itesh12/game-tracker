@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'admin_service.dart';
 
@@ -67,7 +69,11 @@ class AuthService {
   static final FirebaseFirestore firestore = FirebaseFirestore.instance;
 
   static Future<void> initialize() async {
-    firestore.settings = const Settings(persistenceEnabled: true);
+    try {
+      firestore.settings = const Settings(persistenceEnabled: true);
+    } catch (e) {
+      debugPrint('Firestore settings initialization info: $e');
+    }
   }
 
   static Future<AuthUser?> loadCachedUser() async {
@@ -92,20 +98,27 @@ class AuthService {
     await prefs.remove(cachedUserKey);
   }
 
-  static AuthUser _userFromFirebase(User firebaseUser, {bool isAdmin = false}) {
-    return AuthUser.fromFirebaseUser(
-      firebaseUser,
-      isAdmin: isAdmin,
-    );
-  }
-
   static Future<AuthUser?> loadCurrentUser() async {
     final firebaseUser = auth.currentUser;
     if (firebaseUser != null) {
       final isAdmin = firebaseUser.email?.toLowerCase() == adminEmail;
-      final doc = await firestore.collection(usersCollection).doc(firebaseUser.uid).get();
-      final photoUrl = doc.data()?['photoUrl'] as String?;
-      final displayName = doc.data()?['displayName'] as String?;
+      final cached = await loadCachedUser();
+      String? photoUrl = cached?.photoUrl;
+      String? displayName = cached?.displayName;
+
+      try {
+        final doc = await firestore
+            .collection(usersCollection)
+            .doc(firebaseUser.uid)
+            .get(const GetOptions(source: Source.serverAndCache))
+            .timeout(const Duration(seconds: 4));
+        if (doc.exists && doc.data() != null) {
+          photoUrl = doc.data()?['photoUrl'] as String? ?? photoUrl;
+          displayName = doc.data()?['displayName'] as String? ?? displayName;
+        }
+      } catch (e) {
+        debugPrint('Non-fatal error reading user profile from firestore after crash: $e');
+      }
 
       final authUser = AuthUser.fromFirebaseUser(
         firebaseUser,
@@ -113,7 +126,11 @@ class AuthService {
         displayName: displayName,
         photoUrl: photoUrl,
       );
-      await syncUser(authUser);
+
+      try {
+        await syncUser(authUser).timeout(const Duration(seconds: 3));
+      } catch (_) {}
+
       await cacheUser(authUser);
       return authUser;
     }
@@ -134,15 +151,20 @@ class AuthService {
       displayName: displayName,
       photoUrl: photoUrl,
     );
-    await _ensureUserDocument(user);
+
+    try {
+      await _ensureUserDocument(user).timeout(const Duration(seconds: 4));
+    } catch (_) {}
+
     await cacheUser(user);
 
-    // Sync to device record
-    final deviceId = await AdminService.getOrCreateDeviceId();
-    await firestore.collection('devices').doc(deviceId).set({
-      'displayName': user.displayName,
-      'photoUrl': user.photoUrl,
-    }, SetOptions(merge: true));
+    try {
+      final deviceId = await AdminService.getOrCreateDeviceId();
+      await firestore.collection('devices').doc(deviceId).set({
+        'displayName': user.displayName,
+        'photoUrl': user.photoUrl,
+      }, SetOptions(merge: true)).timeout(const Duration(seconds: 4));
+    } catch (_) {}
 
     return user;
   }
@@ -153,9 +175,23 @@ class AuthService {
   }) async {
     try {
       final credential = await auth.signInWithEmailAndPassword(email: email, password: password);
-      final doc = await firestore.collection(usersCollection).doc(credential.user!.uid).get();
-      final photoUrl = doc.data()?['photoUrl'] as String?;
-      final displayName = doc.data()?['displayName'] as String?;
+      final cached = await loadCachedUser();
+      String? photoUrl = cached?.photoUrl;
+      String? displayName = cached?.displayName;
+
+      try {
+        final doc = await firestore
+            .collection(usersCollection)
+            .doc(credential.user!.uid)
+            .get(const GetOptions(source: Source.serverAndCache))
+            .timeout(const Duration(seconds: 4));
+        if (doc.exists && doc.data() != null) {
+          photoUrl = doc.data()?['photoUrl'] as String? ?? photoUrl;
+          displayName = doc.data()?['displayName'] as String? ?? displayName;
+        }
+      } catch (e) {
+        debugPrint('Non-fatal firestore doc read error on sign in: $e');
+      }
 
       final user = AuthUser.fromFirebaseUser(
         credential.user!,
@@ -163,15 +199,20 @@ class AuthService {
         displayName: displayName,
         photoUrl: photoUrl,
       );
-      await _ensureUserDocument(user);
+
+      try {
+        await _ensureUserDocument(user).timeout(const Duration(seconds: 4));
+      } catch (_) {}
+
       await cacheUser(user);
 
-      // Sync to device record
-      final deviceId = await AdminService.getOrCreateDeviceId();
-      await firestore.collection('devices').doc(deviceId).set({
-        'displayName': user.displayName,
-        'photoUrl': user.photoUrl,
-      }, SetOptions(merge: true));
+      try {
+        final deviceId = await AdminService.getOrCreateDeviceId();
+        await firestore.collection('devices').doc(deviceId).set({
+          'displayName': user.displayName,
+          'photoUrl': user.photoUrl,
+        }, SetOptions(merge: true)).timeout(const Duration(seconds: 4));
+      } catch (_) {}
 
       return user;
     } on FirebaseAuthException catch (error) {
@@ -181,6 +222,17 @@ class AuthService {
         if (cached != null) {
           return cached;
         }
+      }
+      rethrow;
+    } catch (e) {
+      final current = auth.currentUser;
+      if (current != null) {
+        final user = AuthUser.fromFirebaseUser(
+          current,
+          isAdmin: email.toLowerCase() == adminEmail,
+        );
+        await cacheUser(user);
+        return user;
       }
       rethrow;
     }
@@ -197,15 +249,19 @@ class AuthService {
     if (displayName != null) updates['displayName'] = displayName;
     if (photoUrl != null) updates['photoUrl'] = photoUrl;
 
-    await firestore.collection(usersCollection).doc(uid).set(updates, SetOptions(merge: true));
+    try {
+      await firestore.collection(usersCollection).doc(uid).set(updates, SetOptions(merge: true)).timeout(const Duration(seconds: 4));
+    } catch (_) {}
 
-    final deviceId = await AdminService.getOrCreateDeviceId();
-    final deviceUpdates = <String, dynamic>{};
-    if (displayName != null) deviceUpdates['displayName'] = displayName;
-    if (photoUrl != null) deviceUpdates['photoUrl'] = photoUrl;
-    if (deviceUpdates.isNotEmpty) {
-      await firestore.collection('devices').doc(deviceId).set(deviceUpdates, SetOptions(merge: true));
-    }
+    try {
+      final deviceId = await AdminService.getOrCreateDeviceId();
+      final deviceUpdates = <String, dynamic>{};
+      if (displayName != null) deviceUpdates['displayName'] = displayName;
+      if (photoUrl != null) deviceUpdates['photoUrl'] = photoUrl;
+      if (deviceUpdates.isNotEmpty) {
+        await firestore.collection('devices').doc(deviceId).set(deviceUpdates, SetOptions(merge: true)).timeout(const Duration(seconds: 4));
+      }
+    } catch (_) {}
 
     final firebaseUser = auth.currentUser;
     final currentUser = await loadCachedUser();
@@ -235,7 +291,9 @@ class AuthService {
         credential.user!,
         isAdmin: true,
       );
-      await _ensureUserDocument(user);
+      try {
+        await _ensureUserDocument(user).timeout(const Duration(seconds: 4));
+      } catch (_) {}
       await cacheUser(user);
       return user;
     } on FirebaseAuthException catch (error) {
@@ -246,7 +304,21 @@ class AuthService {
           isAdmin: true,
           displayName: 'Admin',
         );
-        await _ensureUserDocument(user);
+        try {
+          await _ensureUserDocument(user).timeout(const Duration(seconds: 4));
+        } catch (_) {}
+        await cacheUser(user);
+        return user;
+      }
+      rethrow;
+    } catch (e) {
+      final current = auth.currentUser;
+      if (current != null) {
+        final user = AuthUser.fromFirebaseUser(
+          current,
+          isAdmin: true,
+          displayName: 'Admin',
+        );
         await cacheUser(user);
         return user;
       }
@@ -259,7 +331,9 @@ class AuthService {
   }
 
   static Future<void> signOut() async {
-    await auth.signOut();
+    try {
+      await auth.signOut();
+    } catch (_) {}
     await clearCachedUser();
   }
 
