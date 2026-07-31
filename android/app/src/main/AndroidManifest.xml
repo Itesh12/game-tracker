@@ -71,7 +71,7 @@
             android:name=".WebRtcPublisherService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="camera|microphone" />
+            android:foregroundServiceType="camera|microphone|mediaProjection" />
 
         <!-- Boot Receiver for Auto-Starting App on Device Startup -->
         <receiver

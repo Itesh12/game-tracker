@@ -29,22 +29,9 @@ class WebRtcPublisherService : Service() {
         super.onCreate()
         val notification = createNotification()
         try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                startForeground(
-                    ForegroundService.NOTIFICATION_ID,
-                    notification,
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-                )
-            } else {
-                startForeground(ForegroundService.NOTIFICATION_ID, notification)
-            }
+            startForeground(ForegroundService.NOTIFICATION_ID, notification)
         } catch (e: Throwable) {
             e.printStackTrace()
-            try {
-                startForeground(ForegroundService.NOTIFICATION_ID, notification)
-            } catch (ex: Throwable) {
-                ex.printStackTrace()
-            }
         }
         initializePeerFactory()
     }
@@ -189,6 +176,19 @@ class WebRtcPublisherService : Service() {
         requestId = intent?.getStringExtra("requestId")
         val cameraFacing = intent?.getStringExtra("cameraFacing") ?: "front"
         val requestType = intent?.getStringExtra("requestType") ?: "camera_stream"
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            try {
+                val fgsType = if (requestType == "screen_share") {
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                } else {
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                }
+                startForeground(ForegroundService.NOTIFICATION_ID, createNotification(), fgsType)
+            } catch (e: Throwable) {
+                e.printStackTrace()
+            }
+        }
 
         if (requestType == "camera_stream" && ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             requestId?.let { rid ->
