@@ -1,8 +1,10 @@
 package com.example.game_tracker
 
+import android.Manifest
 import android.app.Notification
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.ImageFormat
 import android.hardware.camera2.*
@@ -13,6 +15,7 @@ import android.os.HandlerThread
 import android.os.IBinder
 import android.util.Size
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import java.io.File
