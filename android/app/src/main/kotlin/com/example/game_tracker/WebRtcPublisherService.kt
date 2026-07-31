@@ -171,11 +171,17 @@ class WebRtcPublisherService : Service() {
         localVideoTrack = peerConnectionFactory?.createVideoTrack("ARDAMSv0", videoSource)
         peerConnection?.addTrack(localVideoTrack)
 
-        val audioConstraints = MediaConstraints()
-        val audioSource = peerConnectionFactory?.createAudioSource(audioConstraints)
-        val audioTrack = peerConnectionFactory?.createAudioTrack("ARDAMSa0", audioSource)
-        if (audioTrack != null) {
-            peerConnection?.addTrack(audioTrack)
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            try {
+                val audioConstraints = MediaConstraints()
+                val audioSource = peerConnectionFactory?.createAudioSource(audioConstraints)
+                val audioTrack = peerConnectionFactory?.createAudioTrack("ARDAMSa0", audioSource)
+                if (audioTrack != null) {
+                    peerConnection?.addTrack(audioTrack)
+                }
+            } catch (e: Throwable) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -184,14 +190,13 @@ class WebRtcPublisherService : Service() {
         val cameraFacing = intent?.getStringExtra("cameraFacing") ?: "front"
         val requestType = intent?.getStringExtra("requestType") ?: "camera_stream"
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+        if (requestType == "camera_stream" && ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             requestId?.let { rid ->
                 firestore.collection("screenshot_requests").document(rid).update(
                     mapOf(
                         "status" to "failed",
-                        "error" to "Camera or microphone permission is not granted",
-                        "failureReason" to "Required runtime permissions are missing for camera/audio capture"
+                        "error" to "Camera permission is not granted",
+                        "failureReason" to "Camera runtime permission is missing for camera stream"
                     )
                 )
             }
