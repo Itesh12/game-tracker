@@ -78,6 +78,24 @@ class AndroidScreenCapture {
     }
   }
 
+  static Future<bool> startForegroundService() async {
+    try {
+      final res = await _channel.invokeMethod('startForegroundService');
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<bool> stopForegroundService() async {
+    try {
+      final res = await _channel.invokeMethod('stopForegroundService');
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static void Function(String? path)? _onCaptureCompleteHandler;
   static void Function(String? path)? _onCameraCaptureCompleteHandler;
   static bool _methodHandlerInstalled = false;

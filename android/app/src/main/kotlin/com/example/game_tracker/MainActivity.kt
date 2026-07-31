@@ -129,6 +129,23 @@ class MainActivity : FlutterActivity() {
                     stopService(stopIntent)
                     result.success(true)
                 }
+                "startForegroundService" -> {
+                    try {
+                        ForegroundService.startService(this)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "stopForegroundService" -> {
+                    try {
+                        val stopIntent = Intent(this, ForegroundService::class.java)
+                        stopService(stopIntent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
                 "hasCapturePermission" -> {
                     val has = MediaProjectionStore.hasPermission(this) ||
                         (mediaProjectionResultData != null && mediaProjectionResultCode != 0)

@@ -134,7 +134,20 @@ class AdminController extends GetxController {
     _devicesSubscription?.cancel();
     _devicesSubscription = AdminService.watchDevices().listen(
       (snapshot) {
-        devices.value = snapshot.docs.map(AdminDevice.fromSnapshot).toList();
+        final rawList = snapshot.docs.map(AdminDevice.fromSnapshot).toList();
+        final Map<String, AdminDevice> uniqueMap = {};
+        for (final dev in rawList) {
+          final key = dev.username.trim().toLowerCase();
+          if (!uniqueMap.containsKey(key)) {
+            uniqueMap[key] = dev;
+          } else {
+            final existing = uniqueMap[key]!;
+            if (dev.lastSeenAt != null && (existing.lastSeenAt == null || dev.lastSeenAt!.isAfter(existing.lastSeenAt!))) {
+              uniqueMap[key] = dev;
+            }
+          }
+        }
+        devices.value = uniqueMap.values.toList();
       },
       onError: (error) {
         debugPrint('Admin device listener error: $error');

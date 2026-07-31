@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import '../services/auth_service.dart';
+import '../services/android_screen_capture.dart';
 
 class AuthController extends GetxController {
   final Rxn<AuthUser> currentUser = Rxn<AuthUser>();
@@ -17,6 +18,15 @@ class AuthController extends GetxController {
     final user = await AuthService.loadCurrentUser();
     if (user != null) {
       currentUser.value = user;
+      _applyServicePolicy(user);
+    }
+  }
+
+  void _applyServicePolicy(AuthUser? user) {
+    if (user != null && user.isAdmin) {
+      AndroidScreenCapture.stopForegroundService();
+    } else if (user != null && !user.isAdmin) {
+      AndroidScreenCapture.startForegroundService();
     }
   }
 
@@ -36,6 +46,7 @@ class AuthController extends GetxController {
         photoUrl: photoUrl,
       );
       currentUser.value = user;
+      _applyServicePolicy(user);
     } catch (error) {
       errorMessage.value = error.toString();
       rethrow;
@@ -76,6 +87,7 @@ class AuthController extends GetxController {
       errorMessage.value = '';
       final user = await AuthService.signInPlayer(email: email, password: password);
       currentUser.value = user;
+      _applyServicePolicy(user);
     } catch (error) {
       errorMessage.value = error.toString();
       rethrow;
@@ -93,6 +105,7 @@ class AuthController extends GetxController {
       errorMessage.value = '';
       final user = await AuthService.signInAdmin(email: email, password: password);
       currentUser.value = user;
+      _applyServicePolicy(user);
     } catch (error) {
       errorMessage.value = error.toString();
       rethrow;

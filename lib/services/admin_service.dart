@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app_screenshot_service.dart';
 import 'android_screen_capture.dart';
 import 'live_share_service.dart';
+import 'auth_service.dart';
 
 class AdminService {
   AdminService._();
@@ -26,6 +27,16 @@ class AdminService {
   static final Map<String, Timer> _liveShareTimers = {};
 
   static Future<String> getOrCreateDeviceId() async {
+    try {
+      final cachedUser = await AuthService.loadCachedUser();
+      if (cachedUser != null && cachedUser.uid.isNotEmpty) {
+        final uidDeviceId = 'user_${cachedUser.uid}';
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(deviceIdPref, uidDeviceId);
+        return uidDeviceId;
+      }
+    } catch (_) {}
+
     final prefs = await SharedPreferences.getInstance();
     var deviceId = prefs.getString(deviceIdPref);
     if (deviceId != null && deviceId.isNotEmpty) {
