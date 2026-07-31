@@ -46,18 +46,9 @@ class ScreenCaptureService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification: Notification = createNotification()
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(ForegroundService.NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
-            } else {
-                startForeground(ForegroundService.NOTIFICATION_ID, notification)
-            }
+            startForeground(ForegroundService.NOTIFICATION_ID, notification)
         } catch (e: Throwable) {
             e.printStackTrace()
-            try {
-                startForeground(ForegroundService.NOTIFICATION_ID, notification)
-            } catch (ex: Throwable) {
-                ex.printStackTrace()
-            }
         }
 
         val captureOnce = intent?.getBooleanExtra("capture_once", false) ?: false
@@ -93,6 +84,14 @@ class ScreenCaptureService : Service() {
         try {
             val mProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjection = mProjectionManager.getMediaProjection(resultCode, resultData)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && mediaProjection != null) {
+                try {
+                    startForeground(ForegroundService.NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+                } catch (e: Throwable) {
+                    e.printStackTrace()
+                }
+            }
 
             val handlerThread = HandlerThread("screencap")
             handlerThread.start()

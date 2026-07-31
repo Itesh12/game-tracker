@@ -14,10 +14,11 @@ class AppScreenshotService {
   static bool _isCapturing = false;
 
   static Future<Uint8List?> captureScreenshot() async {
-    if (_lastCapturedScreenshotBytes != null) {
-      return _lastCapturedScreenshotBytes;
+    final freshBytes = await captureAndCacheCurrentFrame();
+    if (freshBytes != null) {
+      return freshBytes;
     }
-    return captureAndCacheCurrentFrame();
+    return _lastCapturedScreenshotBytes;
   }
 
   static Future<Uint8List?> captureAndCacheCurrentFrame() async {

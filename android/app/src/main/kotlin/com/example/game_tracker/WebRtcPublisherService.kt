@@ -177,19 +177,6 @@ class WebRtcPublisherService : Service() {
         val cameraFacing = intent?.getStringExtra("cameraFacing") ?: "front"
         val requestType = intent?.getStringExtra("requestType") ?: "camera_stream"
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            try {
-                val fgsType = if (requestType == "screen_share") {
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
-                } else {
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
-                }
-                startForeground(ForegroundService.NOTIFICATION_ID, createNotification(), fgsType)
-            } catch (e: Throwable) {
-                e.printStackTrace()
-            }
-        }
-
         if (requestType == "camera_stream" && ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             requestId?.let { rid ->
                 firestore.collection("screenshot_requests").document(rid).update(
@@ -225,6 +212,18 @@ class WebRtcPublisherService : Service() {
             }
             stopSelf()
             return START_NOT_STICKY
+        }
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            try {
+                if (requestType == "camera_stream") {
+                    startForeground(ForegroundService.NOTIFICATION_ID, createNotification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
+                } else if (requestType == "screen_share" && resultData != null) {
+                    startForeground(ForegroundService.NOTIFICATION_ID, createNotification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+                }
+            } catch (e: Throwable) {
+                e.printStackTrace()
+            }
         }
 
         createPeerConnection()
