@@ -76,7 +76,14 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        
+        // Register Unified Command Platform Engine Bridge
+        val commandChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.example.game_tracker/command_platform")
+        val commandBridge = CommandPlatformBridge(this, commandChannel)
+        commandChannel.setMethodCallHandler(commandBridge)
+
         methodChannel.setMethodCallHandler { call, result ->
+
             when (call.method) {
                 "requestCapturePermission" -> {
                     val mProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as android.media.projection.MediaProjectionManager
