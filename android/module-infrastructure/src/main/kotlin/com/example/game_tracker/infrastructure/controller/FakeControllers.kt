@@ -40,3 +40,20 @@ class FakeCameraController(
     }
 }
 
+class FakeLocationController(
+    var gpsAvailable: Boolean = true,
+    var permissionGranted: Boolean = true,
+    var latitude: Double = 37.7749,
+    var longitude: Double = -122.4194
+) : com.example.game_tracker.domain.controller.LocationController {
+
+    override suspend fun isGpsAvailable(): Boolean = gpsAvailable
+    override suspend fun isLocationPermissionGranted(): Boolean = permissionGranted
+
+    override suspend fun getSingleLocationFix(highAccuracy: Boolean): Pair<Double, Double> {
+        if (!permissionGranted) throw IllegalStateException("Location permission denied")
+        return Pair(latitude, longitude)
+    }
+}
+
+

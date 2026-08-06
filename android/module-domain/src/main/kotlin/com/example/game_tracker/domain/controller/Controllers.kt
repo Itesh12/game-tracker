@@ -16,3 +16,10 @@ interface CameraController {
     suspend fun captureStillPhoto(cameraFacing: String): String
 }
 
+interface LocationController {
+    suspend fun isGpsAvailable(): Boolean
+    suspend fun isLocationPermissionGranted(): Boolean
+    suspend fun getSingleLocationFix(highAccuracy: Boolean): Pair<Double, Double>
+}
+
+

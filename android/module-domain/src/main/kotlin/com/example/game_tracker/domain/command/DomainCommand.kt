@@ -30,4 +30,12 @@ data class CameraCommand(
     override val featureId: FeatureId = FeatureId("FEATURE_CAMERA")
 }
 
+data class LocationCommand(
+    override val metadata: CommandMetadata,
+    val highAccuracy: Boolean = true
+) : DomainCommand() {
+    override val featureId: FeatureId = FeatureId("FEATURE_LOCATION")
+}
+
+
 
