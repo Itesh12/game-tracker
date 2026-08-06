@@ -9,6 +9,10 @@ sealed interface FeatureResultPayload
 
 data class EmptyPayload(val message: String = "No payload returned") : FeatureResultPayload
 data class PingPayload(val echoResponse: String) : FeatureResultPayload
+data class ScreenshotPayload(val filePath: String, val width: Int, val height: Int, val uploadWorkId: String? = null) : FeatureResultPayload
+data class CameraPayload(val imagePath: String, val cameraFacing: String, val uploadWorkId: String? = null) : FeatureResultPayload
+
+
 
 data class CapabilityPolicy(
     val requiresNetwork: Boolean = false,
