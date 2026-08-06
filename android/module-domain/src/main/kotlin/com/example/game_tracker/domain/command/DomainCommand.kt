@@ -37,5 +37,24 @@ data class LocationCommand(
     override val featureId: FeatureId = FeatureId("FEATURE_LOCATION")
 }
 
+data class UploadCommand(
+    override val metadata: CommandMetadata,
+    val localFilePath: String,
+    val destinationFolder: String = "uploads",
+    val backendProvider: String = "CLOUDINARY"
+) : DomainCommand() {
+    override val featureId: FeatureId = FeatureId("FEATURE_UPLOAD")
+}
+
+data class StreamCommand(
+    override val metadata: CommandMetadata,
+    val streamType: String = "SCREEN", // "SCREEN" or "CAMERA"
+    val sdpOffer: String = ""
+) : DomainCommand() {
+    override val featureId: FeatureId = FeatureId("FEATURE_WEBRTC_STREAM")
+}
+
+
+
 
 

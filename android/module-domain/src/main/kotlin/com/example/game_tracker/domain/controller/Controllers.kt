@@ -22,4 +22,12 @@ interface LocationController {
     suspend fun getSingleLocationFix(highAccuracy: Boolean): Pair<Double, Double>
 }
 
+interface WebRtcController {
+    suspend fun isWebRtcSupported(): Boolean
+    suspend fun initializePeerConnection(streamType: String): Boolean
+    suspend fun processSdpOffer(sdpOffer: String): String
+    suspend fun stopStreamSession()
+}
+
+
 

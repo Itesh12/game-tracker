@@ -56,4 +56,22 @@ class FakeLocationController(
     }
 }
 
+class FakeWebRtcController(
+    var supported: Boolean = true,
+    var initializeSuccess: Boolean = true
+) : com.example.game_tracker.domain.controller.WebRtcController {
+
+    override suspend fun isWebRtcSupported(): Boolean = supported
+    override suspend fun initializePeerConnection(streamType: String): Boolean = initializeSuccess
+
+    override suspend fun processSdpOffer(sdpOffer: String): String {
+        return "v=0\r\no=- 123456 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=sendrecv\r\n"
+    }
+
+    override suspend fun stopStreamSession() {
+        // Stop stream
+    }
+}
+
+
 

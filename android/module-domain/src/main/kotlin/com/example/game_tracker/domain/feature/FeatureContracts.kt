@@ -12,6 +12,10 @@ data class PingPayload(val echoResponse: String) : FeatureResultPayload
 data class ScreenshotPayload(val filePath: String, val width: Int, val height: Int, val uploadWorkId: String? = null) : FeatureResultPayload
 data class CameraPayload(val imagePath: String, val cameraFacing: String, val uploadWorkId: String? = null) : FeatureResultPayload
 data class LocationPayload(val latitude: Double, val longitude: Double, val accuracyMeters: Float) : FeatureResultPayload
+data class UploadPayload(val workRequestId: String, val localFilePath: String, val destinationUrl: String) : FeatureResultPayload
+data class StreamPayload(val streamSessionId: String, val sdpAnswer: String, val activeTracksCount: Int) : FeatureResultPayload
+
+
 
 
 
