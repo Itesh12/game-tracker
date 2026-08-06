@@ -25,3 +25,24 @@
 - [ ] Samsung OneUI Hardware Test
 - [ ] Xiaomi HyperOS Hardware Test
 - [ ] Pixel Physical Device Test
+
+---
+
+## 3. Real-World Feature Qualification Matrix (RC-0.9 Milestone)
+
+| Lifecycle Scenario | Ping | Remote Screenshot | Still Camera | GPS Location | Upload Engine | WebRTC Stream |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Foreground** | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| **Background FGS** | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| **Screen Locked** | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| **Doze Mode** | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| **Battery Saver** | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| **LMK Process Death** | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| **Reboot Recovery** | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| **Force Stop** | ⚠️ OS Lockout | ⚠️ OS Lockout | ⚠️ OS Lockout | ⚠️ OS Lockout | ⚠️ OS Lockout | ⚠️ OS Lockout |
+| **API 26–35 Matrix** | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| **Samsung OneUI** | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| **Xiaomi HyperOS** | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| **Oppo ColorOS** | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| **Vivo Funtouch** | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+
