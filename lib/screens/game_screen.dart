@@ -16,8 +16,6 @@ class GameScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeCtrl = Get.find<ThemeController>();
-    final ludoCtrl = Get.find<LudoController>();
 
     return GetBuilder<ThemeController>(
       builder: (tCtrl) {

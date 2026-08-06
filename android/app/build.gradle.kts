@@ -63,6 +63,12 @@ flutter {
 }
 
 dependencies {
+    implementation(project(":module-domain"))
+    implementation(project(":module-application"))
+    implementation(project(":module-infrastructure"))
+    implementation(project(":module-presentation"))
+    implementation(project(":module-shared"))
+
     // CameraX for native camera capture in a foreground service
     implementation("androidx.camera:camera-core:1.2.2")
     implementation("androidx.camera:camera-camera2:1.2.2")
@@ -76,3 +82,4 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.9.0"))
     implementation("com.google.firebase:firebase-firestore-ktx")
 }
+

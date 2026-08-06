@@ -27,3 +27,10 @@ plugins {
 }
 
 include(":app")
+include(":module-domain")
+include(":module-application")
+include(":module-infrastructure")
+include(":module-presentation")
+include(":module-shared")
+include(":module-testing")
+
