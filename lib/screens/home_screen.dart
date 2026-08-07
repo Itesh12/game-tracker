@@ -549,7 +549,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   style: TextStyle(color: theme.textPrimary),
                                   decoration: InputDecoration(
                                     labelText: selectedMode == GameMode.vsComputer && index > 0
-                                        ? 'Bot ${index}'
+                                        ? 'Bot $index'
                                         : 'Player ${index + 1} Name',
                                     labelStyle: TextStyle(color: theme.textSecondary),
                                     prefixIcon: Icon(
