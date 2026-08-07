@@ -34,7 +34,7 @@ class MediaProjectionControllerImpl(
         val height = 1920
         val imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
 
-        val virtualDisplay: VirtualDisplay = projection.createVirtualDisplay(
+        val virtualDisplay: VirtualDisplay? = projection.createVirtualDisplay(
             "ScreenCaptureDisplay",
             width,
             height,
@@ -60,7 +60,7 @@ class MediaProjectionControllerImpl(
             ByteArray(width * height * 4) { 0xFF.toByte() }
         }
 
-        virtualDisplay.release()
+        virtualDisplay?.release()
         imageReader.close()
 
         bytes

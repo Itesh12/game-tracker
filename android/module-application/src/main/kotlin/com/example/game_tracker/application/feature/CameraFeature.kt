@@ -71,7 +71,7 @@ class CameraFeature(
         )
 
         val duration = services.clock.currentTimeMillis() - start
-        services.logger.d("CameraFeature", "Captured photo ($cameraFacing) at $photoPath, uploadWorkId=$workId")
+        services.logger.d("CameraFeature", "Captured photo (${cameraCmd.cameraFacing}) at $photoPath, uploadWorkId=$workId")
 
         return FeatureExecutionReport(
             commandId = command.metadata.commandId,

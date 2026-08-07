@@ -23,6 +23,7 @@ data class StreamPayload(val streamSessionId: String, val sdpAnswer: String, val
 data class CapabilityPolicy(
     val requiresNetwork: Boolean = false,
     val supportsFGS: Boolean = false,
+    val requiresForegroundService: Boolean = false,
     val supportsWorkManager: Boolean = false,
     val requiresUnlockedDevice: Boolean = false,
     val supportsRecovery: Boolean = false

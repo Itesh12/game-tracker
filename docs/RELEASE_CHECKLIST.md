@@ -106,7 +106,40 @@
 
 ---
 
-## 8. Official Production Release Sign-off Block
+---
+
+## 9. Release APK Functional Validation (Blocker #9)
+
+| Functional Validation Gate | Target Execution Status | Evidence Artifact |
+| :--- | :---: | :--- |
+| **Release Binary Build** | `./gradlew assembleRelease` | Release APK/AAB SHA-256 Checksum |
+| **Release Package Install** | `adb install -r release.apk` | Installation Log |
+| **Launch & Startup Verification** | Fresh Cold Start | Cold Start Latency Profile |
+| **MethodChannel IPC Execution** | IPC Method Calls | Logcat IPC Evidence |
+| **Room Database Migration/CRUD** | Persistent Command Log | Room Database Query Log |
+| **WorkManager Job Resumption** | Scheduled Upload Worker | WorkManager Logcat Dump |
+| **Foreground Service Notifications** | FGS Active Notifications | FGS Notification Log |
+| **R8 / ProGuard Obfuscation Audit** | Serialization & Reflection | ProGuard Mapping & Rules |
+
+---
+
+## 10. Release Evidence Pack Index Register
+
+| Blocker ID | Gate Status | Evidence File Path | Execution Notes |
+| :--- | :---: | :--- | :--- |
+| **Blocker #1** | 🟡 In Progress | `android/app/build/reports/androidTests/connected/index.html` | AndroidX Instrumentation Report |
+| **Blocker #2** | 🟡 Partially Verified | `test/command_platform_service_test.dart` | 61 Green Unit/Widget Tests |
+| **Blocker #3** | 🟡 Code Reviewed | `android/app/src/main/AndroidManifest.xml` | FGS & Permission Declarations |
+| **Blocker #4** | 🟡 Not Executed | `test/stress_test_log.txt` | Concurrent Payload Dispatch Log |
+| **Blocker #5** | ⚪ Pending | `android/app/build/outputs/apk/release/app-release.apk` | Release APK Binary |
+| **Blocker #6** | ⚪ Pending | `docs/performance_profile_report.txt` | Profiler & Memory Dumps |
+| **Blocker #7** | ⚪ Pending | `docs/oem_compatibility_matrix.txt` | Samsung/Xiaomi Hardware Log |
+| **Blocker #8** | 🔴 No-Go | `docs/RELEASE_CHECKLIST.md` | Formal Signature Block |
+| **Blocker #9** | ⚪ Pending | `docs/release_functional_validation_log.txt` | Release Binary Functional Log |
+
+---
+
+## 11. Official Production Release Sign-off Block
 
 ```
 ====================================================================
@@ -124,10 +157,11 @@ Release Engineering Signature: ___________________  [ Pending Evidence ]
 
 FINAL DECISION:
 [ ] GO  (Ship Release Build)
-[X] NO-GO (ExecuteconnectedAndroidTest & Real Device Matrix First)
+[X] NO-GO (Execute connectedAndroidTest & Real Device Matrix First)
 ====================================================================
 ```
 
 ---
 
 > **Golden Release Qualification Rule**: A feature is considered production-ready only when it is implemented, verified by automated tests, validated on supported Android runtime environments, and supported by reproducible execution evidence. Passing unit tests alone is not sufficient for production qualification.
+
