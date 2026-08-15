@@ -117,7 +117,7 @@ class CommandPlatformBridge(
 
         val cmdResult = engine.processCommand(command, pipelineContext, executionContext, systemServices)
 
-        when (cmdResult) {
+        return when (cmdResult) {
             is CommandResult.Completed -> {
                 val report = cmdResult.report
                 mapOf(
@@ -129,10 +129,24 @@ class CommandPlatformBridge(
                     "timestamp" to report.timestamp
                 )
             }
-            is CommandResult.PipelineError -> {
+            is CommandResult.Rejected -> {
                 mapOf(
-                    "status" to cmdResult.status.name,
+                    "status" to "REJECTED",
+                    "commandId" to cmdResult.commandId.value,
                     "reason" to cmdResult.reason
+                )
+            }
+            is CommandResult.BlockedByPlatform -> {
+                mapOf(
+                    "status" to "BLOCKED",
+                    "commandId" to cmdResult.commandId.value,
+                    "reason" to cmdResult.restriction
+                )
+            }
+            else -> {
+                mapOf(
+                    "status" to "PENDING",
+                    "result" to cmdResult.toString()
                 )
             }
         }
