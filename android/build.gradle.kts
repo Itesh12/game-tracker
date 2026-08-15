@@ -26,6 +26,8 @@ subprojects {
             project.extensions.configure<com.android.build.gradle.BaseExtension> {
                 compileSdkVersion(36)
             }
+            project.dependencies.add("implementation", "androidx.concurrent:concurrent-futures:1.2.0")
+            project.dependencies.add("implementation", "org.jspecify:jspecify:1.0.0")
         }
     }
     if (project.state.executed) {
