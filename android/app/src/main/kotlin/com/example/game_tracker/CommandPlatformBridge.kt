@@ -117,7 +117,7 @@ class CommandPlatformBridge(
 
         val cmdResult = engine.processCommand(command, pipelineContext, executionContext, systemServices)
 
-        return when (cmdResult) {
+        when (cmdResult) {
             is CommandResult.Completed -> {
                 val report = cmdResult.report
                 mapOf(
