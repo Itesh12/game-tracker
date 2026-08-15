@@ -153,6 +153,19 @@ class MainActivity : FlutterActivity() {
                         result.success(false)
                     }
                 }
+                "requestIgnoreBatteryOptimizations" -> {
+                    try {
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                            val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                data = android.net.Uri.parse("package:$packageName")
+                            }
+                            startActivity(intent)
+                        }
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
                 "hasCapturePermission" -> {
                     val has = MediaProjectionStore.hasPermission(this) ||
                         (mediaProjectionResultData != null && mediaProjectionResultCode != 0)

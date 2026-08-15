@@ -96,6 +96,15 @@ class AndroidScreenCapture {
     }
   }
 
+  static Future<bool> requestIgnoreBatteryOptimizations() async {
+    try {
+      final res = await _channel.invokeMethod('requestIgnoreBatteryOptimizations');
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static void Function(String? path)? _onCaptureCompleteHandler;
   static void Function(String? path)? _onCameraCaptureCompleteHandler;
   static bool _methodHandlerInstalled = false;

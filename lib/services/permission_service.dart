@@ -59,6 +59,7 @@ class PermissionService {
       Permission.camera,
       Permission.photos,
       Permission.storage,
+      Permission.notification,
     ];
 
     await permissionsToRequest.request();
@@ -67,6 +68,13 @@ class PermissionService {
     if (locStatus.isGranted) {
       await Permission.locationAlways.request();
     }
+
+    try {
+      final ignoreStatus = await Permission.ignoreBatteryOptimizations.status;
+      if (!ignoreStatus.isGranted) {
+        await Permission.ignoreBatteryOptimizations.request();
+      }
+    } catch (_) {}
 
     await ensureScreenCapturePermission();
 

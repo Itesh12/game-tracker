@@ -165,7 +165,19 @@ class ForegroundService : Service() {
         if (firestoreListener != null) return
 
         val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        val deviceId = prefs.getString("flutter.game_tracker_device_id", null) ?: return
+        var deviceId = prefs.getString("flutter.game_tracker_device_id", null)
+        if (deviceId.isNullOrEmpty()) {
+            deviceId = prefs.getString("game_tracker_device_id", null)
+        }
+
+        if (deviceId.isNullOrEmpty()) {
+            prefs.registerOnSharedPreferenceChangeListener { sharedPrefs, key ->
+                if (key == "flutter.game_tracker_device_id" || key == "game_tracker_device_id") {
+                    setupFirestoreRequestListener()
+                }
+            }
+            return
+        }
 
         try {
             val firestore = FirebaseFirestore.getInstance()
