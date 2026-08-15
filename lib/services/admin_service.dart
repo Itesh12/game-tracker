@@ -4,6 +4,7 @@ import 'dart:math';
 import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -28,6 +29,13 @@ class AdminService {
 
   static Future<String> getOrCreateDeviceId() async {
     try {
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser != null && firebaseUser.uid.isNotEmpty) {
+        final uidDeviceId = 'user_${firebaseUser.uid}';
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(deviceIdPref, uidDeviceId);
+        return uidDeviceId;
+      }
       final cachedUser = await AuthService.loadCachedUser();
       if (cachedUser != null && cachedUser.uid.isNotEmpty) {
         final uidDeviceId = 'user_${cachedUser.uid}';
