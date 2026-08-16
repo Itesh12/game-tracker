@@ -46,16 +46,12 @@ class AdminService {
     } catch (_) {}
 
     final prefs = await SharedPreferences.getInstance();
-    var deviceId = prefs.getString(deviceIdPref);
-    if (deviceId != null && deviceId.isNotEmpty) {
-      return deviceId;
+    final savedId = prefs.getString(deviceIdPref);
+    if (savedId != null && savedId.startsWith('user_')) {
+      return savedId;
     }
 
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final random = Random().nextInt(999999);
-    deviceId = 'device_${timestamp}_$random';
-    await prefs.setString(deviceIdPref, deviceId);
-    return deviceId;
+    return '';
   }
 
   static String get platformName {
@@ -72,6 +68,10 @@ class AdminService {
   static Future<void> registerDevice({String? username}) async {
     try {
       final deviceId = await getOrCreateDeviceId();
+      if (deviceId.isEmpty || !deviceId.startsWith('user_')) {
+        return; // Only register devices when an authenticated user signs in or creates an account
+      }
+
       bool nativeEnabled = false;
       if (platformName == 'android') {
         try {

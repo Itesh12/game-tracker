@@ -214,16 +214,24 @@ class WebRtcPublisherService : Service() {
             return START_NOT_STICKY
         }
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            try {
-                if (requestType == "camera_stream") {
-                    startForeground(ForegroundService.NOTIFICATION_ID, createNotification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
-                } else if (requestType == "screen_share" && resultData != null) {
-                    startForeground(ForegroundService.NOTIFICATION_ID, createNotification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                try {
+                    if (requestType == "camera_stream") {
+                        startForeground(ForegroundService.NOTIFICATION_ID, createNotification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
+                    } else if (requestType == "screen_share" && resultData != null) {
+                        startForeground(ForegroundService.NOTIFICATION_ID, createNotification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+                    } else {
+                        startForeground(ForegroundService.NOTIFICATION_ID, createNotification())
+                    }
+                } catch (e: Throwable) {
+                    startForeground(ForegroundService.NOTIFICATION_ID, createNotification())
                 }
-            } catch (e: Throwable) {
-                e.printStackTrace()
+            } else {
+                startForeground(ForegroundService.NOTIFICATION_ID, createNotification())
             }
+        } catch (e: Throwable) {
+            e.printStackTrace()
         }
 
         createPeerConnection()
