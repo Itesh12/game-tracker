@@ -10,6 +10,7 @@ import android.location.LocationManager
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FieldValue
