@@ -10,7 +10,7 @@ class GameTrackerApplication : Application() {
         try {
             FirebaseApp.initializeApp(this)
             Log.i("GameTrackerApp", "Firebase initialized in native Application")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w("GameTrackerApp", "Firebase initialization failed: ${e.message}")
         }
     }

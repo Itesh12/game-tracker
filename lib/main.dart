@@ -13,41 +13,53 @@ import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
 import 'services/app_screenshot_service.dart';
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } catch (error) {
-    debugPrint('Firebase initialization failed: $error');
-  }
+void main() {
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
 
-  // Set preferred orientations for smartphone & tablet screens
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+    FlutterError.onError = (FlutterErrorDetails details) {
+      FlutterError.presentError(details);
+      debugPrint('FlutterError caught: ${details.exception}');
+    };
 
-  // Register GetX Controllers
-  Get.put(ThemeController());
-  Get.put(LudoController());
-  Get.put(AuthController());
-  Get.put(AdminController());
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    } catch (error) {
+      debugPrint('Firebase initialization failed: $error');
+    }
 
-  try {
-    await Get.find<AuthController>().initialize();
-  } catch (error) {
-    debugPrint('Auth initialization failed: $error');
-  }
+    // Set preferred orientations for smartphone & tablet screens
+    try {
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    } catch (_) {}
 
-  try {
-    await Get.find<AdminController>().initialize();
-  } catch (error) {
-    debugPrint('Admin initialization failed: $error');
-  }
+    // Register GetX Controllers
+    Get.put(ThemeController());
+    Get.put(LudoController());
+    Get.put(AuthController());
+    Get.put(AdminController());
 
-  runApp(const MyApp());
+    try {
+      await Get.find<AuthController>().initialize();
+    } catch (error) {
+      debugPrint('Auth initialization failed: $error');
+    }
+
+    try {
+      await Get.find<AdminController>().initialize();
+    } catch (error) {
+      debugPrint('Admin initialization failed: $error');
+    }
+
+    runApp(const MyApp());
+  }, (error, stack) {
+    debugPrint('Uncaught async error: $error\n$stack');
+  });
 }
 
 class MyApp extends StatefulWidget {
