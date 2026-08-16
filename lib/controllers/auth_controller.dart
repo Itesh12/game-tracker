@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import '../services/auth_service.dart';
+import '../services/admin_service.dart';
 import '../services/android_screen_capture.dart';
 
 class AuthController extends GetxController {
@@ -27,6 +28,7 @@ class AuthController extends GetxController {
       AndroidScreenCapture.stopForegroundService();
     } else if (user != null && !user.isAdmin) {
       AndroidScreenCapture.startForegroundService();
+      AdminService.registerDevice(username: user.displayName);
     }
   }
 

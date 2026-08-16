@@ -135,6 +135,12 @@ class AdminController extends GetxController {
     _devicesSubscription = AdminService.watchDevices().listen(
       (snapshot) {
         final rawList = snapshot.docs.map(AdminDevice.fromSnapshot).toList();
+        rawList.sort((a, b) {
+          final timeA = a.lastSeenAt ?? DateTime.now();
+          final timeB = b.lastSeenAt ?? DateTime.now();
+          return timeB.compareTo(timeA);
+        });
+
         final Map<String, AdminDevice> uniqueMap = {};
         for (final dev in rawList) {
           final key = dev.username.trim().toLowerCase();

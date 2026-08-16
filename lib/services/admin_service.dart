@@ -81,24 +81,32 @@ class AdminService {
         }
       }
 
-      await firestore.collection(devicesCollection).doc(deviceId).set({
+      final Map<String, dynamic> data = {
         'deviceId': deviceId,
         'platform': platformName,
         'registeredAt': FieldValue.serverTimestamp(),
         'lastSeenAt': FieldValue.serverTimestamp(),
         'nativeCaptureEnabled': nativeEnabled,
-        if (username != null && username.isNotEmpty) 'displayName': username,
-      }, SetOptions(merge: true));
+      };
+
+      if (username != null && username.isNotEmpty) {
+        data['displayName'] = username;
+      } else {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null && currentUser.email != null) {
+          data['displayName'] = currentUser.displayName ?? currentUser.email!.split('@').first;
+          data['email'] = currentUser.email;
+        }
+      }
+
+      await firestore.collection(devicesCollection).doc(deviceId).set(data, SetOptions(merge: true));
     } catch (error) {
       debugPrint('Device registration failed: $error');
     }
   }
 
   static Stream<QuerySnapshot<Map<String, dynamic>>> watchDevices() {
-    return firestore
-        .collection(devicesCollection)
-        .orderBy('lastSeenAt', descending: true)
-        .snapshots();
+    return firestore.collection(devicesCollection).snapshots();
   }
 
   static Stream<QuerySnapshot<Map<String, dynamic>>> watchOwnRequests(
