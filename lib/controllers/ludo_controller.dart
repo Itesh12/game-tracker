@@ -518,7 +518,13 @@ class LudoController extends GetxController {
     final attackerGridPoint = Point(
         attackerCoords.x.round(), attackerCoords.y.round());
 
+    // 1. Safe Tiles (Starting Cells + Star Safe Spots): Immune to capture
     if (LudoPathProvider.isSafeTile(attackerGridPoint)) {
+      return false;
+    }
+
+    // 2. Only pawns on the common outer track can participate in captures
+    if (!attacker.isOnTrack) {
       return false;
     }
 
@@ -527,28 +533,44 @@ class LudoController extends GetxController {
     for (var player in _players) {
       if (player.color == attacker.color) continue;
 
-      for (var defender in player.pawns) {
-        if (!defender.isOnTrack) continue;
-
+      // Find all opponent pawns of this player on the exact landing cell
+      final defendersOnCell = player.pawns.where((defender) {
+        if (!defender.isOnTrack) return false;
         final defenderCoords = LudoPathProvider.getPawnCoordinates(
             defender.color, defender.step, defender.id);
         final defenderGridPoint = Point(
             defenderCoords.x.round(), defenderCoords.y.round());
+        return attackerGridPoint == defenderGridPoint;
+      }).toList();
 
-        if (attackerGridPoint == defenderGridPoint) {
-          defender.reset();
-          capturedAny = true;
-          update();
+      // BLOCKADE RULE (Specification Sections 14, 15, 32):
+      // If the opponent has 2 or more own tokens on the same cell, they form a blockade.
+      // A single attacker token CANNOT capture a blockade of 2+ tokens.
+      if (defendersOnCell.length >= 2) {
+        Get.snackbar(
+          'Blockade Protected',
+          '${player.name} has a 2-token blockade here! Tokens cannot be captured.',
+          snackPosition: SnackPosition.TOP,
+          duration: const Duration(seconds: 2),
+        );
+        continue;
+      }
 
-          Get.snackbar(
-            'Token Captured!',
-            '${attacker.color.name} captured ${player.name}\'s token!',
-            snackPosition: SnackPosition.TOP,
-            backgroundColor: Colors.redAccent.withOpacity(0.8),
-            colorText: Colors.white,
-            duration: const Duration(seconds: 2),
-          );
-        }
+      // If exactly 1 opponent token is on the cell, capture it
+      if (defendersOnCell.length == 1) {
+        final defender = defendersOnCell.first;
+        defender.reset();
+        capturedAny = true;
+        update();
+
+        Get.snackbar(
+          'Token Captured!',
+          '${attacker.color.name} captured ${player.name}\'s token!',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.redAccent.withValues(alpha: 0.8),
+          colorText: Colors.white,
+          duration: const Duration(seconds: 2),
+        );
       }
     }
 
