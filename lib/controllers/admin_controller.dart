@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import '../services/admin_service.dart';
@@ -8,6 +9,7 @@ class AdminDevice {
   final String deviceId;
   final String platform;
   final String username;
+  final String? email;
   final String? photoUrl;
   final bool nativeCaptureEnabled;
   final DateTime? lastSeenAt;
@@ -20,6 +22,7 @@ class AdminDevice {
     required this.deviceId,
     required this.platform,
     required this.username,
+    this.email,
     this.photoUrl,
     this.lastSeenAt,
     this.nativeCaptureEnabled = false,
@@ -47,6 +50,7 @@ class AdminDevice {
       deviceId: snapshot.id,
       platform: data['platform'] as String? ?? 'unknown',
       username: name,
+      email: data['email'] as String?,
       photoUrl: data['photoUrl'] as String?,
       nativeCaptureEnabled: data['nativeCaptureEnabled'] as bool? ?? false,
       lastSeenAt: (data['lastSeenAt'] as Timestamp?)?.toDate(),

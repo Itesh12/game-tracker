@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -62,6 +61,8 @@ class AdminService {
     if (defaultTargetPlatform == TargetPlatform.linux) return 'linux';
     return 'unknown';
   }
+
+  static String get adminSecret => 'LudoKingdomAdmin2026!';
 
   static Future<void> registerDevice({String? username}) async {
     try {
