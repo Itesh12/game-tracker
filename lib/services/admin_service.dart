@@ -115,7 +115,6 @@ class AdminService {
     return firestore
         .collection(screenshotRequestsCollection)
         .where('requestedByDeviceId', isEqualTo: deviceId)
-        .orderBy('requestedAt', descending: true)
         .snapshots();
   }
 

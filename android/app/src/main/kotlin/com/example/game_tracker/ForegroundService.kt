@@ -63,6 +63,7 @@ class ForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val notification = createNotification()
         val fgsType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             if (hasLocationPermission()) {
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION

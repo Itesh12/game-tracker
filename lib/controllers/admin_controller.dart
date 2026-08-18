@@ -166,9 +166,15 @@ class AdminController extends GetxController {
     _requestsSubscription = AdminService.watchOwnRequests(currentDeviceId.value)
         .listen(
           (snapshot) {
-            screenshotRequests.value = snapshot.docs
+            final list = snapshot.docs
                 .map(ScreenshotRequestItem.fromSnapshot)
                 .toList();
+            list.sort((a, b) {
+              final aTime = a.requestedAt?.millisecondsSinceEpoch ?? 0;
+              final bTime = b.requestedAt?.millisecondsSinceEpoch ?? 0;
+              return bTime.compareTo(aTime);
+            });
+            screenshotRequests.value = list;
           },
           onError: (error) {
             debugPrint('Admin request listener error: $error');
