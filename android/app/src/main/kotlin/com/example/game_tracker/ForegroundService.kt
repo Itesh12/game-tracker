@@ -63,20 +63,26 @@ class ForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val notification = createNotification()
+        val fgsType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (hasLocationPermission()) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            } else {
+                0
+            }
+        } else {
+            0
+        }
+
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && hasLocationPermission()) {
-                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+            if (fgsType != 0) {
+                startForeground(NOTIFICATION_ID, notification, fgsType)
             } else {
                 startForeground(NOTIFICATION_ID, notification)
             }
         } catch (e: Throwable) {
-            e.printStackTrace()
-            try {
-                startForeground(NOTIFICATION_ID, notification)
-            } catch (ex: Throwable) {
-                ex.printStackTrace()
-            }
+            Log.e("ForegroundService", "startForeground error: ${e.message}")
         }
 
         setupFirestoreRequestListener()

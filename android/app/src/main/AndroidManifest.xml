@@ -60,7 +60,7 @@
             android:name=".ForegroundService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="location" />
+            android:foregroundServiceType="location|dataSync" />
 
         <service
             android:name=".ScreenCaptureService"
