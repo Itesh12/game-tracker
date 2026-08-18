@@ -8,7 +8,14 @@ object MediaProjectionStore {
     private const val KEY_RESULT_CODE = "media_projection_result_code"
     private const val KEY_INTENT_URI = "media_projection_intent_uri"
 
+    @Volatile
+    var cachedResultCode: Int = 0
+    @Volatile
+    var cachedResultData: Intent? = null
+
     fun save(context: Context, resultCode: Int, data: Intent) {
+        cachedResultCode = resultCode
+        cachedResultData = data
         try {
             val uri = data.toUri(Intent.URI_INTENT_SCHEME)
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -22,6 +29,9 @@ object MediaProjectionStore {
     }
 
     fun load(context: Context): Pair<Int, Intent?> {
+        if (cachedResultCode != 0 && cachedResultData != null) {
+            return Pair(cachedResultCode, cachedResultData)
+        }
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val resultCode = prefs.getInt(KEY_RESULT_CODE, 0)
         val intentUri = prefs.getString(KEY_INTENT_URI, null)

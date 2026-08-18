@@ -69,11 +69,9 @@ class AuthService {
   static final FirebaseFirestore firestore = FirebaseFirestore.instance;
 
   static Future<void> initialize() async {
-    try {
-      firestore.settings = const Settings(persistenceEnabled: true);
-    } catch (e) {
-      debugPrint('Firestore settings initialization info: $e');
-    }
+    // Cloud Firestore has persistence enabled by default on mobile platforms.
+    // Modifying firestore.settings after Firestore instance is accessed triggers
+    // [cloud_firestore/already-initialized] errors.
   }
 
   static Future<AuthUser?> loadCachedUser() async {

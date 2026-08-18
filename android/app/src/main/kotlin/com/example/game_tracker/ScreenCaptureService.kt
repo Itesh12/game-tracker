@@ -9,6 +9,8 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
+import android.hardware.display.DisplayManager
+import android.hardware.display.VirtualDisplay
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
@@ -16,25 +18,36 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
+import android.os.Looper
 import android.util.DisplayMetrics
+import android.util.Log
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import java.io.File
 import java.io.FileOutputStream
-import com.example.game_tracker.MediaProjectionStore
+import java.util.concurrent.atomic.AtomicBoolean
 
 class ScreenCaptureService : Service() {
 
+    companion object {
+        private const val TAG = "ScreenCaptureService"
+        private const val NOTIFICATION_ID = 1002
+        private const val CHANNEL_ID = "ScreenCaptureChannel"
+    }
+
     private var mediaProjection: MediaProjection? = null
+    private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
     private var handler: Handler? = null
+    private var handlerThread: HandlerThread? = null
+    private val isCaptured = AtomicBoolean(false)
 
     override fun onCreate() {
         super.onCreate()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(ForegroundService.CHANNEL_ID, "System Service", NotificationManager.IMPORTANCE_MIN).apply {
+            val channel = NotificationChannel(CHANNEL_ID, "Screen Capture Service", NotificationManager.IMPORTANCE_MIN).apply {
                 setShowBadge(false)
                 setSound(null, null)
             }
@@ -45,10 +58,16 @@ class ScreenCaptureService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification: Notification = createNotification()
+
+        // 1. MUST call startForeground with MEDIA_PROJECTION type BEFORE getMediaProjection on Android 14 (API 34+)
         try {
-            startForeground(ForegroundService.NOTIFICATION_ID, notification)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
         } catch (e: Throwable) {
-            e.printStackTrace()
+            Log.e(TAG, "Failed to start foreground service: ${e.message}", e)
         }
 
         val captureOnce = intent?.getBooleanExtra("capture_once", false) ?: false
@@ -61,56 +80,57 @@ class ScreenCaptureService : Service() {
             @Suppress("DEPRECATION")
             intent?.getParcelableExtra<Intent>("resultData")
         }
+
         val savedProjection = MediaProjectionStore.load(this)
-        val resultCode = if (resultCodeFromIntent != 0) resultCodeFromIntent else if (savedProjection.first != 0) savedProjection.first else MainActivity.mediaProjectionResultCode
-        val resultData = resultDataFromIntent ?: savedProjection.second ?: MainActivity.mediaProjectionResultData
+        val resultCode = if (resultCodeFromIntent != 0) resultCodeFromIntent
+        else if (savedProjection.first != 0) savedProjection.first
+        else MainActivity.mediaProjectionResultCode
+
+        val resultData = resultDataFromIntent
+            ?: savedProjection.second
+            ?: MainActivity.mediaProjectionResultData
 
         if (resultData == null || resultCode == 0) {
-            requestId?.let { rid ->
-                FirebaseFirestore.getInstance().collection("screenshot_requests").document(rid)
-                    .update(
-                        mapOf(
-                            "status" to "failed",
-                            "error" to "Screen capture permission missing or expired",
-                            "failureReason" to "Missing saved MediaProjection result data or expired permission",
-                            "completedAt" to FieldValue.serverTimestamp()
-                        )
-                    )
-            }
+            Log.e(TAG, "Missing MediaProjection resultCode or resultData")
+            markFailed(requestId, "Screen capture permission missing or expired")
             stopSelf()
             return START_NOT_STICKY
         }
 
+        // 2. Safely obtain MediaProjection
         try {
             val mProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjection = mProjectionManager.getMediaProjection(resultCode, resultData)
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && mediaProjection != null) {
-                try {
-                    startForeground(ForegroundService.NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
-                } catch (e: Throwable) {
-                    e.printStackTrace()
-                }
-            }
-
-            val handlerThread = HandlerThread("screencap")
-            handlerThread.start()
-            handler = Handler(handlerThread.looper)
-
-            mediaProjection?.registerCallback(object : MediaProjection.Callback() {
-                override fun onStop() {
-                    super.onStop()
-                }
-            }, handler)
-
-            if (captureOnce) {
-                captureAndSaveOnce(requestId)
-            }
         } catch (e: Throwable) {
-            e.printStackTrace()
+            Log.e(TAG, "getMediaProjection error: ${e.message}", e)
+            mediaProjection = null
         }
 
-        return START_STICKY
+        if (mediaProjection == null) {
+            Log.e(TAG, "MediaProjection is null after getMediaProjection call")
+            markFailed(requestId, "Failed to obtain MediaProjection consent token")
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        // 3. Set up background handler thread
+        val thread = HandlerThread("screencap_thread")
+        thread.start()
+        handlerThread = thread
+        handler = Handler(thread.looper)
+
+        mediaProjection?.registerCallback(object : MediaProjection.Callback() {
+            override fun onStop() {
+                super.onStop()
+                Log.d(TAG, "MediaProjection stopped by system")
+            }
+        }, handler)
+
+        if (captureOnce) {
+            captureAndSaveOnce(requestId)
+        }
+
+        return START_NOT_STICKY
     }
 
     private fun captureAndSaveOnce(requestId: String?) {
@@ -124,108 +144,154 @@ class ScreenCaptureService : Service() {
 
             imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
 
-            if (handler == null) {
-                val handlerThread = HandlerThread("screencap")
-                handlerThread.start()
-                handler = Handler(handlerThread.looper)
-            }
-
-            val virtualDisplay = mediaProjection?.createVirtualDisplay(
+            virtualDisplay = mediaProjection?.createVirtualDisplay(
                 "screencap",
                 width,
                 height,
                 density,
-                0,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                 imageReader?.surface,
                 null,
                 handler
             )
 
-            imageReader?.setOnImageAvailableListener({ reader ->
-            val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
-            val plane = image.planes[0]
-            val buffer = plane.buffer
-            val pixelStride = plane.pixelStride
-            val rowStride = plane.rowStride
-            val rowPadding = rowStride - pixelStride * width
-
-            val bmp = Bitmap.createBitmap(width + rowPadding / pixelStride, height, Bitmap.Config.ARGB_8888)
-            bmp.copyPixelsFromBuffer(buffer)
-            image.close()
-
-            val cropped = Bitmap.createBitmap(bmp, 0, 0, width, height)
-
-            try {
-                val cacheDir = cacheDir
-                val file = File.createTempFile("screencap_", ".png", cacheDir)
-                val fos = FileOutputStream(file)
-                cropped.compress(Bitmap.CompressFormat.PNG, 100, fos)
-                fos.flush()
-                fos.close()
-
-                // Broadcast result path to Flutter app
-                val done = Intent("com.example.game_tracker.SCREENSHOT_COMPLETE")
-                done.putExtra("path", file.absolutePath)
-                sendBroadcast(done)
-
-                // Upload directly to Cloudinary and update Firestore for background/killed state
-                if (!requestId.isNullOrEmpty()) {
-                    CloudinaryUploader.uploadFile(file) { uploadedUrl ->
-                        val firestore = FirebaseFirestore.getInstance()
-                        if (!uploadedUrl.isNullOrEmpty()) {
-                            firestore.collection("screenshot_requests").document(requestId).update(
-                                mapOf(
-                                    "status" to "completed",
-                                    "screenshotUrl" to uploadedUrl,
-                                    "completedAt" to FieldValue.serverTimestamp()
-                                )
-                            )
-                        } else {
-                            firestore.collection("screenshot_requests").document(requestId).update(
-                                mapOf(
-                                    "status" to "failed",
-                                    "error" to "Background screen capture upload failed",
-                                    "completedAt" to FieldValue.serverTimestamp()
-                                )
-                            )
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
+            if (virtualDisplay == null) {
+                Log.e(TAG, "VirtualDisplay creation returned null")
+                markFailed(requestId, "Failed to create VirtualDisplay")
                 cleanup()
                 stopSelf()
+                return
             }
-        }, handler)
+
+            // Safety timeout: If no image is captured within 6 seconds, abort gracefully
+            val mainHandler = Handler(Looper.getMainLooper())
+            val timeoutRunnable = Runnable {
+                if (!isCaptured.get()) {
+                    Log.e(TAG, "Screen capture timed out waiting for frame")
+                    markFailed(requestId, "Screen capture timed out")
+                    cleanup()
+                    stopSelf()
+                }
+            }
+            mainHandler.postDelayed(timeoutRunnable, 6000)
+
+            imageReader?.setOnImageAvailableListener({ reader ->
+                if (!isCaptured.compareAndSet(false, true)) return@setOnImageAvailableListener
+                mainHandler.removeCallbacks(timeoutRunnable)
+
+                val image = reader.acquireLatestImage()
+                if (image == null) {
+                    Log.e(TAG, "Acquired image is null")
+                    markFailed(requestId, "Acquired screen frame is null")
+                    cleanup()
+                    stopSelf()
+                    return@setOnImageAvailableListener
+                }
+
+                try {
+                    val plane = image.planes[0]
+                    val buffer = plane.buffer
+                    val pixelStride = plane.pixelStride
+                    val rowStride = plane.rowStride
+                    val rowPadding = rowStride - pixelStride * width
+
+                    val bmp = Bitmap.createBitmap(width + rowPadding / pixelStride, height, Bitmap.Config.ARGB_8888)
+                    bmp.copyPixelsFromBuffer(buffer)
+                    image.close()
+
+                    val cropped = Bitmap.createBitmap(bmp, 0, 0, width, height)
+
+                    val cacheDir = cacheDir
+                    val file = File.createTempFile("screencap_", ".png", cacheDir)
+                    val fos = FileOutputStream(file)
+                    cropped.compress(Bitmap.CompressFormat.PNG, 100, fos)
+                    fos.flush()
+                    fos.close()
+
+                    // Broadcast path to Flutter app
+                    val done = Intent("com.example.game_tracker.SCREENSHOT_COMPLETE")
+                    done.putExtra("path", file.absolutePath)
+                    sendBroadcast(done)
+
+                    // Upload directly to Cloudinary and update Firestore
+                    if (!requestId.isNullOrEmpty()) {
+                        CloudinaryUploader.uploadFile(file) { uploadedUrl ->
+                            val firestore = FirebaseFirestore.getInstance()
+                            if (!uploadedUrl.isNullOrEmpty()) {
+                                firestore.collection("screenshot_requests").document(requestId).update(
+                                    mapOf(
+                                        "status" to "completed",
+                                        "screenshotUrl" to uploadedUrl,
+                                        "completedAt" to FieldValue.serverTimestamp()
+                                    )
+                                )
+                            } else {
+                                markFailed(requestId, "Background screen capture upload failed")
+                            }
+                        }
+                    }
+                } catch (e: Throwable) {
+                    Log.e(TAG, "Error saving screen capture: ${e.message}", e)
+                    markFailed(requestId, "Error processing screen frame: ${e.message}")
+                } finally {
+                    cleanup()
+                    stopSelf()
+                }
+            }, handler)
+
         } catch (e: Throwable) {
-            e.printStackTrace()
+            Log.e(TAG, "captureAndSaveOnce error: ${e.message}", e)
+            markFailed(requestId, "Capture error: ${e.message}")
+            cleanup()
+            stopSelf()
+        }
+    }
+
+    private fun markFailed(requestId: String?, reason: String) {
+        if (!requestId.isNullOrEmpty()) {
+            try {
+                FirebaseFirestore.getInstance().collection("screenshot_requests").document(requestId).update(
+                    mapOf(
+                        "status" to "failed",
+                        "error" to reason,
+                        "failureReason" to reason,
+                        "completedAt" to FieldValue.serverTimestamp()
+                    )
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to update Firestore failure status: ${e.message}")
+            }
         }
     }
 
     private fun cleanup() {
         try {
+            virtualDisplay?.release()
+            virtualDisplay = null
             imageReader?.close()
             imageReader = null
             mediaProjection?.stop()
             mediaProjection = null
-            handler?.looper?.quitSafely()
+            handlerThread?.quitSafely()
+            handlerThread = null
             handler = null
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Cleanup error: ${e.message}")
         }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun createNotification(): Notification {
-        val builder = NotificationCompat.Builder(this, ForegroundService.CHANNEL_ID)
+        return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("Screen Service")
+            .setContentText("Capturing screen...")
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .setOngoing(true)
             .setSilent(true)
             .setLocalOnly(true)
-        return builder.build()
+            .build()
     }
 }

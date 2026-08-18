@@ -31,17 +31,12 @@ class CameraCaptureService : Service() {
         val notification = createNotification()
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                startForeground(ForegroundService.NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
+                startForeground(1003, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
             } else {
-                startForeground(ForegroundService.NOTIFICATION_ID, notification)
+                startForeground(1003, notification)
             }
         } catch (e: Throwable) {
             e.printStackTrace()
-            try {
-                startForeground(ForegroundService.NOTIFICATION_ID, notification)
-            } catch (ex: Throwable) {
-                ex.printStackTrace()
-            }
         }
 
         val facing = intent?.getStringExtra("cameraFacing") ?: "front"
