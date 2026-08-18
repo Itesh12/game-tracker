@@ -268,19 +268,19 @@ class UserLocationScreen extends StatelessWidget {
                                           ],
                                         ),
                                       ],
-                                      if (lastTime != null) ...[
-                                        const Divider(height: 20),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            const Text('Last Updated:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                            Text(
-                                              '${lastTime.hour.toString().padLeft(2, '0')}:${lastTime.minute.toString().padLeft(2, '0')}:${lastTime.second.toString().padLeft(2, '0')}',
-                                              style: TextStyle(color: theme.textSecondary),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
+                                       if (lastTime != null) ...[
+                                         const Divider(height: 20),
+                                         Row(
+                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                           children: [
+                                             const Text('Last Updated:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                             Text(
+                                               '${lastTime.day.toString().padLeft(2, '0')}/${lastTime.month.toString().padLeft(2, '0')}/${lastTime.year} ${lastTime.hour.toString().padLeft(2, '0')}:${lastTime.minute.toString().padLeft(2, '0')}:${lastTime.second.toString().padLeft(2, '0')}',
+                                               style: TextStyle(color: theme.textSecondary, fontWeight: FontWeight.w600),
+                                             ),
+                                           ],
+                                         ),
+                                       ],
                                     ],
                                   ),
                                 ),
