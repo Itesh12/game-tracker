@@ -192,18 +192,6 @@ class MainActivity : FlutterActivity() {
                 mediaProjectionResultCode = resultCode
                 mediaProjectionResultData = data
                 MediaProjectionStore.save(this, resultCode, data)
-                // Start service so it can use the granted permission
-                val svcIntent = Intent(this, ScreenCaptureService::class.java)
-                svcIntent.putExtra("capture_once", true)
-                // pass the permission result directly into the service so the
-                // service doesn't rely on the Activity staying alive
-                svcIntent.putExtra("resultCode", mediaProjectionResultCode)
-                svcIntent.putExtra("resultData", mediaProjectionResultData)
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    startForegroundService(svcIntent)
-                } else {
-                    startService(svcIntent)
-                }
             }
         }
     }

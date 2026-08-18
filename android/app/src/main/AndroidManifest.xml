@@ -72,7 +72,7 @@
             android:name=".CameraCaptureService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="camera" />
+            android:foregroundServiceType="camera|dataSync" />
 
         <service
             android:name=".WebRtcPublisherService"

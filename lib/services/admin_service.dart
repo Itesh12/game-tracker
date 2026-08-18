@@ -400,6 +400,16 @@ class AdminService {
   }
 
   static Future<String?> _captureAndUploadCurrentFrame() async {
+    // 1. Try in-app frame capture first if the app is active in foreground
+    final inAppBytes = await AppScreenshotService.captureScreenshot();
+    if (inAppBytes != null && inAppBytes.isNotEmpty) {
+      final inAppUrl = await _uploadToCloudinary(inAppBytes);
+      if (inAppUrl != null) {
+        return inAppUrl;
+      }
+    }
+
+    // 2. Fall back to native background screen capture
     if (platformName == 'android') {
       final completer = Completer<String?>();
       AndroidScreenCapture.setOnCaptureComplete((path) async {
@@ -429,12 +439,7 @@ class AdminService {
       }
     }
 
-    final screenshotBytes = await AppScreenshotService.captureScreenshot();
-    if (screenshotBytes == null) {
-      return null;
-    }
-
-    return _uploadToCloudinary(screenshotBytes);
+    return null;
   }
 
   static Future<String?> uploadFileToCloudinary(File file) async {
