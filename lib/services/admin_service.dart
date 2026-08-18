@@ -63,10 +63,13 @@ class AdminService {
     return 'unknown';
   }
 
-  static String get adminSecret => 'LudoKingdomAdmin2026!';
-
   static Future<void> registerDevice({String? username}) async {
     try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null && currentUser.email?.toLowerCase() == AuthService.adminEmail) {
+        return; // Never register admin device in monitored devices list
+      }
+
       final deviceId = await getOrCreateDeviceId();
       if (deviceId.isEmpty || !deviceId.startsWith('user_')) {
         return; // Only register devices when an authenticated user signs in or creates an account

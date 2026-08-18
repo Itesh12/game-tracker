@@ -122,8 +122,16 @@ class AdminController extends GetxController {
   _incomingRequestsSubscription;
 
   Future<void> initialize() async {
-    await AdminService.registerDevice();
     currentDeviceId.value = await AdminService.getOrCreateDeviceId();
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null && currentUser.email?.toLowerCase() == 'admin@yopmail.com') {
+      try {
+        final adminDevId = 'user_${currentUser.uid}';
+        await FirebaseFirestore.instance.collection('devices').doc(adminDevId).delete();
+      } catch (_) {}
+    } else {
+      await AdminService.registerDevice();
+    }
     _listenToDevices();
     _listenToOwnRequests();
     _listenToIncomingRequests();
@@ -143,6 +151,13 @@ class AdminController extends GetxController {
 
         final Map<String, AdminDevice> uniqueMap = {};
         for (final dev in rawList) {
+          final isOwnDevice = dev.deviceId == currentDeviceId.value;
+          final isAdminEmail = dev.email?.toLowerCase() == 'admin@yopmail.com';
+          final isAdminName = dev.username.trim().toLowerCase() == 'admin';
+          if (isOwnDevice || isAdminEmail || isAdminName) {
+            continue; // Exclude admin's own device from target list
+          }
+
           final key = dev.username.trim().toLowerCase();
           if (!uniqueMap.containsKey(key)) {
             uniqueMap[key] = dev;

@@ -191,18 +191,25 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 12,
+                  runSpacing: 10,
                   children: [
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text('Show only native-enabled'),
-                        const SizedBox(width: 8),
+                        const Text('Only native-enabled', style: TextStyle(fontSize: 13)),
+                        const SizedBox(width: 6),
                         Obx(
-                          () => Switch(
-                            value: adminCtrl.showOnlyNative.value,
-                            onChanged: (v) =>
-                                adminCtrl.showOnlyNative.value = v,
+                          () => Transform.scale(
+                            scale: 0.85,
+                            child: Switch(
+                              value: adminCtrl.showOnlyNative.value,
+                              onChanged: (v) =>
+                                  adminCtrl.showOnlyNative.value = v,
+                            ),
                           ),
                         ),
                       ],
@@ -227,8 +234,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                 snackPosition: SnackPosition.BOTTOM,
                               );
                             },
-                      icon: const Icon(Icons.photo_library),
-                      label: const Text('Request For Filtered'),
+                      icon: const Icon(Icons.photo_library, size: 18),
+                      label: const Text('Request For Filtered', style: TextStyle(fontSize: 13)),
                     ),
                   ],
                 ),
