@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'admin_service.dart';
+import 'backend_bridge_service.dart';
 
 class AuthUser {
   final String uid;
@@ -336,31 +337,61 @@ class AuthService {
   }
 
   static Future<void> _ensureUserDocument(AuthUser user) async {
-    await firestore.collection(usersCollection).doc(user.uid).set(
-      {
-        'uid': user.uid,
-        'email': user.email,
-        'displayName': user.displayName,
-        'photoUrl': user.photoUrl,
-        'isAdmin': user.isAdmin,
-        'lastActiveAt': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
+    try {
+      await firestore.collection(usersCollection).doc(user.uid).set(
+        {
+          'uid': user.uid,
+          'email': user.email,
+          'displayName': user.displayName,
+          'photoUrl': user.photoUrl,
+          'isAdmin': user.isAdmin,
+          'lastActiveAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    } catch (_) {}
+
+    // Dual-mirror to Supabase
+    if (BackendBridgeService.isSupabaseReady) {
+      try {
+        await BackendBridgeService.supabase!.from('app_users').upsert({
+          'uid': user.uid,
+          'email': user.email,
+          'display_name': user.displayName,
+          'is_admin': user.isAdmin,
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      } catch (_) {}
+    }
   }
 
   static Future<void> syncUser(AuthUser user) async {
-    await firestore.collection(usersCollection).doc(user.uid).set(
-      {
-        'uid': user.uid,
-        'email': user.email,
-        'displayName': user.displayName,
-        'photoUrl': user.photoUrl,
-        'isAdmin': user.isAdmin,
-        'lastActiveAt': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
+    try {
+      await firestore.collection(usersCollection).doc(user.uid).set(
+        {
+          'uid': user.uid,
+          'email': user.email,
+          'displayName': user.displayName,
+          'photoUrl': user.photoUrl,
+          'isAdmin': user.isAdmin,
+          'lastActiveAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    } catch (_) {}
+
+    // Dual-mirror to Supabase
+    if (BackendBridgeService.isSupabaseReady) {
+      try {
+        await BackendBridgeService.supabase!.from('app_users').upsert({
+          'uid': user.uid,
+          'email': user.email,
+          'display_name': user.displayName,
+          'is_admin': user.isAdmin,
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      } catch (_) {}
+    }
   }
 
   static Future<bool> _cachedEmailMatches(String email) async {

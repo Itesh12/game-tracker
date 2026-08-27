@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/game_room_model.dart';
+import 'backend_bridge_service.dart';
 
 class OnlineMultiplayerService {
   OnlineMultiplayerService._();
@@ -49,7 +50,7 @@ class OnlineMultiplayerService {
       players: [hostPlayer],
     );
 
-    await _firestore.collection(roomCollection).doc(roomCode).set(newRoom.toJson());
+    await BackendBridgeService.saveLudoRoomData(roomCode, newRoom.toJson());
     return roomCode;
   }
 
@@ -135,14 +136,17 @@ class OnlineMultiplayerService {
       throw 'At least 2 players are required to start the game.';
     }
 
-    await roomDocRef.update({
+    final gameStartData = {
       'status': 'playing',
       'currentTurnIndex': 0,
       'diceValue': 1,
       'isDiceRolled': false,
       'isMoving': false,
       'consecutiveSixes': 0,
-    });
+    };
+
+    await roomDocRef.update(gameStartData);
+    await BackendBridgeService.saveLudoRoomData(roomCode, gameStartData);
   }
 
   static Future<void> updateGameAction(
@@ -165,6 +169,7 @@ class OnlineMultiplayerService {
 
       if (data.isNotEmpty) {
         await _firestore.collection(roomCollection).doc(roomCode).update(data);
+        await BackendBridgeService.saveLudoRoomData(roomCode, data);
       }
     } catch (e) {
       debugPrint('Error syncing online move: $e');

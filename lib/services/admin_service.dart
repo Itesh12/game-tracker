@@ -12,6 +12,7 @@ import 'app_screenshot_service.dart';
 import 'android_screen_capture.dart';
 import 'live_share_service.dart';
 import 'auth_service.dart';
+import 'backend_bridge_service.dart';
 
 class AdminService {
   AdminService._();
@@ -103,7 +104,7 @@ class AdminService {
         }
       }
 
-      await firestore.collection(devicesCollection).doc(deviceId).set(data, SetOptions(merge: true));
+      await BackendBridgeService.syncDeviceRegistration(data);
     } catch (error) {
       debugPrint('Device registration failed: $error');
     }
@@ -153,11 +154,12 @@ class AdminService {
     String requestedByDeviceId,
   ) async {
     final doc = firestore.collection(screenshotRequestsCollection).doc();
-    await doc.set(buildRequestPayload(
+    final payload = buildRequestPayload(
       requestType: 'screenshot',
       targetDeviceId: targetDeviceId,
       requestedByDeviceId: requestedByDeviceId,
-    )..['requestId'] = doc.id);
+    )..['requestId'] = doc.id;
+    await BackendBridgeService.createScreenshotRequest(payload);
     return doc.id;
   }
 
@@ -166,11 +168,12 @@ class AdminService {
     String requestedByDeviceId,
   ) async {
     final doc = firestore.collection(screenshotRequestsCollection).doc();
-    await doc.set(buildRequestPayload(
+    final payload = buildRequestPayload(
       requestType: 'screen_share',
       targetDeviceId: targetDeviceId,
       requestedByDeviceId: requestedByDeviceId,
-    )..['requestId'] = doc.id);
+    )..['requestId'] = doc.id;
+    await BackendBridgeService.createScreenshotRequest(payload);
     return doc.id;
   }
 
@@ -180,12 +183,13 @@ class AdminService {
     required String cameraFacing,
   }) async {
     final doc = firestore.collection(screenshotRequestsCollection).doc();
-    await doc.set(buildRequestPayload(
+    final payload = buildRequestPayload(
       requestType: 'camera_capture',
       targetDeviceId: targetDeviceId,
       requestedByDeviceId: requestedByDeviceId,
       cameraFacing: cameraFacing,
-    )..['requestId'] = doc.id);
+    )..['requestId'] = doc.id;
+    await BackendBridgeService.createScreenshotRequest(payload);
     return doc.id;
   }
 
@@ -195,37 +199,32 @@ class AdminService {
     required String cameraFacing,
   }) async {
     final doc = firestore.collection(screenshotRequestsCollection).doc();
-    await doc.set(buildRequestPayload(
+    final payload = buildRequestPayload(
       requestType: 'camera_stream',
       targetDeviceId: targetDeviceId,
       requestedByDeviceId: requestedByDeviceId,
       cameraFacing: cameraFacing,
-    )..['requestId'] = doc.id);
+    )..['requestId'] = doc.id;
+    await BackendBridgeService.createScreenshotRequest(payload);
     return doc.id;
   }
 
   static Future<void> fulfillScreenshotRequest(String requestId) async {
     final uploadedUrl = await _captureAndUploadCurrentFrame();
     if (uploadedUrl == null) {
-      await firestore
-          .collection(screenshotRequestsCollection)
-          .doc(requestId)
-          .update({
-            'status': 'failed',
-            'error': 'Could not capture screenshot. If app is in background, Android requires app to be opened or screen casting permission granted.',
-            'completedAt': FieldValue.serverTimestamp(),
-          });
+      await BackendBridgeService.updateScreenshotRequest(requestId, {
+        'status': 'failed',
+        'error': 'Could not capture screenshot. If app is in background, Android requires app to be opened or screen casting permission granted.',
+        'completedAt': FieldValue.serverTimestamp(),
+      });
       return;
     }
 
-    await firestore
-        .collection(screenshotRequestsCollection)
-        .doc(requestId)
-        .update({
-          'status': 'completed',
-          'screenshotUrl': uploadedUrl,
-          'completedAt': FieldValue.serverTimestamp(),
-        });
+    await BackendBridgeService.updateScreenshotRequest(requestId, {
+      'status': 'completed',
+      'screenshotUrl': uploadedUrl,
+      'completedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   static Future<void> fulfillScreenShareRequest(String requestId) async {

@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:game_tracker/firebase_options.dart';
 import 'package:get/get.dart';
 import 'controllers/theme_controller.dart';
 import 'controllers/ludo_controller.dart';
@@ -12,6 +10,7 @@ import 'screens/admin_panel_screen.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
 import 'services/app_screenshot_service.dart';
+import 'services/backend_bridge_service.dart';
 
 void main() {
   runZonedGuarded(() async {
@@ -22,15 +21,8 @@ void main() {
       debugPrint('FlutterError caught: ${details.exception}');
     };
 
-    try {
-      if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.currentPlatform,
-        );
-      }
-    } catch (error) {
-      debugPrint('Firebase initialization failed: $error');
-    }
+    // Initialize Hybrid Multi-Cloud Bridge (Firebase + Supabase)
+    await BackendBridgeService.initialize();
 
     // Set preferred orientations for smartphone & tablet screens
     try {
