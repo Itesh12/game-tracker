@@ -15,10 +15,10 @@ class BackendConfig {
   /// Active operating mode
   static BackendMode backendMode = BackendMode.hybridAutoFailover;
 
-  /// Supabase project credentials (Replace with your actual Supabase credentials if available)
-  static String supabaseUrl = 'https://ludokingdom.supabase.co';
+  /// Supabase project credentials
+  static String supabaseUrl = 'https://qnxmdslhixdmzujdjaoj.supabase.co';
   static String supabaseAnonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1ZG9raW5nZG9tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDkzMTIwMDAsImV4cCI6MjAyNDg4ODAwMH0.placeholder';
+      'sb_publishable_SeX9TxJqbgdAjG6sin70Uw_DsnpFHNR';
 
   /// Whether Supabase credentials are valid and active
   static bool get isSupabaseConfigured =>
