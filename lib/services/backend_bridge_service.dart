@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/backend_config.dart';
+import '../firebase_options.dart';
 
 class BackendBridgeService {
   static bool _isFirebaseReady = false;
@@ -20,10 +21,12 @@ class BackendBridgeService {
 
   /// Initialize both Firebase and Supabase cloud connectors
   static Future<void> initialize() async {
-    // 1. Initialize Firebase Core
+    // 1. Initialize Firebase Core with options and timeout
     try {
       if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp();
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        ).timeout(const Duration(seconds: 4));
       }
       _isFirebaseReady = true;
       debugPrint('[BackendBridge] Firebase initialized successfully.');
@@ -32,7 +35,7 @@ class BackendBridgeService {
       debugPrint('[BackendBridge] Firebase initialization warning: $e');
     }
 
-    // 2. Initialize Supabase if configured
+    // 2. Initialize Supabase if configured with timeout
     if (BackendConfig.isSupabaseConfigured) {
       try {
         await Supabase.initialize(
@@ -41,7 +44,7 @@ class BackendBridgeService {
           realtimeClientOptions: const RealtimeClientOptions(
             eventsPerSecond: 10,
           ),
-        );
+        ).timeout(const Duration(seconds: 4));
         _isSupabaseReady = true;
         debugPrint('[BackendBridge] Supabase initialized successfully.');
       } catch (e) {

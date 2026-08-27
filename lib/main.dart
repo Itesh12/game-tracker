@@ -92,22 +92,25 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return GetBuilder<ThemeController>(
       builder: (ctrl) {
-        return RepaintBoundary(
-          key: AppScreenshotService.screenshotKey,
-          child: GetMaterialApp(
-            title: 'Ludo Realm',
-            debugShowCheckedModeBanner: false,
-            theme: ctrl.themeData,
-            home: Obx(() {
-              final authCtrl = Get.find<AuthController>();
-              if (!authCtrl.isSignedIn) {
-                return const AuthScreen();
-              }
-              return authCtrl.isAdmin
-                  ? const AdminPanelScreen()
-                  : const HomeScreen();
-            }),
-          ),
+        return GetMaterialApp(
+          title: 'Ludo Realm',
+          debugShowCheckedModeBanner: false,
+          theme: ctrl.themeData,
+          builder: (context, child) {
+            return RepaintBoundary(
+              key: AppScreenshotService.screenshotKey,
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
+          home: Obx(() {
+            final authCtrl = Get.find<AuthController>();
+            if (!authCtrl.isSignedIn) {
+              return const AuthScreen();
+            }
+            return authCtrl.isAdmin
+                ? const AdminPanelScreen()
+                : const HomeScreen();
+          }),
         );
       },
     );
