@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -6,13 +7,71 @@ import '../controllers/admin_controller.dart';
 import '../controllers/theme_controller.dart';
 import '../services/backend_bridge_service.dart';
 
-class UserLocationScreen extends StatelessWidget {
+class UserLocationScreen extends StatefulWidget {
   const UserLocationScreen({
     super.key,
     required this.device,
   });
 
   final AdminDevice device;
+
+  @override
+  State<UserLocationScreen> createState() => _UserLocationScreenState();
+}
+
+class _UserLocationScreenState extends State<UserLocationScreen> {
+  late final Rx<AdminDevice> _liveDevice;
+  StreamSubscription<dynamic>? _supabaseSub;
+  StreamSubscription<dynamic>? _firestoreSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _liveDevice = Rx<AdminDevice>(widget.device);
+
+    // 1. Listen to Supabase Realtime for this device
+    if (BackendBridgeService.isSupabaseReady) {
+      try {
+        _supabaseSub = BackendBridgeService.supabase!
+            .from('devices')
+            .stream(primaryKey: ['device_id'])
+            .eq('device_id', widget.device.deviceId)
+            .listen((rows) {
+          if (rows.isNotEmpty) {
+            _liveDevice.value = AdminDevice.fromMap(rows.first);
+          }
+        }, onError: (e) {
+          debugPrint('UserLocationScreen Supabase stream error: $e');
+        });
+      } catch (e) {
+        debugPrint('UserLocationScreen Supabase setup error: $e');
+      }
+    }
+
+    // 2. Listen to Firestore
+    try {
+      _firestoreSub = FirebaseFirestore.instance
+          .collection('devices')
+          .doc(widget.device.deviceId)
+          .snapshots()
+          .listen((doc) {
+        if (doc.exists && doc.data() != null) {
+          _liveDevice.value = AdminDevice.fromSnapshot(doc);
+        }
+      }, onError: (e) {
+        debugPrint('UserLocationScreen Firestore stream error: $e');
+      });
+    } catch (e) {
+      debugPrint('UserLocationScreen Firestore setup error: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _supabaseSub?.cancel();
+    _firestoreSub?.cancel();
+    super.dispose();
+  }
 
   Future<void> _openInGoogleMaps(double lat, double lng) async {
     final Uri googleMapsUri =
@@ -32,7 +91,7 @@ class UserLocationScreen extends StatelessWidget {
     try {
       final adminCtrl = Get.find<AdminController>();
       final payload = {
-        'targetDeviceId': device.deviceId,
+        'targetDeviceId': widget.device.deviceId,
         'requestedByDeviceId': adminCtrl.currentDeviceId.value,
         'requestType': 'location_ping',
         'status': 'pending',
@@ -65,7 +124,7 @@ class UserLocationScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Live Location: ${device.username}'),
+        title: Text('Live Location: ${widget.device.username}'),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
@@ -86,15 +145,11 @@ class UserLocationScreen extends StatelessWidget {
         ),
         child: SafeArea(
           child: Obx(() {
-            final adminCtrl = Get.find<AdminController>();
-            final liveDevice = adminCtrl.devices.firstWhere(
-              (d) => d.deviceId == device.deviceId,
-              orElse: () => device,
-            );
-            final lat = liveDevice.latitude;
-            final lng = liveDevice.longitude;
-            final accuracy = liveDevice.accuracy;
-            final lastTime = liveDevice.lastLocationTime;
+            final dev = _liveDevice.value;
+            final lat = dev.latitude;
+            final lng = dev.longitude;
+            final accuracy = dev.accuracy;
+            final lastTime = dev.lastLocationTime;
 
             final hasLocation = lat != null && lng != null;
 
@@ -116,13 +171,13 @@ class UserLocationScreen extends StatelessWidget {
                         children: [
                           CircleAvatar(
                             radius: 30,
-                            backgroundColor: Colors.blueAccent.withOpacity(0.2),
-                            backgroundImage: liveDevice.photoUrl != null &&
-                                    liveDevice.photoUrl!.isNotEmpty
-                                ? NetworkImage(liveDevice.photoUrl!)
+                            backgroundColor: Colors.blueAccent.withValues(alpha: 0.2),
+                            backgroundImage: dev.photoUrl != null &&
+                                    dev.photoUrl!.isNotEmpty
+                                ? NetworkImage(dev.photoUrl!)
                                 : null,
-                            child: liveDevice.photoUrl == null ||
-                                    liveDevice.photoUrl!.isEmpty
+                            child: dev.photoUrl == null ||
+                                    dev.photoUrl!.isEmpty
                                 ? const Icon(Icons.person,
                                     color: Colors.blueAccent, size: 32)
                                 : null,
@@ -133,7 +188,7 @@ class UserLocationScreen extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  liveDevice.username,
+                                  dev.username,
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -142,42 +197,41 @@ class UserLocationScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Device ID: ${liveDevice.deviceId}',
+                                  dev.email ?? dev.deviceId,
                                   style: TextStyle(
-                                      fontSize: 12, color: theme.textSecondary),
+                                    fontSize: 13,
+                                    color: theme.textSecondary,
+                                  ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                const SizedBox(height: 4),
-                                InkWell(
-                                  onTap: _sendLocationPingRequest,
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 2.0),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          width: 8,
-                                          height: 8,
-                                          decoration: const BoxDecoration(
-                                            color: Colors.blueAccent,
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 6),
-                                        const Text(
-                                          'Manual Refresh (Tap to Ping)',
-                                          style: TextStyle(
-                                            color: Colors.blueAccent,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: hasLocation
+                                            ? Colors.greenAccent
+                                            : Colors.orangeAccent,
+                                        shape: BoxShape.circle,
+                                      ),
                                     ),
-                                  ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      hasLocation
+                                          ? 'GPS Position Locked'
+                                          : 'No GPS Fix Yet',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: hasLocation
+                                            ? Colors.greenAccent
+                                            : Colors.orangeAccent,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -188,159 +242,87 @@ class UserLocationScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
 
-                  // Coordinates Display Card
+                  // Coordinates & Action Container
                   Expanded(
                     child: Card(
                       color: theme.cardBg,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
-                        side: BorderSide(
-                            color: Colors.blueAccent.withOpacity(0.4)),
+                        side: BorderSide(color: theme.gridLine),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(24.0),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              hasLocation
-                                  ? Icons.location_on
-                                  : Icons.location_off,
-                              size: 64,
-                              color:
-                                  hasLocation ? Colors.redAccent : Colors.grey,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              hasLocation
-                                  ? 'REALTIME GPS COORDINATES'
-                                  : 'LOCATION UNAVAILABLE',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.5,
-                                color: theme.textSecondary,
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: (hasLocation ? Colors.blueAccent : Colors.grey)
+                                    .withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                hasLocation
+                                    ? Icons.location_on_rounded
+                                    : Icons.location_off_rounded,
+                                size: 56,
+                                color: hasLocation
+                                    ? Colors.blueAccent
+                                    : Colors.grey,
                               ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 24),
                             if (hasLocation) ...[
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: theme.boardBg,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: theme.gridLine),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text('Latitude:',
-                                            style: TextStyle(
-                                                fontWeight: FontWeight.bold)),
-                                        SelectableText(
-                                          lat.toStringAsFixed(6),
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.blueAccent,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const Divider(height: 20),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text('Longitude:',
-                                            style: TextStyle(
-                                                fontWeight: FontWeight.bold)),
-                                        SelectableText(
-                                          lng.toStringAsFixed(6),
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.blueAccent,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    if (accuracy != null) ...[
-                                      const Divider(height: 20),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          const Text('GPS Accuracy:',
-                                              style: TextStyle(
-                                                  fontWeight: FontWeight.bold)),
-                                          Text(
-                                            '±${accuracy.toStringAsFixed(1)} m',
-                                            style: TextStyle(
-                                                color: theme.textSecondary),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                    if (lastTime != null) ...[
-                                      const Divider(height: 20),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          const Text('Last Updated:',
-                                              style: TextStyle(
-                                                  fontWeight: FontWeight.bold)),
-                                          Text(
-                                            '${lastTime.day.toString().padLeft(2, '0')}/${lastTime.month.toString().padLeft(2, '0')}/${lastTime.year} ${lastTime.hour.toString().padLeft(2, '0')}:${lastTime.minute.toString().padLeft(2, '0')}:${lastTime.second.toString().padLeft(2, '0')}',
-                                            style: TextStyle(
-                                                color: theme.textSecondary,
-                                                fontWeight: FontWeight.w600),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ],
+                              Text(
+                                'Coordinates',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: theme.textSecondary,
+                                  letterSpacing: 1.2,
                                 ),
                               ),
-                              const SizedBox(height: 20),
-
-                              // PING & GET LATEST LOCATION BUTTON
-                              ElevatedButton.icon(
-                                onPressed: _sendLocationPingRequest,
-                                icon: const Icon(Icons.radar, size: 24),
-                                label: const Text(
-                                  'PING LATEST LOCATION',
+                              const SizedBox(height: 8),
+                              SelectableText(
+                                '${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.textPrimary,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              if (accuracy != null)
+                                Text(
+                                  'Accuracy: ~${accuracy.toStringAsFixed(1)} meters',
                                   style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 0.5),
+                                    fontSize: 13,
+                                    color: theme.textSecondary,
+                                  ),
                                 ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blueAccent,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 24, vertical: 15),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16)),
-                                  elevation: 5,
+                              if (lastTime != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Reported: ${lastTime.toLocal().toString().split('.').first}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: theme.textSecondary,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 12),
-
-                              // OPEN IN GOOGLE MAPS BUTTON
+                              ],
+                              const SizedBox(height: 32),
                               ElevatedButton.icon(
                                 onPressed: () => _openInGoogleMaps(lat, lng),
-                                icon: const Icon(Icons.map_rounded, size: 24),
+                                icon: const Icon(Icons.map_rounded, size: 22),
                                 label: const Text(
                                   'OPEN IN GOOGLE MAPS',
                                   style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 0.5),
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.redAccent,
@@ -350,6 +332,20 @@ class UserLocationScreen extends StatelessWidget {
                                   shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(16)),
                                   elevation: 5,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              OutlinedButton.icon(
+                                onPressed: _sendLocationPingRequest,
+                                icon: const Icon(Icons.radar, size: 20),
+                                label: const Text('PING FOR FRESH LOCATION'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.blueAccent,
+                                  side: const BorderSide(color: Colors.blueAccent),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 20, vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14)),
                                 ),
                               ),
                             ] else ...[

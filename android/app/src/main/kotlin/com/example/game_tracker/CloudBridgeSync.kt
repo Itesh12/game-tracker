@@ -33,7 +33,7 @@ object CloudBridgeSync {
             if (error != null) updates["error"] = error
             if (failureReason != null) updates["failureReason"] = failureReason
 
-            firestore.collection("screenshot_requests").document(requestId).update(updates)
+            firestore.collection("screenshot_requests").document(requestId).set(updates, com.google.firebase.firestore.SetOptions.merge())
         } catch (e: Throwable) {
             Log.e(TAG, "Firestore updateRequestStatus error: ${e.message}")
         }
@@ -41,23 +41,26 @@ object CloudBridgeSync {
         // 2. Dual-Mirror Update to Supabase REST API
         Thread {
             try {
-                val patchUrl = URL("$SUPABASE_URL/rest/v1/screenshot_requests?id=eq.$requestId")
-                val conn = patchUrl.openConnection() as HttpURLConnection
+                val postUrl = URL("$SUPABASE_URL/rest/v1/screenshot_requests")
+                val conn = postUrl.openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"
-                conn.setRequestProperty("X-HTTP-Method-Override", "PATCH")
                 conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
                 conn.setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
                 conn.setRequestProperty("Content-Type", "application/json")
-                conn.setRequestProperty("Prefer", "return=minimal")
+                conn.setRequestProperty("Prefer", "resolution=merge-duplicates")
                 conn.connectTimeout = 8000
                 conn.readTimeout = 8000
                 conn.doOutput = true
 
                 val jsonBody = JSONObject().apply {
+                    put("id", requestId)
                     put("status", status)
                     if (screenshotUrl != null) put("screenshot_url", screenshotUrl)
                     if (error != null) put("error", error)
                     if (failureReason != null) put("failure_reason", failureReason)
+                    put("completed_at", java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
+                        timeZone = java.util.TimeZone.getTimeZone("UTC")
+                    }.format(java.util.Date()))
                 }
 
                 conn.outputStream.use { it.write(jsonBody.toString().toByteArray(Charsets.UTF_8)) }
@@ -88,31 +91,34 @@ object CloudBridgeSync {
                 "lastLocationTime" to timestamp,
                 "lastSeenAt" to FieldValue.serverTimestamp()
             )
-            firestore.collection("devices").document(deviceId).update(updates)
+            firestore.collection("devices").document(deviceId).set(updates, com.google.firebase.firestore.SetOptions.merge())
         } catch (e: Throwable) {
             Log.e(TAG, "Firestore updateDeviceLocation error: ${e.message}")
         }
 
-        // 2. Dual-Mirror Update to Supabase REST API
+        // 2. Dual-Mirror Upsert to Supabase REST API
         Thread {
             try {
-                val patchUrl = URL("$SUPABASE_URL/rest/v1/devices?device_id=eq.$deviceId")
-                val conn = patchUrl.openConnection() as HttpURLConnection
+                val postUrl = URL("$SUPABASE_URL/rest/v1/devices")
+                val conn = postUrl.openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"
-                conn.setRequestProperty("X-HTTP-Method-Override", "PATCH")
                 conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
                 conn.setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
                 conn.setRequestProperty("Content-Type", "application/json")
-                conn.setRequestProperty("Prefer", "return=minimal")
+                conn.setRequestProperty("Prefer", "resolution=merge-duplicates")
                 conn.connectTimeout = 8000
                 conn.readTimeout = 8000
                 conn.doOutput = true
 
                 val jsonBody = JSONObject().apply {
+                    put("device_id", deviceId)
                     put("latitude", latitude)
                     put("longitude", longitude)
                     put("accuracy", accuracy)
                     put("last_location_time", timestamp)
+                    put("last_seen_at", java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
+                        timeZone = java.util.TimeZone.getTimeZone("UTC")
+                    }.format(java.util.Date()))
                 }
 
                 conn.outputStream.use { it.write(jsonBody.toString().toByteArray(Charsets.UTF_8)) }

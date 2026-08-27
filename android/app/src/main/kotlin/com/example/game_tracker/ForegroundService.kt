@@ -180,7 +180,16 @@ class ForegroundService : Service() {
 
     private fun updateFirestoreLocation(location: Location, requestId: String? = null) {
         val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        val deviceId = prefs.getString("flutter.game_tracker_device_id", null) ?: return
+        var deviceId = prefs.getString("flutter.game_tracker_device_id", null)
+        if (deviceId.isNullOrEmpty()) {
+            deviceId = prefs.getString("game_tracker_device_id", null)
+        }
+        if (deviceId.isNullOrEmpty()) {
+            Log.e("ForegroundService", "Cannot update location: deviceId is null or empty")
+            return
+        }
+
+        Log.d("ForegroundService", "Updating location for $deviceId: ${location.latitude}, ${location.longitude}")
 
         CloudBridgeSync.updateDeviceLocation(
             deviceId = deviceId,
