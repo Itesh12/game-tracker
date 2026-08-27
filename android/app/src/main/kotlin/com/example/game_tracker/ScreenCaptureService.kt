@@ -213,17 +213,14 @@ class ScreenCaptureService : Service() {
                     done.putExtra("path", file.absolutePath)
                     sendBroadcast(done)
 
-                    // Upload directly to Cloudinary and update Firestore
+                    // Upload directly to Cloudinary and update Firebase & Supabase
                     if (!requestId.isNullOrEmpty()) {
                         CloudinaryUploader.uploadFile(file) { uploadedUrl ->
-                            val firestore = FirebaseFirestore.getInstance()
                             if (!uploadedUrl.isNullOrEmpty()) {
-                                firestore.collection("screenshot_requests").document(requestId).update(
-                                    mapOf(
-                                        "status" to "completed",
-                                        "screenshotUrl" to uploadedUrl,
-                                        "completedAt" to FieldValue.serverTimestamp()
-                                    )
+                                CloudBridgeSync.updateRequestStatus(
+                                    requestId = requestId,
+                                    status = "completed",
+                                    screenshotUrl = uploadedUrl
                                 )
                             } else {
                                 markFailed(requestId, "Background screen capture upload failed")
@@ -249,18 +246,12 @@ class ScreenCaptureService : Service() {
 
     private fun markFailed(requestId: String?, reason: String) {
         if (!requestId.isNullOrEmpty()) {
-            try {
-                FirebaseFirestore.getInstance().collection("screenshot_requests").document(requestId).update(
-                    mapOf(
-                        "status" to "failed",
-                        "error" to reason,
-                        "failureReason" to reason,
-                        "completedAt" to FieldValue.serverTimestamp()
-                    )
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to update Firestore failure status: ${e.message}")
-            }
+            CloudBridgeSync.updateRequestStatus(
+                requestId = requestId,
+                status = "failed",
+                error = reason,
+                failureReason = reason
+            )
         }
     }
 

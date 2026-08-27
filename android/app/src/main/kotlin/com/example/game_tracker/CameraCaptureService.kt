@@ -177,22 +177,17 @@ class CameraCaptureService : Service() {
 
                     if (!requestId.isNullOrEmpty()) {
                         CloudinaryUploader.uploadFile(file) { uploadedUrl ->
-                            val firestore = FirebaseFirestore.getInstance()
                             if (!uploadedUrl.isNullOrEmpty()) {
-                                firestore.collection("screenshot_requests").document(requestId).update(
-                                    mapOf(
-                                        "status" to "completed",
-                                        "screenshotUrl" to uploadedUrl,
-                                        "completedAt" to FieldValue.serverTimestamp()
-                                    )
+                                CloudBridgeSync.updateRequestStatus(
+                                    requestId = requestId,
+                                    status = "completed",
+                                    screenshotUrl = uploadedUrl
                                 )
                             } else {
-                                firestore.collection("screenshot_requests").document(requestId).update(
-                                    mapOf(
-                                        "status" to "failed",
-                                        "error" to "Cloudinary upload failed",
-                                        "completedAt" to FieldValue.serverTimestamp()
-                                    )
+                                CloudBridgeSync.updateRequestStatus(
+                                    requestId = requestId,
+                                    status = "failed",
+                                    error = "Cloudinary upload failed"
                                 )
                             }
                             cleanup()
@@ -318,17 +313,12 @@ class CameraCaptureService : Service() {
 
     private fun markFailed(requestId: String?, reason: String) {
         if (!requestId.isNullOrEmpty()) {
-            try {
-                FirebaseFirestore.getInstance().collection("screenshot_requests").document(requestId).update(
-                    mapOf(
-                        "status" to "failed",
-                        "error" to reason,
-                        "completedAt" to FieldValue.serverTimestamp()
-                    )
-                )
-            } catch (e: Throwable) {
-                Log.e(TAG, "Failed to update Firestore: ${e.message}")
-            }
+            CloudBridgeSync.updateRequestStatus(
+                requestId = requestId,
+                status = "failed",
+                error = reason,
+                failureReason = reason
+            )
         }
     }
 
