@@ -241,10 +241,21 @@ class CameraCaptureService : Service() {
                             override fun onConfigured(session: CameraCaptureSession) {
                                 captureSession = session
                                 try {
-                                    val req = device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
-                                    req.addTarget(surface)
-                                    req.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
-                                    session.capture(req.build(), object : CameraCaptureSession.CaptureCallback() {}, bgHandler)
+                                    val reqBuilder = try {
+                                        device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
+                                    } catch (t1: Throwable) {
+                                        Log.w(TAG, "TEMPLATE_STILL_CAPTURE unsupported, falling back to TEMPLATE_PREVIEW: ${t1.message}")
+                                        try {
+                                            device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+                                        } catch (t2: Throwable) {
+                                            device.createCaptureRequest(CameraDevice.TEMPLATE_RECORD)
+                                        }
+                                    }
+                                    reqBuilder.addTarget(surface)
+                                    try {
+                                        reqBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+                                    } catch (_: Throwable) {}
+                                    session.capture(reqBuilder.build(), object : CameraCaptureSession.CaptureCallback() {}, bgHandler)
                                 } catch (e: Throwable) {
                                     Log.e(TAG, "Failed to send capture request: ${e.message}", e)
                                     if (isDone.compareAndSet(false, true)) {

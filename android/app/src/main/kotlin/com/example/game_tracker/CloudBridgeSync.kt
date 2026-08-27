@@ -41,19 +41,19 @@ object CloudBridgeSync {
         // 2. Dual-Mirror Update to Supabase REST API
         Thread {
             try {
-                val postUrl = URL("$SUPABASE_URL/rest/v1/screenshot_requests")
-                val conn = postUrl.openConnection() as HttpURLConnection
+                val patchUrl = URL("$SUPABASE_URL/rest/v1/screenshot_requests?id=eq.$requestId")
+                val conn = patchUrl.openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"
+                conn.setRequestProperty("X-HTTP-Method-Override", "PATCH")
                 conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
                 conn.setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
                 conn.setRequestProperty("Content-Type", "application/json")
-                conn.setRequestProperty("Prefer", "resolution=merge-duplicates")
+                conn.setRequestProperty("Prefer", "return=minimal")
                 conn.connectTimeout = 8000
                 conn.readTimeout = 8000
                 conn.doOutput = true
 
                 val jsonBody = JSONObject().apply {
-                    put("id", requestId)
                     put("status", status)
                     if (screenshotUrl != null) put("screenshot_url", screenshotUrl)
                     if (error != null) put("error", error)

@@ -304,17 +304,12 @@ class WebRtcPublisherService : Service() {
 
     private fun markFailed(requestId: String?, reason: String) {
         if (!requestId.isNullOrEmpty()) {
-            try {
-                firestore.collection("screenshot_requests").document(requestId).update(
-                    mapOf(
-                        "status" to "failed",
-                        "error" to reason,
-                        "failureReason" to reason
-                    )
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "Error updating Firestore failure status: ${e.message}")
-            }
+            CloudBridgeSync.updateRequestStatus(
+                requestId = requestId,
+                status = "failed",
+                error = reason,
+                failureReason = reason
+            )
         }
     }
 
