@@ -129,11 +129,12 @@ class AdminController extends GetxController {
   Future<void> initialize() async {
     isReady.value = true;
     _listenToDevices();
-    _listenToOwnRequests();
-    _listenToIncomingRequests();
 
     try {
-      currentDeviceId.value = await AdminService.getOrCreateDeviceId();
+      final devId = await AdminService.getOrCreateDeviceId();
+      if (devId.isNotEmpty) {
+        updateCurrentDeviceId(devId);
+      }
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null &&
           currentUser.email?.toLowerCase() == 'admin@yopmail.com') {
@@ -150,6 +151,13 @@ class AdminController extends GetxController {
     } catch (e) {
       debugPrint('Non-fatal AdminController background registration error: $e');
     }
+  }
+
+  void updateCurrentDeviceId(String newDeviceId) {
+    if (newDeviceId.isEmpty) return;
+    currentDeviceId.value = newDeviceId;
+    _listenToOwnRequests();
+    _listenToIncomingRequests();
   }
 
   void _listenToDevices() {

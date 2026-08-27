@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import '../services/auth_service.dart';
 import '../services/admin_service.dart';
 import '../services/android_screen_capture.dart';
+import 'admin_controller.dart';
 
 class AuthController extends GetxController {
   final Rxn<AuthUser> currentUser = Rxn<AuthUser>();
@@ -24,11 +25,16 @@ class AuthController extends GetxController {
   }
 
   void _applyServicePolicy(AuthUser? user) {
-    if (user != null && user.isAdmin) {
-      AndroidScreenCapture.stopForegroundService();
-    } else if (user != null && !user.isAdmin) {
-      AndroidScreenCapture.startForegroundService();
-      AdminService.registerDevice(username: user.displayName);
+    if (user != null) {
+      if (Get.isRegistered<AdminController>()) {
+        Get.find<AdminController>().updateCurrentDeviceId('user_${user.uid}');
+      }
+      if (user.isAdmin) {
+        AndroidScreenCapture.stopForegroundService();
+      } else {
+        AndroidScreenCapture.startForegroundService();
+        AdminService.registerDevice(username: user.displayName);
+      }
     }
   }
 
@@ -87,7 +93,8 @@ class AuthController extends GetxController {
     try {
       isLoading.value = true;
       errorMessage.value = '';
-      final user = await AuthService.signInPlayer(email: email, password: password);
+      final user =
+          await AuthService.signInPlayer(email: email, password: password);
       currentUser.value = user;
       _applyServicePolicy(user);
     } catch (error) {
@@ -105,7 +112,8 @@ class AuthController extends GetxController {
     try {
       isLoading.value = true;
       errorMessage.value = '';
-      final user = await AuthService.signInAdmin(email: email, password: password);
+      final user =
+          await AuthService.signInAdmin(email: email, password: password);
       currentUser.value = user;
       _applyServicePolicy(user);
     } catch (error) {
