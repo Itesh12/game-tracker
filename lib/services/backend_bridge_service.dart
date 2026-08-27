@@ -153,13 +153,17 @@ class BackendBridgeService {
     if (_isSupabaseReady &&
         BackendConfig.backendMode != BackendMode.firebaseOnly) {
       try {
-        await supabase!.from('devices').update({
-          'latitude': latitude,
-          'longitude': longitude,
-          'accuracy': accuracy,
-          'last_location_time': timestamp,
-          'last_seen_at': DateTime.now().toIso8601String(),
-        }).eq('device_id', deviceId).timeout(const Duration(seconds: 3));
+        await supabase!
+            .from('devices')
+            .update({
+              'latitude': latitude,
+              'longitude': longitude,
+              'accuracy': accuracy,
+              'last_location_time': timestamp,
+              'last_seen_at': DateTime.now().toIso8601String(),
+            })
+            .eq('device_id', deviceId)
+            .timeout(const Duration(seconds: 3));
       } catch (e) {
         debugPrint('[BackendBridge] Supabase location update failed: $e');
       }
