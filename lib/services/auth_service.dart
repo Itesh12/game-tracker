@@ -364,7 +364,7 @@ class AuthService {
           'display_name': user.displayName,
           'is_admin': user.isAdmin,
           'updated_at': DateTime.now().toIso8601String(),
-        });
+        }).timeout(const Duration(seconds: 3));
       } catch (_) {}
     }
   }
@@ -381,7 +381,7 @@ class AuthService {
           'lastActiveAt': FieldValue.serverTimestamp(),
         },
         SetOptions(merge: true),
-      );
+      ).timeout(const Duration(seconds: 3));
     } catch (_) {}
 
     // Dual-mirror to Supabase
@@ -393,7 +393,7 @@ class AuthService {
           'display_name': user.displayName,
           'is_admin': user.isAdmin,
           'updated_at': DateTime.now().toIso8601String(),
-        });
+        }).timeout(const Duration(seconds: 3));
       } catch (_) {}
     }
   }

@@ -93,7 +93,8 @@ class BackendBridgeService {
         await FirebaseFirestore.instance
             .collection('devices')
             .doc(deviceId)
-            .set(data, SetOptions(merge: true));
+            .set(data, SetOptions(merge: true))
+            .timeout(const Duration(seconds: 3));
       } catch (e) {
         debugPrint('[BackendBridge] Firestore device register failed: $e');
       }
@@ -111,7 +112,10 @@ class BackendBridgeService {
           'native_capture_enabled': data['nativeCaptureEnabled'] ?? false,
           'last_seen_at': DateTime.now().toIso8601String(),
         };
-        await supabase!.from('devices').upsert(supabaseData);
+        await supabase!
+            .from('devices')
+            .upsert(supabaseData)
+            .timeout(const Duration(seconds: 3));
       } catch (e) {
         debugPrint(
             '[BackendBridge] Supabase device register mirror failed: $e');
@@ -139,7 +143,7 @@ class BackendBridgeService {
           'accuracy': accuracy,
           'lastLocationTime': timestamp,
           'lastSeenAt': FieldValue.serverTimestamp(),
-        });
+        }).timeout(const Duration(seconds: 3));
       } catch (e) {
         debugPrint('[BackendBridge] Firestore location update failed: $e');
       }
@@ -155,7 +159,7 @@ class BackendBridgeService {
           'accuracy': accuracy,
           'last_location_time': timestamp,
           'last_seen_at': DateTime.now().toIso8601String(),
-        }).eq('device_id', deviceId);
+        }).eq('device_id', deviceId).timeout(const Duration(seconds: 3));
       } catch (e) {
         debugPrint('[BackendBridge] Supabase location update failed: $e');
       }
@@ -180,7 +184,8 @@ class BackendBridgeService {
         await FirebaseFirestore.instance
             .collection('screenshot_requests')
             .doc(requestId)
-            .set(requestPayload, SetOptions(merge: true));
+            .set(requestPayload, SetOptions(merge: true))
+            .timeout(const Duration(seconds: 3));
         firestoreSuccess = true;
       } catch (e) {
         debugPrint('[BackendBridge] Firestore create request failed: $e');
@@ -201,7 +206,10 @@ class BackendBridgeService {
           'status': requestPayload['status'] ?? 'pending',
           'requested_at': DateTime.now().toIso8601String(),
         };
-        await supabase!.from('screenshot_requests').upsert(supabaseRow);
+        await supabase!
+            .from('screenshot_requests')
+            .upsert(supabaseRow)
+            .timeout(const Duration(seconds: 3));
       } catch (e) {
         debugPrint('[BackendBridge] Supabase create request failed: $e');
       }
@@ -221,7 +229,8 @@ class BackendBridgeService {
         await FirebaseFirestore.instance
             .collection('screenshot_requests')
             .doc(requestId)
-            .update(updates);
+            .update(updates)
+            .timeout(const Duration(seconds: 3));
       } catch (e) {
         debugPrint('[BackendBridge] Firestore request update failed: $e');
       }
@@ -256,7 +265,8 @@ class BackendBridgeService {
           await supabase!
               .from('screenshot_requests')
               .update(supabaseUpdates)
-              .eq('id', requestId);
+              .eq('id', requestId)
+              .timeout(const Duration(seconds: 3));
         }
       } catch (e) {
         debugPrint('[BackendBridge] Supabase request update failed: $e');
@@ -277,7 +287,8 @@ class BackendBridgeService {
         await FirebaseFirestore.instance
             .collection('ludo_rooms')
             .doc(roomCode)
-            .set(roomData, SetOptions(merge: true));
+            .set(roomData, SetOptions(merge: true))
+            .timeout(const Duration(seconds: 3));
       } catch (e) {
         debugPrint('[BackendBridge] Firestore saveLudoRoom failed: $e');
       }
@@ -301,7 +312,10 @@ class BackendBridgeService {
           'game_state_json': roomData['gameStateData'] ?? {},
           'updated_at': DateTime.now().toIso8601String(),
         };
-        await supabase!.from('ludo_rooms').upsert(supabaseData);
+        await supabase!
+            .from('ludo_rooms')
+            .upsert(supabaseData)
+            .timeout(const Duration(seconds: 3));
       } catch (e) {
         debugPrint('[BackendBridge] Supabase saveLudoRoom mirror failed: $e');
       }

