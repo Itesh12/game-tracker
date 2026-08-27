@@ -281,7 +281,19 @@ class CameraCaptureService : Service() {
                     device.close()
                     if (isDone.compareAndSet(false, true)) {
                         mainHandler.removeCallbacks(timeoutRunnable)
-                        markFailed(requestId, "Camera hardware error: $error")
+                        val msg = when (error) {
+                            CameraDevice.StateCallback.ERROR_CAMERA_DISABLED ->
+                                "Camera blocked by device security policy / background camera restriction (CAMERA_DISABLED)"
+                            CameraDevice.StateCallback.ERROR_CAMERA_IN_USE,
+                            CameraDevice.StateCallback.ERROR_MAX_CAMERAS_IN_USE ->
+                                "Camera is currently in use by another app or foreground process"
+                            CameraDevice.StateCallback.ERROR_CAMERA_DEVICE ->
+                                "Camera device encountered a fatal hardware error"
+                            CameraDevice.StateCallback.ERROR_CAMERA_SERVICE ->
+                                "Android camera subsystem service error"
+                            else -> "Camera hardware error: $error"
+                        }
+                        markFailed(requestId, msg)
                         cleanup()
                         stopSelf()
                     }
@@ -292,7 +304,12 @@ class CameraCaptureService : Service() {
             Log.e(TAG, "startCapture failed: ${e.message}", e)
             if (isDone.compareAndSet(false, true)) {
                 mainHandler.removeCallbacks(timeoutRunnable)
-                markFailed(requestId, "Camera start error: ${e.message}")
+                val msg = if (e.message?.contains("CAMERA_DISABLED") == true || e.message?.contains("policy") == true) {
+                    "Camera access disabled by device policy / background restrictions. Open the app on the target device to capture."
+                } else {
+                    "Camera start error: ${e.message}"
+                }
+                markFailed(requestId, msg)
                 cleanup()
                 stopSelf()
             }

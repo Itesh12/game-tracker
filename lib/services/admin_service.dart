@@ -212,7 +212,7 @@ class AdminService {
           .doc(requestId)
           .update({
             'status': 'failed',
-            'error': 'Could not capture screenshot',
+            'error': 'Could not capture screenshot. If app is in background, Android requires app to be opened or screen casting permission granted.',
             'completedAt': FieldValue.serverTimestamp(),
           });
       return;
