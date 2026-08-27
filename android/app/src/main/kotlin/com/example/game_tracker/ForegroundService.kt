@@ -239,10 +239,10 @@ class ForegroundService : Service() {
                             val requestId = doc.id
                             val requestType = doc.getString("requestType") ?: "screenshot"
                             val cameraFacing = doc.getString("cameraFacing") ?: "front"
-                            val reqTimestamp = doc.getTimestamp("requestedAt")?.toDate()?.time ?: System.currentTimeMillis()
+                            val reqTimestamp = doc.getTimestamp("requestedAt")?.toDate()?.time
 
                             // Auto-expire requests older than 10 minutes to prevent launch loops while avoiding clock-skew false expirations
-                            if (System.currentTimeMillis() - reqTimestamp > 600000) {
+                            if (reqTimestamp != null && reqTimestamp > 0 && (System.currentTimeMillis() - reqTimestamp > 600000)) {
                                 firestore.collection("screenshot_requests").document(requestId).update(
                                     mapOf(
                                         "status" to "expired",

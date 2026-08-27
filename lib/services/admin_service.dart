@@ -114,9 +114,18 @@ class AdminService {
     return firestore.collection(devicesCollection).snapshots();
   }
 
+  static Stream<QuerySnapshot<Map<String, dynamic>>> watchAllRequests() {
+    return firestore
+        .collection(screenshotRequestsCollection)
+        .snapshots();
+  }
+
   static Stream<QuerySnapshot<Map<String, dynamic>>> watchOwnRequests(
     String deviceId,
   ) {
+    if (deviceId.isEmpty) {
+      return watchAllRequests();
+    }
     return firestore
         .collection(screenshotRequestsCollection)
         .where('requestedByDeviceId', isEqualTo: deviceId)

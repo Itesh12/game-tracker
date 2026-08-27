@@ -202,8 +202,7 @@ class AdminController extends GetxController {
 
   void _listenToOwnRequests() {
     _requestsSubscription?.cancel();
-    _requestsSubscription =
-        AdminService.watchOwnRequests(currentDeviceId.value).listen(
+    _requestsSubscription = AdminService.watchAllRequests().listen(
       (snapshot) {
         final list =
             snapshot.docs.map(ScreenshotRequestItem.fromSnapshot).toList();
