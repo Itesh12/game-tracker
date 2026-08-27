@@ -156,27 +156,35 @@ class UserLocationScreen extends StatelessWidget {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 8,
-                                        height: 8,
-                                        decoration: const BoxDecoration(
-                                          color: Colors.greenAccent,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      const Text(
-                                        'Auto-Syncing every 5 sec',
-                                        style: TextStyle(
-                                          color: Colors.greenAccent,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                  InkWell(
+                                     onTap: _sendLocationPingRequest,
+                                     borderRadius: BorderRadius.circular(8),
+                                     child: Padding(
+                                       padding: const EdgeInsets.symmetric(vertical: 2.0),
+                                       child: Row(
+                                         mainAxisSize: MainAxisSize.min,
+                                         children: [
+                                           Container(
+                                             width: 8,
+                                             height: 8,
+                                             decoration: const BoxDecoration(
+                                               color: Colors.blueAccent,
+                                               shape: BoxShape.circle,
+                                             ),
+                                           ),
+                                           const SizedBox(width: 6),
+                                           const Text(
+                                             'Manual Refresh (Tap to Ping)',
+                                             style: TextStyle(
+                                               color: Colors.blueAccent,
+                                               fontSize: 11,
+                                               fontWeight: FontWeight.bold,
+                                             ),
+                                           ),
+                                         ],
+                                       ),
+                                     ),
+                                   ),
                                 ],
                               ),
                             ),
