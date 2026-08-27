@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
 import '../controllers/admin_controller.dart';
 import '../controllers/theme_controller.dart';
@@ -22,39 +21,23 @@ class UserGalleryScreen extends StatelessWidget {
         title: Text('${device.username}\'s Gallery'),
         backgroundColor: theme.blue,
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance
-            .collection('screenshot_requests')
-            .where('targetDeviceId', isEqualTo: device.deviceId)
-            .where('status', isEqualTo: 'completed')
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                'Error loading gallery: ${snapshot.error}',
-                style: const TextStyle(color: Colors.redAccent),
-              ),
-            );
-          }
+      body: Obx(() {
+        final adminCtrl = Get.find<AdminController>();
+        final items = adminCtrl.screenshotRequests
+            .where((item) =>
+                item.targetDeviceId == device.deviceId &&
+                item.status == 'completed' &&
+                item.screenshotUrl != null &&
+                item.screenshotUrl!.isNotEmpty)
+            .toList();
 
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+        items.sort((a, b) {
+          final tA = a.completedAt ?? a.requestedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final tB = b.completedAt ?? b.requestedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return tB.compareTo(tA);
+        });
 
-          final docs = snapshot.data!.docs;
-          final items = docs
-              .map((doc) => ScreenshotRequestItem.fromSnapshot(doc))
-              .where((item) => item.screenshotUrl != null && item.screenshotUrl!.isNotEmpty)
-              .toList();
-
-          items.sort((a, b) {
-            final tA = a.completedAt ?? a.requestedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-            final tB = b.completedAt ?? b.requestedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-            return tB.compareTo(tA);
-          });
-
-          if (items.isEmpty) {
+        if (items.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -86,11 +69,10 @@ class UserGalleryScreen extends StatelessWidget {
                 theme: theme,
                 onTap: () => _showFullScreenImage(context, item, theme),
                 onDelete: () => _confirmDelete(context, item),
-              );
-            },
-          );
-        },
-      ),
+            );
+          },
+        );
+      }),
     );
   }
 
