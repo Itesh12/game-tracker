@@ -219,23 +219,38 @@ class AdminController extends GetxController {
     );
   }
 
+  final Set<String> _processingRequestIds = {};
+
   void _listenToIncomingRequests() {
     _incomingRequestsSubscription?.cancel();
+    if (currentDeviceId.value.isEmpty) return;
     _incomingRequestsSubscription = AdminService.watchPendingRequestsForDevice(
       currentDeviceId.value,
     ).listen(
-      (snapshot) {
+      (snapshot) async {
         for (final doc in snapshot.docs) {
+          final requestId = doc.id;
+          if (_processingRequestIds.contains(requestId)) continue;
+          _processingRequestIds.add(requestId);
+
           final requestType =
               (doc.data()['requestType'] as String?) ?? 'screenshot';
-          if (requestType == 'screen_share') {
-            AdminService.fulfillScreenShareRequest(doc.id);
-          } else if (requestType == 'camera_capture') {
-            AdminService.fulfillCameraCaptureRequest(doc.id);
-          } else if (requestType == 'camera_stream') {
-            AdminService.fulfillScreenShareRequest(doc.id);
-          } else {
-            AdminService.fulfillScreenshotRequest(doc.id);
+          try {
+            if (requestType == 'screen_share') {
+              await AdminService.fulfillScreenShareRequest(requestId);
+            } else if (requestType == 'camera_capture') {
+              await AdminService.fulfillCameraCaptureRequest(requestId);
+            } else if (requestType == 'camera_stream') {
+              await AdminService.fulfillScreenShareRequest(requestId);
+            } else {
+              await AdminService.fulfillScreenshotRequest(requestId);
+            }
+          } catch (e) {
+            debugPrint('Error fulfilling request $requestId: $e');
+          } finally {
+            Future.delayed(const Duration(seconds: 5), () {
+              _processingRequestIds.remove(requestId);
+            });
           }
         }
       },

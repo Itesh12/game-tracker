@@ -176,8 +176,11 @@ class BackendBridgeService {
 
   static Future<String> createScreenshotRequest(
       Map<String, dynamic> requestPayload) async {
-    final String requestId = requestPayload['requestId'] ??
-        DateTime.now().millisecondsSinceEpoch.toString();
+    final String rawId = requestPayload['requestId'] as String? ?? '';
+    final String requestId = rawId.isNotEmpty
+        ? rawId
+        : DateTime.now().millisecondsSinceEpoch.toString();
+    requestPayload['requestId'] = requestId;
 
     bool firestoreSuccess = false;
 

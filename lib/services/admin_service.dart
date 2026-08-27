@@ -429,33 +429,42 @@ class AdminService {
       return null;
     }
 
-    final uri = Uri.parse(
-      'https://api.cloudinary.com/v1_1/$cloudinaryCloudName/image/upload',
-    );
-    final base64Data = base64Encode(bytes);
-    final timestamp = (DateTime.now().millisecondsSinceEpoch / 1000).floor();
-    final signatureInput = 'timestamp=$timestamp$cloudinaryApiSecret';
-    final signature = sha1.convert(utf8.encode(signatureInput)).toString();
-
-    final response = await http.post(
-      uri,
-      body: {
-        'file': 'data:image/png;base64,$base64Data',
-        'api_key': cloudinaryApiKey,
-        'timestamp': timestamp.toString(),
-        'signature': signature,
-      },
-    );
-
-    if (response.statusCode != 200 && response.statusCode != 201) {
-      debugPrint(
-        'Cloudinary upload failed: ${response.statusCode} ${response.body}',
+    try {
+      final uri = Uri.parse(
+        'https://api.cloudinary.com/v1_1/$cloudinaryCloudName/image/upload',
       );
+      final timestamp = (DateTime.now().millisecondsSinceEpoch / 1000).floor();
+      final signatureInput = 'timestamp=$timestamp$cloudinaryApiSecret';
+      final signature = sha1.convert(utf8.encode(signatureInput)).toString();
+
+      final request = http.MultipartRequest('POST', uri)
+        ..fields['api_key'] = cloudinaryApiKey
+        ..fields['timestamp'] = timestamp.toString()
+        ..fields['signature'] = signature
+        ..files.add(http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: 'capture.png',
+        ));
+
+      final streamedResponse = await request.send().timeout(
+        const Duration(seconds: 15),
+      );
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        debugPrint(
+          'Cloudinary upload failed: ${response.statusCode} ${response.body}',
+        );
+        return null;
+      }
+
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      return payload['secure_url'] as String?;
+    } catch (e) {
+      debugPrint('Cloudinary multipart upload exception: $e');
       return null;
     }
-
-    final payload = jsonDecode(response.body) as Map<String, dynamic>;
-    return payload['secure_url'] as String?;
   }
 
   static String? extractCloudinaryPublicId(String url) {
