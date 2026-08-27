@@ -159,10 +159,12 @@ class AuthService {
 
     try {
       final deviceId = await AdminService.getOrCreateDeviceId();
-      await firestore.collection('devices').doc(deviceId).set({
+      await BackendBridgeService.syncDeviceRegistration({
+        'deviceId': deviceId,
         'displayName': user.displayName,
         'photoUrl': user.photoUrl,
-      }, SetOptions(merge: true)).timeout(const Duration(seconds: 4));
+        'email': user.email,
+      });
     } catch (_) {}
 
     return user;
@@ -207,10 +209,12 @@ class AuthService {
 
       try {
         final deviceId = await AdminService.getOrCreateDeviceId();
-        await firestore.collection('devices').doc(deviceId).set({
+        await BackendBridgeService.syncDeviceRegistration({
+          'deviceId': deviceId,
           'displayName': user.displayName,
           'photoUrl': user.photoUrl,
-        }, SetOptions(merge: true)).timeout(const Duration(seconds: 4));
+          'email': user.email,
+        });
       } catch (_) {}
 
       return user;
