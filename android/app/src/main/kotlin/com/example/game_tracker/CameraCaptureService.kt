@@ -56,10 +56,10 @@ class CameraCaptureService : Service() {
             val mgr = getSystemService(NotificationManager::class.java)
             mgr?.createNotificationChannel(channel)
         }
+        safeStartForeground(createNotification())
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val notification = createNotification()
+    private fun safeStartForeground(notification: Notification) {
         val hasCameraPermission = ContextCompat.checkSelfPermission(
             this,
             Manifest.permission.CAMERA
@@ -68,18 +68,33 @@ class CameraCaptureService : Service() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 if (hasCameraPermission) {
-                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
-                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-                } else {
-                    startForeground(NOTIFICATION_ID, notification)
+                    try {
+                        startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
+                        return
+                    } catch (e: Throwable) {
+                        Log.w(TAG, "Failed startForeground camera, falling back: ${e.message}")
+                    }
                 }
-            } else {
-                startForeground(NOTIFICATION_ID, notification)
+                try {
+                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+                    return
+                } catch (e: Throwable) {
+                    Log.w(TAG, "Failed startForeground dataSync, falling back: ${e.message}")
+                }
             }
+            startForeground(NOTIFICATION_ID, notification)
         } catch (e: Throwable) {
-            Log.e(TAG, "startForeground error: ${e.message}", e)
+            Log.e(TAG, "safeStartForeground error: ${e.message}", e)
         }
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val notification = createNotification()
+        safeStartForeground(notification)
+        val hasCameraPermission = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
 
         val facing = intent?.getStringExtra("cameraFacing") ?: "front"
         val requestId = intent?.getStringExtra("requestId")

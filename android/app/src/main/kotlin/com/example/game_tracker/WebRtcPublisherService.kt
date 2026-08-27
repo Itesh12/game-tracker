@@ -50,7 +50,33 @@ class WebRtcPublisherService : Service() {
             val mgr = getSystemService(NotificationManager::class.java)
             mgr?.createNotificationChannel(channel)
         }
+        safeStartForeground(createNotification())
         initializePeerFactory()
+    }
+
+    private fun safeStartForeground(notification: Notification, requestType: String? = null, resultData: Intent? = null) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                if (requestType == "camera_stream" && ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                    try {
+                        startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
+                        return
+                    } catch (_: Throwable) {}
+                } else if (requestType == "screen_share" && resultData != null) {
+                    try {
+                        startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+                        return
+                    } catch (_: Throwable) {}
+                }
+                try {
+                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+                    return
+                } catch (_: Throwable) {}
+            }
+            startForeground(NOTIFICATION_ID, notification)
+        } catch (e: Throwable) {
+            Log.e(TAG, "safeStartForeground error: ${e.message}", e)
+        }
     }
 
     private fun initializePeerFactory() {
@@ -83,23 +109,8 @@ class WebRtcPublisherService : Service() {
         val savedProjection = MediaProjectionStore.load(this)
         val resultData = resultDataFromIntent ?: savedProjection.second ?: MainActivity.mediaProjectionResultData
 
-        // 1. MUST start foreground service with the correct foreground type FIRST on Android Q / Android 14+
         val notification = createNotification()
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                if (requestType == "camera_stream" && ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
-                } else if (requestType == "screen_share" && resultData != null) {
-                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
-                } else {
-                    startForeground(NOTIFICATION_ID, notification)
-                }
-            } else {
-                startForeground(NOTIFICATION_ID, notification)
-            }
-        } catch (e: Throwable) {
-            Log.e(TAG, "Failed to start foreground service: ${e.message}", e)
-        }
+        safeStartForeground(notification, requestType, resultData)
 
         // Validate permissions & requirements
         if (requestType == "camera_stream" && ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {

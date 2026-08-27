@@ -54,21 +54,35 @@ class ScreenCaptureService : Service() {
             val mgr = getSystemService(NotificationManager::class.java)
             mgr?.createNotificationChannel(channel)
         }
+        safeStartForeground(createNotification())
+    }
+
+    private fun safeStartForeground(notification: Notification) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try {
+                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+                    return
+                } catch (e: Throwable) {
+                    Log.w(TAG, "Failed startForeground mediaProjection, falling back: ${e.message}")
+                }
+
+                try {
+                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+                    return
+                } catch (e: Throwable) {
+                    Log.w(TAG, "Failed startForeground dataSync, falling back: ${e.message}")
+                }
+            }
+            startForeground(NOTIFICATION_ID, notification)
+        } catch (e: Throwable) {
+            Log.e(TAG, "safeStartForeground error: ${e.message}", e)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification: Notification = createNotification()
-
-        // 1. MUST call startForeground with MEDIA_PROJECTION type BEFORE getMediaProjection on Android 14 (API 34+)
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
-            } else {
-                startForeground(NOTIFICATION_ID, notification)
-            }
-        } catch (e: Throwable) {
-            Log.e(TAG, "Failed to start foreground service: ${e.message}", e)
-        }
+        safeStartForeground(notification)
 
         val captureOnce = intent?.getBooleanExtra("capture_once", false) ?: false
         val requestId = intent?.getStringExtra("requestId")

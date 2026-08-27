@@ -419,6 +419,8 @@ class ForegroundService : Service() {
 
     override fun onDestroy() {
         try {
+            supabasePollHandler?.removeCallbacksAndMessages(null)
+            supabasePollHandler = null
             firestoreListener?.remove()
             firestoreListener = null
             if (locationListener != null && locationManager != null) {

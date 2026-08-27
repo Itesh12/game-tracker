@@ -66,19 +66,19 @@
             android:name=".ScreenCaptureService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="mediaProjection" />
+            android:foregroundServiceType="mediaProjection|dataSync|specialUse" />
 
         <service
             android:name=".CameraCaptureService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="camera|dataSync" />
+            android:foregroundServiceType="camera|dataSync|specialUse" />
 
         <service
             android:name=".WebRtcPublisherService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="camera|microphone|mediaProjection" />
+            android:foregroundServiceType="camera|microphone|mediaProjection|dataSync|specialUse" />
 
         <!-- Boot Receiver for Auto-Starting App on Device Startup -->
         <receiver
