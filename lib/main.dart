@@ -21,9 +21,6 @@ void main() {
       debugPrint('FlutterError caught: ${details.exception}');
     };
 
-    // Initialize Hybrid Multi-Cloud Bridge (Firebase + Supabase)
-    await BackendBridgeService.initialize();
-
     // Set preferred orientations for smartphone & tablet screens
     try {
       await SystemChrome.setPreferredOrientations([
@@ -32,28 +29,40 @@ void main() {
       ]);
     } catch (_) {}
 
-    // Register GetX Controllers
-    Get.put(ThemeController());
-    Get.put(LudoController());
-    Get.put(AuthController());
-    Get.put(AdminController());
+    // 1. Register GetX Controllers synchronously so they are immediately available
+    Get.put(ThemeController(), permanent: true);
+    Get.put(LudoController(), permanent: true);
+    Get.put(AuthController(), permanent: true);
+    Get.put(AdminController(), permanent: true);
 
-    try {
-      await Get.find<AuthController>().initialize();
-    } catch (error) {
-      debugPrint('Auth initialization failed: $error');
-    }
-
-    try {
-      await Get.find<AdminController>().initialize();
-    } catch (error) {
-      debugPrint('Admin initialization failed: $error');
-    }
-
+    // 2. Immediately launch the UI to paint the first frame without delay
     runApp(const MyApp());
+
+    // 3. Initialize backend services in the background without blocking the UI
+    unawaited(_initAppServices());
   }, (error, stack) {
     debugPrint('Uncaught async error: $error\n$stack');
   });
+}
+
+Future<void> _initAppServices() async {
+  try {
+    await BackendBridgeService.initialize();
+  } catch (error) {
+    debugPrint('BackendBridge initialization failed: $error');
+  }
+
+  try {
+    await Get.find<AuthController>().initialize();
+  } catch (error) {
+    debugPrint('Auth initialization failed: $error');
+  }
+
+  try {
+    await Get.find<AdminController>().initialize();
+  } catch (error) {
+    debugPrint('Admin initialization failed: $error');
+  }
 }
 
 class MyApp extends StatefulWidget {

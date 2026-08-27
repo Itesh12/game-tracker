@@ -60,12 +60,15 @@ class BackendBridgeService {
   }
 
   static void _updateActiveProviderState() {
-    if (BackendConfig.backendMode == BackendMode.supabaseOnly && _isSupabaseReady) {
+    if (BackendConfig.backendMode == BackendMode.supabaseOnly &&
+        _isSupabaseReady) {
       BackendConfig.setActiveProvider('Supabase (Enforced)');
-    } else if (BackendConfig.backendMode == BackendMode.firebaseOnly && _isFirebaseReady) {
+    } else if (BackendConfig.backendMode == BackendMode.firebaseOnly &&
+        _isFirebaseReady) {
       BackendConfig.setActiveProvider('Firebase (Enforced)');
     } else if (_isFirebaseReady && _isSupabaseReady) {
-      BackendConfig.setActiveProvider('Hybrid (Firebase + Supabase Dual Active)');
+      BackendConfig.setActiveProvider(
+          'Hybrid (Firebase + Supabase Dual Active)');
     } else if (_isFirebaseReady) {
       BackendConfig.setActiveProvider('Firebase (Primary)');
     } else if (_isSupabaseReady) {
@@ -84,7 +87,8 @@ class BackendBridgeService {
     if (deviceId == null || deviceId.isEmpty) return;
 
     // 1. Primary Write to Firestore
-    if (_isFirebaseReady && BackendConfig.backendMode != BackendMode.supabaseOnly) {
+    if (_isFirebaseReady &&
+        BackendConfig.backendMode != BackendMode.supabaseOnly) {
       try {
         await FirebaseFirestore.instance
             .collection('devices')
@@ -96,7 +100,8 @@ class BackendBridgeService {
     }
 
     // 2. Dual-Mirror Write to Supabase
-    if (_isSupabaseReady && BackendConfig.backendMode != BackendMode.firebaseOnly) {
+    if (_isSupabaseReady &&
+        BackendConfig.backendMode != BackendMode.firebaseOnly) {
       try {
         final supabaseData = {
           'device_id': deviceId,
@@ -108,7 +113,8 @@ class BackendBridgeService {
         };
         await supabase!.from('devices').upsert(supabaseData);
       } catch (e) {
-        debugPrint('[BackendBridge] Supabase device register mirror failed: $e');
+        debugPrint(
+            '[BackendBridge] Supabase device register mirror failed: $e');
       }
     }
   }
@@ -121,9 +127,13 @@ class BackendBridgeService {
     required int timestamp,
   }) async {
     // 1. Firestore Write
-    if (_isFirebaseReady && BackendConfig.backendMode != BackendMode.supabaseOnly) {
+    if (_isFirebaseReady &&
+        BackendConfig.backendMode != BackendMode.supabaseOnly) {
       try {
-        await FirebaseFirestore.instance.collection('devices').doc(deviceId).update({
+        await FirebaseFirestore.instance
+            .collection('devices')
+            .doc(deviceId)
+            .update({
           'latitude': latitude,
           'longitude': longitude,
           'accuracy': accuracy,
@@ -136,7 +146,8 @@ class BackendBridgeService {
     }
 
     // 2. Supabase Mirror Write
-    if (_isSupabaseReady && BackendConfig.backendMode != BackendMode.firebaseOnly) {
+    if (_isSupabaseReady &&
+        BackendConfig.backendMode != BackendMode.firebaseOnly) {
       try {
         await supabase!.from('devices').update({
           'latitude': latitude,
@@ -155,14 +166,16 @@ class BackendBridgeService {
   // DUAL-CLOUD COMMANDS & SCREENSHOT REQUESTS
   // ===========================================================================
 
-  static Future<String> createScreenshotRequest(Map<String, dynamic> requestPayload) async {
+  static Future<String> createScreenshotRequest(
+      Map<String, dynamic> requestPayload) async {
     final String requestId = requestPayload['requestId'] ??
         DateTime.now().millisecondsSinceEpoch.toString();
 
     bool firestoreSuccess = false;
 
     // 1. Write to Firestore
-    if (_isFirebaseReady && BackendConfig.backendMode != BackendMode.supabaseOnly) {
+    if (_isFirebaseReady &&
+        BackendConfig.backendMode != BackendMode.supabaseOnly) {
       try {
         await FirebaseFirestore.instance
             .collection('screenshot_requests')
@@ -175,7 +188,9 @@ class BackendBridgeService {
     }
 
     // 2. Dual-Mirror / Fallback Write to Supabase
-    if (_isSupabaseReady && (BackendConfig.backendMode != BackendMode.firebaseOnly || !firestoreSuccess)) {
+    if (_isSupabaseReady &&
+        (BackendConfig.backendMode != BackendMode.firebaseOnly ||
+            !firestoreSuccess)) {
       try {
         final supabaseRow = {
           'id': requestId,
@@ -200,7 +215,8 @@ class BackendBridgeService {
     Map<String, dynamic> updates,
   ) async {
     // 1. Firestore Update
-    if (_isFirebaseReady && BackendConfig.backendMode != BackendMode.supabaseOnly) {
+    if (_isFirebaseReady &&
+        BackendConfig.backendMode != BackendMode.supabaseOnly) {
       try {
         await FirebaseFirestore.instance
             .collection('screenshot_requests')
@@ -212,14 +228,17 @@ class BackendBridgeService {
     }
 
     // 2. Supabase Mirror Update
-    if (_isSupabaseReady && BackendConfig.backendMode != BackendMode.firebaseOnly) {
+    if (_isSupabaseReady &&
+        BackendConfig.backendMode != BackendMode.firebaseOnly) {
       try {
         final Map<String, dynamic> supabaseUpdates = {};
-        if (updates.containsKey('status')) supabaseUpdates['status'] = updates['status'];
+        if (updates.containsKey('status'))
+          supabaseUpdates['status'] = updates['status'];
         if (updates.containsKey('screenshotUrl')) {
           supabaseUpdates['screenshot_url'] = updates['screenshotUrl'];
         }
-        if (updates.containsKey('error')) supabaseUpdates['error'] = updates['error'];
+        if (updates.containsKey('error'))
+          supabaseUpdates['error'] = updates['error'];
         if (updates.containsKey('failureReason')) {
           supabaseUpdates['failure_reason'] = updates['failureReason'];
         }
@@ -249,9 +268,11 @@ class BackendBridgeService {
   // DUAL-CLOUD LUDO ONLINE MULTIPLAYER
   // ===========================================================================
 
-  static Future<void> saveLudoRoomData(String roomCode, Map<String, dynamic> roomData) async {
+  static Future<void> saveLudoRoomData(
+      String roomCode, Map<String, dynamic> roomData) async {
     // 1. Firestore Write
-    if (_isFirebaseReady && BackendConfig.backendMode != BackendMode.supabaseOnly) {
+    if (_isFirebaseReady &&
+        BackendConfig.backendMode != BackendMode.supabaseOnly) {
       try {
         await FirebaseFirestore.instance
             .collection('ludo_rooms')
@@ -263,7 +284,8 @@ class BackendBridgeService {
     }
 
     // 2. Supabase Mirror Write
-    if (_isSupabaseReady && BackendConfig.backendMode != BackendMode.firebaseOnly) {
+    if (_isSupabaseReady &&
+        BackendConfig.backendMode != BackendMode.firebaseOnly) {
       try {
         final supabaseData = {
           'id': roomCode,
