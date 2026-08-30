@@ -146,14 +146,17 @@ class ScreenshotRequestItem {
       if (d == null) return null;
       if (d is Timestamp) return d.toDate().toLocal();
       if (d is String) {
-        final parsed = DateTime.tryParse(d);
-        if (parsed != null) return parsed.toLocal();
+        final str = d.trim();
+        final parsed = DateTime.tryParse(str);
+        if (parsed != null) {
+          return parsed.isUtc ? parsed.toLocal() : parsed;
+        }
       }
       if (d is int) {
         if (d < 10000000000) {
-          return DateTime.fromMillisecondsSinceEpoch(d * 1000).toLocal();
+          return DateTime.fromMillisecondsSinceEpoch(d * 1000, isUtc: true).toLocal();
         }
-        return DateTime.fromMillisecondsSinceEpoch(d).toLocal();
+        return DateTime.fromMillisecondsSinceEpoch(d, isUtc: true).toLocal();
       }
       return null;
     }
@@ -444,16 +447,24 @@ class AdminController extends GetxController {
     }
   }
 
+  final Map<String, ScreenshotRequestItem> _allRequestsMap = {};
   final Map<String, String> _lastKnownRequestStatus = {};
 
-  void _handleRequestListUpdate(List<ScreenshotRequestItem> list) {
-    list.sort((a, b) {
+  void _handleRequestListUpdate(List<ScreenshotRequestItem> incomingList) {
+    for (final req in incomingList) {
+      if (req.requestId.isNotEmpty) {
+        _allRequestsMap[req.requestId] = req;
+      }
+    }
+
+    final mergedList = _allRequestsMap.values.toList();
+    mergedList.sort((a, b) {
       final aTime = a.requestedAt?.millisecondsSinceEpoch ?? 0;
       final bTime = b.requestedAt?.millisecondsSinceEpoch ?? 0;
       return bTime.compareTo(aTime);
     });
 
-    for (final req in list) {
+    for (final req in mergedList) {
       final prevStatus = _lastKnownRequestStatus[req.requestId];
       if (prevStatus == null) {
         _lastKnownRequestStatus[req.requestId] = req.status;
@@ -480,7 +491,7 @@ class AdminController extends GetxController {
       }
     }
 
-    screenshotRequests.value = list.take(20).toList();
+    screenshotRequests.value = mergedList.take(30).toList();
   }
 
   void _addEventLog({

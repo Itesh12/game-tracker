@@ -174,7 +174,7 @@ class AdminService {
     required String requestedByDeviceId,
     String? cameraFacing,
   }) {
-    final now = DateTime.now();
+    final now = DateTime.now().toUtc();
     return {
       'requestId': '',
       'requestType': requestType,

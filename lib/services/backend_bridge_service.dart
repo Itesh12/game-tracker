@@ -112,7 +112,7 @@ class BackendBridgeService {
           'native_capture_enabled': data['nativeCaptureEnabled'] ?? false,
           if (data['fcm_token'] != null || data['fcmToken'] != null)
             'fcm_token': data['fcm_token'] ?? data['fcmToken'],
-          'last_seen_at': DateTime.now().toIso8601String(),
+          'last_seen_at': DateTime.now().toUtc().toIso8601String(),
         };
         await supabase!
             .from('devices')
@@ -213,7 +213,7 @@ class BackendBridgeService {
           'request_type': requestPayload['requestType'] ?? 'screenshot',
           'camera_facing': requestPayload['cameraFacing'] ?? 'front',
           'status': requestPayload['status'] ?? 'pending',
-          'requested_at': DateTime.now().toIso8601String(),
+          'requested_at': DateTime.now().toUtc().toIso8601String(),
         };
         await supabase!
             .from('screenshot_requests')
