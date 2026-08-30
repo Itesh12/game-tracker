@@ -90,6 +90,12 @@ class ForegroundService : Service() {
 
         setupFirestoreRequestListener()
 
+        val action = intent?.getStringExtra("action")
+        if (action == "location_ping") {
+            val reqId = intent.getStringExtra("requestId")
+            fetchLocationOnce(reqId)
+        }
+
         return START_STICKY
     }
 

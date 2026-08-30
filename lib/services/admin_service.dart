@@ -218,6 +218,20 @@ class AdminService {
     return doc.id;
   }
 
+  static Future<String> sendWakeRequest(
+    String targetDeviceId,
+    String requestedByDeviceId,
+  ) async {
+    final doc = firestore.collection(screenshotRequestsCollection).doc();
+    final payload = buildRequestPayload(
+      requestType: 'wake_up',
+      targetDeviceId: targetDeviceId,
+      requestedByDeviceId: requestedByDeviceId,
+    )..['requestId'] = doc.id;
+    await BackendBridgeService.createScreenshotRequest(payload);
+    return doc.id;
+  }
+
   static Future<void> fulfillScreenshotRequest(String requestId) async {
     final uploadedUrl = await _captureAndUploadCurrentFrame();
     if (uploadedUrl == null) {

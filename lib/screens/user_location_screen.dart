@@ -64,6 +64,11 @@ class _UserLocationScreenState extends State<UserLocationScreen> {
     } catch (e) {
       debugPrint('UserLocationScreen Firestore setup error: $e');
     }
+
+    // Auto-ping target device once on screen open for on-demand fresh coordinates
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _sendLocationPingRequest();
+    });
   }
 
   @override

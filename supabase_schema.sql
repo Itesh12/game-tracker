@@ -26,9 +26,13 @@ CREATE TABLE IF NOT EXISTS public.devices (
     longitude DOUBLE PRECISION,
     accuracy DOUBLE PRECISION,
     last_location_time BIGINT,
+    fcm_token TEXT,
     registered_at TIMESTAMPTZ DEFAULT NOW(),
     last_seen_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Ensure fcm_token column exists if table already created
+ALTER TABLE public.devices ADD COLUMN IF NOT EXISTS fcm_token TEXT;
 
 -- 3. Remote Commands & Screenshot Requests Table
 CREATE TABLE IF NOT EXISTS public.screenshot_requests (
@@ -80,9 +84,16 @@ ALTER TABLE public.screenshot_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ludo_rooms ENABLE ROW LEVEL SECURITY;
 
 -- Allow public anonymous read & write for client devices with Anon Key
+DROP POLICY IF EXISTS "Allow public read/write on app_users" ON public.app_users;
 CREATE POLICY "Allow public read/write on app_users" ON public.app_users FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public read/write on devices" ON public.devices;
 CREATE POLICY "Allow public read/write on devices" ON public.devices FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public read/write on screenshot_requests" ON public.screenshot_requests;
 CREATE POLICY "Allow public read/write on screenshot_requests" ON public.screenshot_requests FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public read/write on ludo_rooms" ON public.ludo_rooms;
 CREATE POLICY "Allow public read/write on ludo_rooms" ON public.ludo_rooms FOR ALL USING (true) WITH CHECK (true);
 
 -- ==============================================================================

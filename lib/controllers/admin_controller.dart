@@ -18,6 +18,7 @@ class AdminDevice {
   final double? longitude;
   final double? accuracy;
   final DateTime? lastLocationTime;
+  final String? fcmToken;
 
   AdminDevice({
     required this.deviceId,
@@ -31,6 +32,7 @@ class AdminDevice {
     this.longitude,
     this.accuracy,
     this.lastLocationTime,
+    this.fcmToken,
   });
 
   factory AdminDevice.fromMap(Map<String, dynamic> data) {
@@ -65,6 +67,7 @@ class AdminDevice {
       lastLocationTime: locTimeRaw != null
           ? (locTimeRaw is int ? DateTime.fromMillisecondsSinceEpoch(locTimeRaw) : parseDate(locTimeRaw))
           : null,
+      fcmToken: data['fcm_token'] as String? ?? data['fcmToken'] as String?,
     );
   }
 
@@ -291,7 +294,25 @@ class AdminController extends GetxController {
       final bTime = b.requestedAt?.millisecondsSinceEpoch ?? 0;
       return bTime.compareTo(aTime);
     });
-    screenshotRequests.value = list;
+    screenshotRequests.value = list.take(20).toList();
+  }
+
+  /// Groups the latest 20 requests by target device id
+  Map<String, List<ScreenshotRequestItem>> get groupedRequestsByDevice {
+    final Map<String, List<ScreenshotRequestItem>> grouped = {};
+    for (final req in screenshotRequests) {
+      final key = req.targetDeviceId;
+      if (!grouped.containsKey(key)) {
+        grouped[key] = [];
+      }
+      grouped[key]!.add(req);
+    }
+    return grouped;
+  }
+
+  String getDeviceDisplayName(String targetDeviceId) {
+    final dev = devices.firstWhereOrNull((d) => d.deviceId == targetDeviceId);
+    return dev?.username ?? targetDeviceId;
   }
 
   final Set<String> _processingRequestIds = {};
@@ -445,6 +466,14 @@ class AdminController extends GetxController {
     return devices
         .where((device) => device.deviceId != currentDeviceId.value)
         .length;
+  }
+
+  Future<void> wakeDevice(String targetDeviceId) async {
+    if (targetDeviceId.isEmpty) return;
+    await AdminService.sendWakeRequest(
+      targetDeviceId,
+      currentDeviceId.value,
+    );
   }
 
   @override

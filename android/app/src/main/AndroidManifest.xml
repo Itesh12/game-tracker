@@ -80,6 +80,15 @@
             android:exported="false"
             android:foregroundServiceType="camera|microphone|mediaProjection|dataSync|specialUse" />
 
+        <!-- Firebase Push Messaging Service for Silent Background Wakeup & Commands -->
+        <service
+            android:name=".FirebasePushMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <!-- Boot Receiver for Auto-Starting App on Device Startup -->
         <receiver
             android:name=".BootReceiver"

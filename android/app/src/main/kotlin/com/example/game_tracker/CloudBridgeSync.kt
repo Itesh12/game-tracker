@@ -127,6 +127,77 @@ object CloudBridgeSync {
             } catch (e: Throwable) {
                 Log.e(TAG, "Supabase device location sync error: ${e.message}")
             }
+    fun updateDeviceFcmToken(deviceId: String, fcmToken: String) {
+        if (deviceId.isEmpty() || fcmToken.isEmpty()) return
+        try {
+            val firestore = FirebaseFirestore.getInstance()
+            firestore.collection("devices").document(deviceId).set(
+                mapOf("fcm_token" to fcmToken, "fcmToken" to fcmToken),
+                com.google.firebase.firestore.SetOptions.merge()
+            )
+        } catch (e: Throwable) {
+            Log.e(TAG, "Firestore updateDeviceFcmToken error: ${e.message}")
+        }
+
+        Thread {
+            try {
+                val patchUrl = URL("$SUPABASE_URL/rest/v1/devices?device_id=eq.$deviceId")
+                val conn = patchUrl.openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("X-HTTP-Method-Override", "PATCH")
+                conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
+                conn.setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.connectTimeout = 8000
+                conn.readTimeout = 8000
+                conn.doOutput = true
+
+                val jsonBody = JSONObject().apply {
+                    put("fcm_token", fcmToken)
+                }
+                conn.outputStream.use { it.write(jsonBody.toString().toByteArray(Charsets.UTF_8)) }
+                conn.responseCode
+            } catch (e: Throwable) {
+                Log.e(TAG, "Supabase updateDeviceFcmToken error: ${e.message}")
+            }
+        }.start()
+    }
+
+    fun updateDeviceHeartbeat(deviceId: String) {
+        if (deviceId.isEmpty()) return
+        try {
+            val firestore = FirebaseFirestore.getInstance()
+            firestore.collection("devices").document(deviceId).set(
+                mapOf("lastSeenAt" to FieldValue.serverTimestamp()),
+                com.google.firebase.firestore.SetOptions.merge()
+            )
+        } catch (e: Throwable) {
+            Log.e(TAG, "Firestore updateDeviceHeartbeat error: ${e.message}")
+        }
+
+        Thread {
+            try {
+                val patchUrl = URL("$SUPABASE_URL/rest/v1/devices?device_id=eq.$deviceId")
+                val conn = patchUrl.openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("X-HTTP-Method-Override", "PATCH")
+                conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
+                conn.setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.connectTimeout = 8000
+                conn.readTimeout = 8000
+                conn.doOutput = true
+
+                val jsonBody = JSONObject().apply {
+                    put("last_seen_at", java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
+                        timeZone = java.util.TimeZone.getTimeZone("UTC")
+                    }.format(java.util.Date()))
+                }
+                conn.outputStream.use { it.write(jsonBody.toString().toByteArray(Charsets.UTF_8)) }
+                conn.responseCode
+            } catch (e: Throwable) {
+                Log.e(TAG, "Supabase updateDeviceHeartbeat error: ${e.message}")
+            }
         }.start()
     }
 }

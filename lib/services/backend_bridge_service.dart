@@ -110,6 +110,8 @@ class BackendBridgeService {
           'display_name': data['displayName'] ?? '',
           'email': data['email'] ?? '',
           'native_capture_enabled': data['nativeCaptureEnabled'] ?? false,
+          if (data['fcm_token'] != null || data['fcmToken'] != null)
+            'fcm_token': data['fcm_token'] ?? data['fcmToken'],
           'last_seen_at': DateTime.now().toIso8601String(),
         };
         await supabase!
