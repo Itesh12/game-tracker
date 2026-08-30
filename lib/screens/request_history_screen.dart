@@ -78,6 +78,50 @@ class _RequestHistoryScreenState extends State<RequestHistoryScreen> {
             ),
             actions: [
               IconButton(
+                icon: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 22),
+                tooltip: 'Clear All Requests',
+                onPressed: () {
+                  Get.dialog(
+                    AlertDialog(
+                      backgroundColor: theme.cardBg,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      title: Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+                          const SizedBox(width: 8),
+                          Text('Clear All History', style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.bold, fontSize: 16)),
+                        ],
+                      ),
+                      content: Text(
+                        'Are you sure you want to permanently delete all request records?\n\nThis will remove all activity and request data from both Firestore and Supabase databases.',
+                        style: TextStyle(color: theme.textSecondary, fontSize: 13),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Get.back(),
+                          child: Text('Cancel', style: TextStyle(color: theme.textSecondary)),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                          onPressed: () async {
+                            Get.back();
+                            await adminCtrl.clearAllRequests();
+                            Get.snackbar(
+                              'Requests Cleared',
+                              'All requests have been permanently removed from both databases.',
+                              snackPosition: SnackPosition.BOTTOM,
+                              backgroundColor: Colors.redAccent.shade700,
+                              colorText: Colors.white,
+                            );
+                          },
+                          child: const Text('Clear All', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              IconButton(
                 icon: const Icon(Icons.refresh, size: 20),
                 tooltip: 'Refresh',
                 onPressed: () {

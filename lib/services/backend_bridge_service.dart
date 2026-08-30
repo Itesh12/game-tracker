@@ -283,6 +283,38 @@ class BackendBridgeService {
     }
   }
 
+  static Future<void> clearAllScreenshotRequests() async {
+    // 1. Delete all from Firestore
+    if (_isFirebaseReady &&
+        BackendConfig.backendMode != BackendMode.supabaseOnly) {
+      try {
+        final collection = FirebaseFirestore.instance.collection('screenshot_requests');
+        final snapshots = await collection.get().timeout(const Duration(seconds: 8));
+        final batch = FirebaseFirestore.instance.batch();
+        for (final doc in snapshots.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit().timeout(const Duration(seconds: 8));
+      } catch (e) {
+        debugPrint('[BackendBridge] Firestore clear requests failed: $e');
+      }
+    }
+
+    // 2. Delete all from Supabase
+    if (_isSupabaseReady &&
+        BackendConfig.backendMode != BackendMode.firebaseOnly) {
+      try {
+        await supabase!
+            .from('screenshot_requests')
+            .delete()
+            .neq('id', '___dummy_never_match___')
+            .timeout(const Duration(seconds: 8));
+      } catch (e) {
+        debugPrint('[BackendBridge] Supabase clear requests failed: $e');
+      }
+    }
+  }
+
   // ===========================================================================
   // DUAL-CLOUD LUDO ONLINE MULTIPLAYER
   // ===========================================================================

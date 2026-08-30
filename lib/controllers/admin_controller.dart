@@ -414,6 +414,7 @@ class AdminController extends GetxController {
   final Map<String, ScreenshotRequestItem> _allRequestsMap = {};
 
   void _handleRequestListUpdate(List<ScreenshotRequestItem> incomingList) {
+    _allRequestsMap.clear();
     for (final req in incomingList) {
       if (req.requestId.isNotEmpty) {
         _allRequestsMap[req.requestId] = req;
@@ -428,6 +429,13 @@ class AdminController extends GetxController {
     });
 
     screenshotRequests.value = mergedList;
+  }
+
+  Future<void> clearAllRequests() async {
+    _allRequestsMap.clear();
+    screenshotRequests.value = [];
+    screenshotRequests.refresh();
+    await BackendBridgeService.clearAllScreenshotRequests();
   }
 
   /// Groups the latest 20 requests by target device id
