@@ -193,19 +193,25 @@ class WebRtcPublisherService : Service() {
         })
     }
 
+    private var hasSetAnswer = false
+
     private fun watchForAnswerAndRemoteIce(rid: String) {
+        hasSetAnswer = false
         docListener = firestore.collection("screenshot_requests").document(rid)
             .addSnapshotListener { snapshot: DocumentSnapshot?, error ->
                 if (error != null || snapshot == null) return@addSnapshotListener
-                if (snapshot.contains("answer")) {
+                if (!hasSetAnswer && snapshot.contains("answer")) {
                     val answer = snapshot.get("answer") as? Map<*, *>
                     val sdp = answer?.get("sdp") as? String
                     val type = answer?.get("type") as? String
                     if (!sdp.isNullOrEmpty() && !type.isNullOrEmpty()) {
+                        hasSetAnswer = true
                         try {
                             val sd = SessionDescription(SessionDescription.Type.fromCanonicalForm(type), sdp)
                             peerConnection?.setRemoteDescription(object : SdpObserver {
-                                override fun onSetSuccess() {}
+                                override fun onSetSuccess() {
+                                    Log.d(TAG, "WebRTC remote answer successfully established")
+                                }
                                 override fun onSetFailure(p0: String?) {
                                     Log.e(TAG, "setRemoteDescription failure: $p0")
                                 }

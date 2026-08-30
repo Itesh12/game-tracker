@@ -21,9 +21,15 @@ class LiveShareSession {
     await renderer.initialize();
 
     peerConnection.onTrack = (event) {
-      if (event.track.kind == 'video' && event.streams.isNotEmpty) {
-        renderer.srcObject = event.streams[0];
+      if (event.track.kind == 'video') {
+        if (event.streams.isNotEmpty) {
+          renderer.srcObject = event.streams[0];
+        }
       }
+    };
+
+    peerConnection.onAddStream = (stream) {
+      renderer.srcObject = stream;
     };
 
     peerConnection.onIceCandidate = (candidate) async {
@@ -44,25 +50,33 @@ class LiveShareSession {
         .collection('screenshot_requests')
         .doc(requestId);
 
+    bool hasSetOffer = false;
+
     _requestSub = requestDoc.snapshots().listen((snapshot) async {
       if (_isDisposed) return;
       final data = snapshot.data();
       if (data == null) return;
       final offer = data['offer'];
-      if (offer is Map<String, dynamic> && offer['sdp'] != null) {
-        final remoteDescription = RTCSessionDescription(
-          offer['sdp'] as String,
-          offer['type'] as String? ?? 'offer',
-        );
-        await peerConnection.setRemoteDescription(remoteDescription);
-        final answer = await peerConnection.createAnswer({});
-        await peerConnection.setLocalDescription(answer);
-        await requestDoc.set({
-          'answer': {
-            'sdp': answer.sdp,
-            'type': answer.type,
-          },
-        }, SetOptions(merge: true));
+      if (!hasSetOffer && offer is Map && offer['sdp'] != null) {
+        hasSetOffer = true;
+        try {
+          final remoteDescription = RTCSessionDescription(
+            offer['sdp'] as String,
+            offer['type'] as String? ?? 'offer',
+          );
+          await peerConnection.setRemoteDescription(remoteDescription);
+          final answer = await peerConnection.createAnswer({});
+          await peerConnection.setLocalDescription(answer);
+          await requestDoc.set({
+            'answer': {
+              'sdp': answer.sdp,
+              'type': answer.type,
+            },
+            'status': 'live',
+          }, SetOptions(merge: true));
+        } catch (e) {
+          // ignore duplicate state transition
+        }
       }
     });
 
@@ -76,7 +90,9 @@ class LiveShareSession {
           data['sdpMid'] as String? ?? '0',
           (data['sdpMLineIndex'] as num?)?.toInt() ?? 0,
         );
-        await peerConnection.addCandidate(candidate);
+        try {
+          await peerConnection.addCandidate(candidate);
+        } catch (_) {}
       }
     });
   }
