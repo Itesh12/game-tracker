@@ -28,6 +28,12 @@ class _LiveShareViewState extends State<LiveShareView> {
 
   Future<void> _initialize() async {
     await _renderer.initialize();
+    _renderer.onResize = () {
+      if (mounted) setState(() {});
+    };
+    _renderer.onFirstFrameRendered = () {
+      if (mounted) setState(() {});
+    };
     await LiveShareService.instance.attachToRequest(widget.requestId, _renderer);
     if (mounted) {
       setState(() => _ready = true);

@@ -330,7 +330,8 @@ class WebRtcPublisherService : Service() {
 
             localVideoTrack = peerConnectionFactory?.createVideoTrack("ARDAMSv0", videoSource)
             if (localVideoTrack != null) {
-                peerConnection?.addTrack(localVideoTrack)
+                localVideoTrack?.setEnabled(true)
+                peerConnection?.addTrack(localVideoTrack, listOf("ARDAMS"))
             }
         } catch (e: Throwable) {
             Log.e(TAG, "startLocalCapture exception: ${e.message}", e)

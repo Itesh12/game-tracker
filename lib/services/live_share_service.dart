@@ -22,12 +22,15 @@ class LiveShareSession {
 
     peerConnection.onTrack = (event) async {
       if (event.track.kind == 'video') {
+        try {
+          event.track.enabled = true;
+        } catch (_) {}
         if (event.streams.isNotEmpty) {
           renderer.srcObject = event.streams[0];
         } else {
           try {
             final stream = await createLocalMediaStream('remote_stream_${DateTime.now().millisecondsSinceEpoch}');
-            stream.addTrack(event.track);
+            await stream.addTrack(event.track);
             renderer.srcObject = stream;
           } catch (_) {}
         }
@@ -35,6 +38,11 @@ class LiveShareSession {
     };
 
     peerConnection.onAddStream = (stream) {
+      try {
+        for (final track in stream.getVideoTracks()) {
+          track.enabled = true;
+        }
+      } catch (_) {}
       renderer.srcObject = stream;
     };
 
