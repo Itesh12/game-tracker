@@ -1,13 +1,68 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../controllers/admin_controller.dart';
 import '../controllers/theme_controller.dart';
 
-class RequestDetailScreen extends StatelessWidget {
+class RequestDetailScreen extends StatefulWidget {
   final ScreenshotRequestItem request;
 
   const RequestDetailScreen({super.key, required this.request});
+
+  @override
+  State<RequestDetailScreen> createState() => _RequestDetailScreenState();
+}
+
+class _RequestDetailScreenState extends State<RequestDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _printDebugLogs();
+  }
+
+  void _printDebugLogs() {
+    final adminCtrl = Get.find<AdminController>();
+    final targetName = adminCtrl.getDeviceDisplayName(widget.request.targetDeviceId);
+    final req = widget.request;
+
+    if (req.status == 'failed' || req.error != null || req.failureReason != null) {
+      final logOutput = '''
+================ [FAILED REQUEST DIAGNOSTICS] ================
+Request ID: ${req.requestId}
+Type: ${req.requestType}
+Target Device: ${req.targetDeviceId} ($targetName)
+Status: ${req.status}
+Requested At: ${req.requestedAt}
+Completed/Failed At: ${req.completedAt}
+Background Woken: ${req.backgroundAttemptedAt}
+Error: ${req.error}
+Failure Reason: ${req.failureReason}
+Screenshot URL: ${req.screenshotUrl}
+==============================================================
+''';
+      debugPrint(logOutput);
+    }
+  }
+
+  String _getDiagnosticsText() {
+    final adminCtrl = Get.find<AdminController>();
+    final targetName = adminCtrl.getDeviceDisplayName(widget.request.targetDeviceId);
+    final req = widget.request;
+
+    return '''
+[Request Diagnostics]
+ID: ${req.requestId}
+Type: ${req.requestType}
+Target: $targetName (${req.targetDeviceId})
+Status: ${req.status}
+Requested At: ${req.requestedAt}
+Completed/Failed At: ${req.completedAt}
+Error: ${req.error ?? 'None'}
+Failure Reason: ${req.failureReason ?? 'None'}
+Media URL: ${req.screenshotUrl ?? 'None'}
+''';
+  }
 
   Color _statusColor(String status) {
     switch (status.toLowerCase()) {
@@ -58,8 +113,9 @@ class RequestDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final adminCtrl = Get.find<AdminController>();
-    final targetName = adminCtrl.getDeviceDisplayName(request.targetDeviceId);
-    final statusColor = _statusColor(request.status);
+    final targetName = adminCtrl.getDeviceDisplayName(widget.request.targetDeviceId);
+    final statusColor = _statusColor(widget.request.status);
+    final isFailed = widget.request.status == 'failed' || widget.request.error != null || widget.request.failureReason != null;
 
     return GetBuilder<ThemeController>(
       builder: (themeState) {
@@ -79,8 +135,23 @@ class RequestDetailScreen extends StatelessWidget {
               style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.bold, fontSize: 18),
             ),
             actions: [
+              IconButton(
+                icon: const Icon(Icons.copy_all_rounded, size: 20),
+                tooltip: 'Copy Diagnostics Log',
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: _getDiagnosticsText()));
+                  Get.snackbar(
+                    'Diagnostics Copied',
+                    'Request error logs copied to clipboard.',
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.blueGrey.shade900,
+                    colorText: Colors.white,
+                    duration: const Duration(seconds: 2),
+                  );
+                },
+              ),
               Container(
-                margin: const EdgeInsets.only(right: 16),
+                margin: const EdgeInsets.only(right: 16, left: 4),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
@@ -89,7 +160,7 @@ class RequestDetailScreen extends StatelessWidget {
                   border: Border.all(color: statusColor.withOpacity(0.4)),
                 ),
                 child: Text(
-                  request.status.toUpperCase(),
+                  widget.request.status.toUpperCase(),
                   style: TextStyle(
                     color: statusColor,
                     fontSize: 11,
@@ -121,7 +192,7 @@ class RequestDetailScreen extends StatelessWidget {
                               radius: 24,
                               backgroundColor: theme.blue.withOpacity(0.15),
                               child: Icon(
-                                _requestIcon(request.requestType),
+                                _requestIcon(widget.request.requestType),
                                 color: theme.blue,
                                 size: 26,
                               ),
@@ -132,7 +203,7 @@ class RequestDetailScreen extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    request.requestType.replaceAll('_', ' ').toUpperCase(),
+                                    widget.request.requestType.replaceAll('_', ' ').toUpperCase(),
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -155,16 +226,16 @@ class RequestDetailScreen extends StatelessWidget {
                         const SizedBox(height: 16),
                         Divider(color: theme.gridLine),
                         const SizedBox(height: 12),
-                        _buildInfoRow('Request ID', request.requestId, theme),
+                        _buildInfoRow('Request ID', widget.request.requestId, theme),
                         const SizedBox(height: 8),
-                        _buildInfoRow('Requested At', _formatDate(request.requestedAt), theme),
-                        if (request.completedAt != null) ...[
+                        _buildInfoRow('Requested At', _formatDate(widget.request.requestedAt), theme),
+                        if (widget.request.completedAt != null) ...[
                           const SizedBox(height: 8),
-                          _buildInfoRow('Completed At', _formatDate(request.completedAt), theme),
+                          _buildInfoRow('Completed At', _formatDate(widget.request.completedAt), theme),
                         ],
-                        if (request.backgroundAttemptedAt != null) ...[
+                        if (widget.request.backgroundAttemptedAt != null) ...[
                           const SizedBox(height: 8),
-                          _buildInfoRow('Background Woken', _formatDate(request.backgroundAttemptedAt), theme),
+                          _buildInfoRow('Background Woken', _formatDate(widget.request.backgroundAttemptedAt), theme),
                         ],
                       ],
                     ),
@@ -173,7 +244,7 @@ class RequestDetailScreen extends StatelessWidget {
                 const SizedBox(height: 16),
 
                 // 2. Image Capture Preview (if available)
-                if (request.screenshotUrl != null && request.screenshotUrl!.isNotEmpty) ...[
+                if (widget.request.screenshotUrl != null && widget.request.screenshotUrl!.isNotEmpty) ...[
                   Card(
                     color: theme.cardBg,
                     shape: RoundedRectangleBorder(
@@ -202,7 +273,7 @@ class RequestDetailScreen extends StatelessWidget {
                                 icon: const Icon(Icons.open_in_browser, size: 20, color: Colors.blueAccent),
                                 tooltip: 'Open Full Image in Browser',
                                 onPressed: () async {
-                                  final uri = Uri.parse(request.screenshotUrl!);
+                                  final uri = Uri.parse(widget.request.screenshotUrl!);
                                   if (await canLaunchUrl(uri)) {
                                     await launchUrl(uri, mode: LaunchMode.externalApplication);
                                   }
@@ -219,7 +290,7 @@ class RequestDetailScreen extends StatelessWidget {
                             minScale: 1.0,
                             maxScale: 4.0,
                             child: Image.network(
-                              request.screenshotUrl!,
+                              widget.request.screenshotUrl!,
                               fit: BoxFit.contain,
                               loadingBuilder: (_, child, progress) {
                                 if (progress == null) return child;
@@ -255,7 +326,7 @@ class RequestDetailScreen extends StatelessWidget {
                 ],
 
                 // 3. Error / Failure Card (if failed)
-                if (request.status == 'failed' || request.error != null || request.failureReason != null) ...[
+                if (isFailed) ...[
                   Card(
                     color: Colors.red.withOpacity(0.08),
                     shape: RoundedRectangleBorder(
@@ -267,41 +338,54 @@ class RequestDetailScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Row(
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 20),
-                              SizedBox(width: 8),
-                              Text(
-                                'Execution Failure Details',
-                                style: TextStyle(
-                                  color: Colors.redAccent,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
+                              const Row(
+                                children: [
+                                  Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 20),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Execution Failure Details',
+                                    style: TextStyle(
+                                      color: Colors.redAccent,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              TextButton.icon(
+                                onPressed: () {
+                                  Clipboard.setData(ClipboardData(text: _getDiagnosticsText()));
+                                  Get.snackbar('Copied', 'Error logs copied to clipboard.');
+                                },
+                                icon: const Icon(Icons.copy, size: 14, color: Colors.redAccent),
+                                label: const Text('Copy', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
                               ),
                             ],
                           ),
                           const SizedBox(height: 10),
-                          if (request.error != null) ...[
+                          if (widget.request.error != null) ...[
                             Text(
                               'Error Message:',
                               style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.w600, fontSize: 12),
                             ),
                             const SizedBox(height: 2),
-                            Text(
-                              request.error!,
+                            SelectableText(
+                              widget.request.error!,
                               style: const TextStyle(color: Colors.redAccent, fontSize: 13),
                             ),
                           ],
-                          if (request.failureReason != null) ...[
+                          if (widget.request.failureReason != null) ...[
                             const SizedBox(height: 8),
                             Text(
                               'Reason / Diagnostics:',
                               style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.w600, fontSize: 12),
                             ),
                             const SizedBox(height: 2),
-                            Text(
-                              request.failureReason!,
+                            SelectableText(
+                              widget.request.failureReason!,
                               style: const TextStyle(color: Colors.orangeAccent, fontSize: 13),
                             ),
                           ],
@@ -315,28 +399,28 @@ class RequestDetailScreen extends StatelessWidget {
                 // 4. Quick Action Retry Button
                 ElevatedButton.icon(
                   onPressed: () async {
-                    if (request.requestType == 'camera_capture') {
-                      await adminCtrl.requestCameraCapture(request.targetDeviceId, cameraFacing: 'front');
-                    } else if (request.requestType == 'camera_stream') {
-                      await adminCtrl.requestCameraStream(request.targetDeviceId, cameraFacing: 'front');
-                    } else if (request.requestType == 'screen_share') {
-                      await adminCtrl.requestScreenShare(request.targetDeviceId);
-                    } else if (request.requestType == 'wake_up') {
-                      await adminCtrl.wakeDevice(request.targetDeviceId);
+                    if (widget.request.requestType == 'camera_capture') {
+                      await adminCtrl.requestCameraCapture(widget.request.targetDeviceId, cameraFacing: 'front');
+                    } else if (widget.request.requestType == 'camera_stream') {
+                      await adminCtrl.requestCameraStream(widget.request.targetDeviceId, cameraFacing: 'front');
+                    } else if (widget.request.requestType == 'screen_share') {
+                      await adminCtrl.requestScreenShare(widget.request.targetDeviceId);
+                    } else if (widget.request.requestType == 'wake_up') {
+                      await adminCtrl.wakeDevice(widget.request.targetDeviceId);
                     } else {
-                      await adminCtrl.requestScreenshot(request.targetDeviceId);
+                      await adminCtrl.requestScreenshot(widget.request.targetDeviceId);
                     }
                     Get.back();
                     Get.snackbar(
                       'Request Dispatched',
-                      'Re-sent ${request.requestType} command to $targetName',
+                      'Re-sent ${widget.request.requestType} command to $targetName',
                       snackPosition: SnackPosition.BOTTOM,
                       backgroundColor: Colors.indigo.shade800,
                       colorText: Colors.white,
                     );
                   },
                   icon: const Icon(Icons.refresh_rounded),
-                  label: Text('Re-dispatch ${request.requestType.replaceAll('_', ' ')}'),
+                  label: Text('Re-dispatch ${widget.request.requestType.replaceAll('_', ' ')}'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.blue,
                     padding: const EdgeInsets.symmetric(vertical: 14),
