@@ -95,10 +95,23 @@ class WebRtcPublisherService : Service() {
         }
     }
 
+    private var isSessionRunning = false
+    private var currentSessionRequestId: String? = null
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        requestId = intent?.getStringExtra("requestId")
+        val newRequestId = intent?.getStringExtra("requestId")
         val cameraFacing = intent?.getStringExtra("cameraFacing") ?: "front"
         val requestType = intent?.getStringExtra("requestType") ?: "camera_stream"
+
+        if (isSessionRunning && newRequestId == currentSessionRequestId && newRequestId != null) {
+            Log.d(TAG, "WebRTC session already actively running for request: $newRequestId")
+            return START_STICKY
+        }
+
+        stopCurrentSession()
+
+        requestId = newRequestId
+        currentSessionRequestId = newRequestId
 
         val resultDataFromIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent?.getParcelableExtra("resultData", Intent::class.java)
@@ -125,6 +138,7 @@ class WebRtcPublisherService : Service() {
             return START_NOT_STICKY
         }
 
+        isSessionRunning = true
         createPeerConnection()
         startLocalCapture(requestType, cameraFacing, resultData)
 
@@ -259,7 +273,7 @@ class WebRtcPublisherService : Service() {
             }
 
             if (videoCapturer == null) {
-                val enumerator = Camera2Enumerator(this)
+                val enumerator = Camera2Enumerator(applicationContext)
                 val deviceNames = enumerator.deviceNames
                 var chosenName: String? = null
                 for (name in deviceNames) {
@@ -271,7 +285,20 @@ class WebRtcPublisherService : Service() {
                 }
                 val targetName = chosenName ?: if (deviceNames.isNotEmpty()) deviceNames[0] else null
                 if (targetName != null) {
-                    videoCapturer = enumerator.createCapturer(targetName, null)
+                    videoCapturer = enumerator.createCapturer(targetName, object : CameraVideoCapturer.CameraEventsHandler {
+                        override fun onCameraError(p0: String?) {
+                            Log.e(TAG, "WebRTC Camera error: $p0")
+                        }
+                        override fun onCameraDisconnected() {
+                            Log.w(TAG, "WebRTC Camera disconnected")
+                        }
+                        override fun onCameraFreezed(p0: String?) {
+                            Log.w(TAG, "WebRTC Camera frozen: $p0")
+                        }
+                        override fun onCameraOpening(p0: String?) {}
+                        override fun onFirstFrameAvailable() {}
+                        override fun onCameraClosed() {}
+                    })
                 }
             }
 
@@ -281,10 +308,20 @@ class WebRtcPublisherService : Service() {
                 return
             }
 
-            surfaceTextureHelper = SurfaceTextureHelper.create("WebRTC_Thread", eglBase?.eglBaseContext)
+            surfaceTextureHelper = SurfaceTextureHelper.create("WebRtcCaptureThread", eglBase?.eglBaseContext)
             val videoSource = peerConnectionFactory?.createVideoSource(false)
-            videoCapturer?.initialize(surfaceTextureHelper, applicationContext, videoSource?.capturerObserver)
-            videoCapturer?.startCapture(640, 480, 25)
+            val capturer = videoCapturer
+            val helper = surfaceTextureHelper
+
+            capturer?.initialize(helper, applicationContext, videoSource?.capturerObserver)
+            helper?.handler?.post {
+                try {
+                    capturer?.startCapture(640, 480, 25)
+                } catch (e: Throwable) {
+                    Log.e(TAG, "Error starting video capture on helper thread: ${e.message}", e)
+                }
+            }
+
             localVideoTrack = peerConnectionFactory?.createVideoTrack("ARDAMSv0", videoSource)
             if (localVideoTrack != null) {
                 peerConnection?.addTrack(localVideoTrack)
@@ -319,27 +356,34 @@ class WebRtcPublisherService : Service() {
         }
     }
 
-    override fun onDestroy() {
+    private fun stopCurrentSession() {
+        isSessionRunning = false
         try {
             videoCapturer?.stopCapture()
             videoCapturer?.dispose()
             videoCapturer = null
-        } catch (e: Exception) {}
+        } catch (_: Throwable) {}
         try {
             surfaceTextureHelper?.dispose()
             surfaceTextureHelper = null
-        } catch (e: Exception) {}
+        } catch (_: Throwable) {}
         try {
             docListener?.remove()
-        } catch (e: Exception) {}
+            docListener = null
+        } catch (_: Throwable) {}
         try {
             iceListener?.remove()
-        } catch (e: Exception) {}
-
+            iceListener = null
+        } catch (_: Throwable) {}
         try {
             peerConnection?.close()
+            peerConnection?.dispose()
             peerConnection = null
-        } catch (e: Exception) {}
+        } catch (_: Throwable) {}
+    }
+
+    override fun onDestroy() {
+        stopCurrentSession()
         try {
             peerConnectionFactory?.dispose()
             peerConnectionFactory = null

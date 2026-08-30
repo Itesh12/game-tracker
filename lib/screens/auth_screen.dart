@@ -446,8 +446,9 @@ class _AuthScreenState extends State<AuthScreen> {
                         const SizedBox(height: 16),
 
                         // Toggle Sign In / Create Account
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Text(
                               isSignup
