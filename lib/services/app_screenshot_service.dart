@@ -9,35 +9,13 @@ class AppScreenshotService {
   static final GlobalKey screenshotKey = GlobalKey(
     debugLabel: 'app_screenshot',
   );
-  static Uint8List? _lastCapturedScreenshotBytes;
-  static bool _isCapturing = false;
 
   static Future<Uint8List?> captureScreenshot() async {
-    final freshBytes = await captureAndCacheCurrentFrame();
-    if (freshBytes != null) {
-      return freshBytes;
-    }
-    return _lastCapturedScreenshotBytes;
+    return _captureFromCurrentView();
   }
 
   static Future<Uint8List?> captureAndCacheCurrentFrame() async {
-    if (_isCapturing) {
-      return _lastCapturedScreenshotBytes;
-    }
-
-    _isCapturing = true;
-    try {
-      final screenshotBytes = await _captureFromCurrentView();
-      if (screenshotBytes != null) {
-        _lastCapturedScreenshotBytes = screenshotBytes;
-      }
-      return screenshotBytes;
-    } catch (error) {
-      debugPrint('Screenshot capture failed: $error');
-      return _lastCapturedScreenshotBytes;
-    } finally {
-      _isCapturing = false;
-    }
+    return _captureFromCurrentView();
   }
 
   static Future<Uint8List?> _captureFromCurrentView() async {
@@ -53,7 +31,7 @@ class AppScreenshotService {
       final byteData = await image.toByteData(format: ImageByteFormat.png);
       return byteData?.buffer.asUint8List();
     } catch (error) {
-      debugPrint('Screenshot capture failed: $error');
+      debugPrint('In-app frame capture skipped: $error');
       return null;
     }
   }
