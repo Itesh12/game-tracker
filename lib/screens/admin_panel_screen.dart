@@ -51,6 +51,18 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     });
   }
 
+  String _formatRequestTime(DateTime? dt) {
+    if (dt == null) return 'Time: Just now';
+    final local = dt.toLocal();
+    final hour = local.hour > 12 ? local.hour - 12 : (local.hour == 0 ? 12 : local.hour);
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
+    final min = local.minute.toString().padLeft(2, '0');
+    final sec = local.second.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    return '$day/$month, $hour:$min:$sec $ampm';
+  }
+
   @override
   Widget build(BuildContext context) {
     final adminCtrl = Get.find<AdminController>();
@@ -716,11 +728,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                         Row(
                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
-                                            if (request.requestedAt != null)
-                                              Text(
-                                                'Time: ${request.requestedAt!.toLocal().toString().split('.').first}',
-                                                style: TextStyle(color: theme.textSecondary, fontSize: 11),
-                                              ),
+                                            Text(
+                                              _formatRequestTime(request.requestedAt),
+                                              style: TextStyle(color: theme.textSecondary, fontSize: 11),
+                                            ),
                                             Text(
                                               'Tap for details & media',
                                               style: TextStyle(color: theme.blue, fontSize: 11, fontWeight: FontWeight.w600),

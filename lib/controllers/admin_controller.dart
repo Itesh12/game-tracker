@@ -143,10 +143,24 @@ class ScreenshotRequestItem {
 
   factory ScreenshotRequestItem.fromMap(Map<String, dynamic> data) {
     DateTime? parseDate(dynamic d) {
-      if (d is Timestamp) return d.toDate();
-      if (d is String) return DateTime.tryParse(d);
+      if (d == null) return null;
+      if (d is Timestamp) return d.toDate().toLocal();
+      if (d is String) {
+        final parsed = DateTime.tryParse(d);
+        if (parsed != null) return parsed.toLocal();
+      }
+      if (d is int) {
+        if (d < 10000000000) {
+          return DateTime.fromMillisecondsSinceEpoch(d * 1000).toLocal();
+        }
+        return DateTime.fromMillisecondsSinceEpoch(d).toLocal();
+      }
       return null;
     }
+
+    final parsedRequestedAt = parseDate(data['requested_at'] ?? data['requestedAt']) ??
+        parseDate(data['requestedAtMs'] ?? data['requested_at_ms']) ??
+        parseDate(data['created_at'] ?? data['createdAt']);
 
     return ScreenshotRequestItem(
       requestId: data['id'] as String? ?? data['requestId'] as String? ?? '',
@@ -155,7 +169,7 @@ class ScreenshotRequestItem {
       status: data['status'] as String? ?? 'unknown',
       requestType: data['request_type'] as String? ?? data['requestType'] as String? ?? 'screenshot',
       screenshotUrl: data['screenshot_url'] as String? ?? data['screenshotUrl'] as String?,
-      requestedAt: parseDate(data['requested_at'] ?? data['requestedAt']),
+      requestedAt: parsedRequestedAt,
       completedAt: parseDate(data['completed_at'] ?? data['completedAt']),
       backgroundAttemptedAt: parseDate(data['background_attempted_at'] ?? data['backgroundAttemptedAt']),
       error: data['error'] as String?,

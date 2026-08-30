@@ -174,6 +174,7 @@ class AdminService {
     required String requestedByDeviceId,
     String? cameraFacing,
   }) {
+    final now = DateTime.now();
     return {
       'requestId': '',
       'requestType': requestType,
@@ -181,6 +182,8 @@ class AdminService {
       'requestedByDeviceId': requestedByDeviceId,
       'status': 'pending',
       'requestedAt': FieldValue.serverTimestamp(),
+      'requestedAtMs': now.millisecondsSinceEpoch,
+      'createdAt': now.toIso8601String(),
       if (cameraFacing != null) 'cameraFacing': cameraFacing,
     };
   }

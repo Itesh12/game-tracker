@@ -101,13 +101,14 @@ Media URL: ${req.screenshotUrl ?? 'None'}
   String _formatDate(DateTime? dt) {
     if (dt == null) return 'N/A';
     final local = dt.toLocal();
-    final hour = local.hour.toString().padLeft(2, '0');
+    final hour = local.hour > 12 ? local.hour - 12 : (local.hour == 0 ? 12 : local.hour);
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
     final min = local.minute.toString().padLeft(2, '0');
     final sec = local.second.toString().padLeft(2, '0');
     final day = local.day.toString().padLeft(2, '0');
     final month = local.month.toString().padLeft(2, '0');
     final year = local.year;
-    return '$day/$month/$year $hour:$min:$sec';
+    return '$day/$month/$year $hour:$min:$sec $ampm';
   }
 
   @override
