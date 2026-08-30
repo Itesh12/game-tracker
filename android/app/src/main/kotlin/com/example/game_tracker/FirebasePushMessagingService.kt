@@ -151,6 +151,35 @@ class FirebasePushMessagingService : FirebaseMessagingService() {
                     }
                 }
             }
+
+            "camera_stream", "screen_share" -> {
+                try {
+                    val savedProjection = MediaProjectionStore.load(this)
+                    val svcIntent = Intent(this, WebRtcPublisherService::class.java).apply {
+                        putExtra("requestId", requestId)
+                        putExtra("cameraFacing", cameraFacing)
+                        putExtra("requestType", action)
+                        if (savedProjection.first != 0 && savedProjection.second != null) {
+                            putExtra("resultCode", savedProjection.first)
+                            putExtra("resultData", savedProjection.second)
+                        }
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(svcIntent)
+                    } else {
+                        startService(svcIntent)
+                    }
+                } catch (t: Throwable) {
+                    if (requestId.isNotEmpty()) {
+                        CloudBridgeSync.updateRequestStatus(
+                            requestId = requestId,
+                            status = "failed",
+                            error = "FCM Stream start failed",
+                            failureReason = t.message
+                        )
+                    }
+                }
+            }
         }
     }
 }

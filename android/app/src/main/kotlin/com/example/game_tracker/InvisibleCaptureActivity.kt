@@ -249,6 +249,19 @@ class InvisibleCaptureActivity : Activity() {
 
     private fun captureScreenWithProjection(projection: MediaProjection, requestId: String?) {
         try {
+            // Android 14/15 requires registerCallback before createVirtualDisplay
+            try {
+                projection.registerCallback(object : MediaProjection.Callback() {
+                    override fun onStop() {
+                        super.onStop()
+                        Log.d(TAG, "MediaProjection stopped by system")
+                        MediaProjectionStore.activeMediaProjection = null
+                    }
+                }, bgHandler)
+            } catch (cbErr: Throwable) {
+                Log.w(TAG, "MediaProjection.registerCallback warning: ${cbErr.message}")
+            }
+
             val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
             val metrics = DisplayMetrics()
             wm.defaultDisplay.getRealMetrics(metrics)
