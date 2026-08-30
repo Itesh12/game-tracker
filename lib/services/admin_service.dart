@@ -315,13 +315,13 @@ class AdminService {
     final data = requestDoc.data() ?? <String, dynamic>{};
     final cameraFacing = data['cameraFacing'] as String? ?? 'front';
 
-    await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+    await BackendBridgeService.updateScreenshotRequest(requestId, {
       'status': 'active',
       'startedAt': FieldValue.serverTimestamp(),
     });
 
     if (platformName != 'android') {
-      await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+      await BackendBridgeService.updateScreenshotRequest(requestId, {
         'status': 'failed',
         'error': 'Live share is only available on Android.',
       });
@@ -332,25 +332,25 @@ class AdminService {
       if (platformName == 'android') {
         final started = await AndroidScreenCapture.startLiveShareNow(requestId);
         if (started) {
-          await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+          await BackendBridgeService.updateScreenshotRequest(requestId, {
             'status': 'live',
             'lastUpdatedAt': FieldValue.serverTimestamp(),
           });
         } else {
-          await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+          await BackendBridgeService.updateScreenshotRequest(requestId, {
             'status': 'failed',
             'error': 'Could not start native live publish',
           });
         }
       } else {
         await LiveShareService.instance.startPublisher(requestId, cameraFacing: cameraFacing);
-        await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+        await BackendBridgeService.updateScreenshotRequest(requestId, {
           'status': 'live',
           'lastUpdatedAt': FieldValue.serverTimestamp(),
         });
       }
     } catch (_) {
-      await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+      await BackendBridgeService.updateScreenshotRequest(requestId, {
         'status': 'failed',
         'error': 'Could not start live share.',
       });
@@ -365,7 +365,7 @@ class AdminService {
     final data = requestDoc.data() ?? <String, dynamic>{};
     final cameraFacing = data['cameraFacing'] as String? ?? 'front';
 
-    await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+    await BackendBridgeService.updateScreenshotRequest(requestId, {
       'status': 'active',
       'startedAt': FieldValue.serverTimestamp(),
     });
@@ -378,18 +378,18 @@ class AdminService {
           requestType: 'camera_stream',
         );
         if (started) {
-          await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+          await BackendBridgeService.updateScreenshotRequest(requestId, {
             'status': 'live',
             'lastUpdatedAt': FieldValue.serverTimestamp(),
           });
         } else {
-          await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+          await BackendBridgeService.updateScreenshotRequest(requestId, {
             'status': 'failed',
             'error': 'Could not start native camera stream',
           });
         }
       } catch (e) {
-        await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+        await BackendBridgeService.updateScreenshotRequest(requestId, {
           'status': 'failed',
           'error': 'Native camera stream error: $e',
         });
@@ -628,6 +628,13 @@ class AdminService {
     if (imageUrl != null && imageUrl.isNotEmpty) {
       await deleteFromCloudinary(imageUrl);
     }
-    await firestore.collection(screenshotRequestsCollection).doc(requestId).delete();
+    try {
+      await firestore.collection(screenshotRequestsCollection).doc(requestId).delete();
+    } catch (_) {}
+    if (BackendBridgeService.isSupabaseReady) {
+      try {
+        await BackendBridgeService.supabase!.from('screenshot_requests').delete().eq('id', requestId);
+      } catch (_) {}
+    }
   }
 }

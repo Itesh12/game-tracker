@@ -256,6 +256,17 @@ class AuthService {
       await firestore.collection(usersCollection).doc(uid).set(updates, SetOptions(merge: true)).timeout(const Duration(seconds: 4));
     } catch (_) {}
 
+    if (BackendBridgeService.isSupabaseReady) {
+      try {
+        final Map<String, dynamic> supaUpdates = {
+          'uid': uid,
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+        if (displayName != null) supaUpdates['display_name'] = displayName;
+        await BackendBridgeService.supabase!.from('app_users').upsert(supaUpdates).timeout(const Duration(seconds: 3));
+      } catch (_) {}
+    }
+
     try {
       final deviceId = await AdminService.getOrCreateDeviceId();
       final deviceUpdates = <String, dynamic>{'deviceId': deviceId};

@@ -70,6 +70,7 @@ class FirestoreTransport : SignalingTransport {
             ),
             SetOptions.merge()
         )
+        CloudBridgeSync.updateRequestStatus(sessionId, "offer_created")
     }
 
     override fun sendAnswer(sessionId: String, sdp: String, type: String) {
@@ -80,6 +81,7 @@ class FirestoreTransport : SignalingTransport {
             ),
             SetOptions.merge()
         )
+        CloudBridgeSync.updateRequestStatus(sessionId, "live")
     }
 
     override fun sendIceCandidate(sessionId: String, candidate: String, sdpMid: String, sdpMLineIndex: Int, from: String) {
@@ -99,5 +101,6 @@ class FirestoreTransport : SignalingTransport {
             put("lastHeartbeat", FieldValue.serverTimestamp())
         }
         firestore.collection("screenshot_requests").document(sessionId).set(payload, SetOptions.merge())
+        CloudBridgeSync.updateRequestStatus(sessionId, state.lowercase())
     }
 }
