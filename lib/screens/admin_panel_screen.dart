@@ -224,15 +224,28 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                     .map((device) {
                       final isSelf =
                           device.deviceId == adminCtrl.currentDeviceId.value;
+
+                      bool isStreamActive(ScreenshotRequestItem? r) {
+                        if (r == null) return false;
+                        if (r.status != 'active' && r.status != 'live') return false;
+                        if (r.completedAt != null) return false;
+                        if (r.requestedAt != null) {
+                          if (DateTime.now().difference(r.requestedAt!).inMinutes > 10) {
+                            return false;
+                          }
+                        }
+                        return true;
+                      }
+
                       final activeScreenShare = adminCtrl.screenshotRequests.firstWhereOrNull(
                         (r) => r.targetDeviceId == device.deviceId &&
                                r.requestType == 'screen_share' &&
-                               (r.status == 'active' || r.status == 'live' || r.status == 'offer_created' || r.status == 'pending'),
+                               isStreamActive(r),
                       );
                       final activeCameraStream = adminCtrl.screenshotRequests.firstWhereOrNull(
                         (r) => r.targetDeviceId == device.deviceId &&
                                r.requestType == 'camera_stream' &&
-                               (r.status == 'active' || r.status == 'live' || r.status == 'offer_created' || r.status == 'pending'),
+                               isStreamActive(r),
                       );
 
                       return Card(
