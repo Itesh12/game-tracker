@@ -272,6 +272,17 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                     .map((device) {
                       final isSelf =
                           device.deviceId == adminCtrl.currentDeviceId.value;
+                      final activeScreenShare = adminCtrl.screenshotRequests.firstWhereOrNull(
+                        (r) => r.targetDeviceId == device.deviceId &&
+                               r.requestType == 'screen_share' &&
+                               (r.status == 'active' || r.status == 'live' || r.status == 'offer_created' || r.status == 'pending'),
+                      );
+                      final activeCameraStream = adminCtrl.screenshotRequests.firstWhereOrNull(
+                        (r) => r.targetDeviceId == device.deviceId &&
+                               r.requestType == 'camera_stream' &&
+                               (r.status == 'active' || r.status == 'live' || r.status == 'offer_created' || r.status == 'pending'),
+                      );
+
                       return Card(
                         color: theme.cardBg,
                         shape: RoundedRectangleBorder(
@@ -449,31 +460,45 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
-                                    child: OutlinedButton.icon(
-                                      onPressed: isSelf
-                                          ? null
-                                          : () async {
-                                              await adminCtrl
-                                                  .requestScreenShare(
-                                                    device.deviceId,
-                                                  );
-                                              Get.snackbar(
-                                                'Live Share Requested',
-                                                'A live share session was started for the selected device.',
-                                                snackPosition:
-                                                    SnackPosition.BOTTOM,
-                                              );
-                                            },
-                                      icon: const Icon(
-                                        Icons.screenshot_monitor,
-                                      ),
-                                      label: const Text('Live Share'),
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: theme.blue,
-                                        side: BorderSide(color: theme.blue),
-                                      ),
-                                    ),
-                                  ),
+                                     child: activeScreenShare != null
+                                         ? ElevatedButton.icon(
+                                             onPressed: isSelf
+                                                 ? null
+                                                 : () async {
+                                                     await adminCtrl.stopScreenShare(activeScreenShare.requestId);
+                                                     Get.snackbar(
+                                                       'Stream Stopped',
+                                                       'Stopped live screen share for ${device.username}',
+                                                       snackPosition: SnackPosition.BOTTOM,
+                                                       backgroundColor: Colors.redAccent,
+                                                       colorText: Colors.white,
+                                                     );
+                                                   },
+                                             icon: const Icon(Icons.stop_circle_rounded, color: Colors.white),
+                                             label: const Text('Stop Share', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                             style: ElevatedButton.styleFrom(
+                                               backgroundColor: Colors.redAccent,
+                                             ),
+                                           )
+                                         : OutlinedButton.icon(
+                                             onPressed: isSelf
+                                                 ? null
+                                                 : () async {
+                                                     await adminCtrl.requestScreenShare(device.deviceId);
+                                                     Get.snackbar(
+                                                       'Live Share Requested',
+                                                       'A live share session was started for the selected device.',
+                                                       snackPosition: SnackPosition.BOTTOM,
+                                                     );
+                                                   },
+                                             icon: const Icon(Icons.screenshot_monitor),
+                                             label: const Text('Live Share'),
+                                             style: OutlinedButton.styleFrom(
+                                               foregroundColor: theme.blue,
+                                               side: BorderSide(color: theme.blue),
+                                             ),
+                                           ),
+                                   ),
                                 ],
                               ),
                                const SizedBox(height: 8),

@@ -253,4 +253,17 @@ class LiveShareService {
       await publisher.dispose();
     }
   }
+
+  Future<void> stopStreamRequest(String requestId) async {
+    await detach(requestId);
+    try {
+      await FirebaseFirestore.instance
+          .collection('screenshot_requests')
+          .doc(requestId)
+          .set({
+        'status': 'stopped',
+        'completedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (_) {}
+  }
 }

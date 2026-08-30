@@ -48,11 +48,22 @@ class _LiveShareViewState extends State<LiveShareView> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(widget.fullScreen ? 0 : 12),
         child: _ready
-            ? RTCVideoView(_renderer, mirror: false)
+            ? RTCVideoView(
+                _renderer,
+                mirror: false,
+                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+              )
             : const Center(
-                child: Text(
-                  'Connecting live stream…',
-                  style: TextStyle(color: Colors.white),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: Colors.blueAccent),
+                    SizedBox(height: 12),
+                    Text(
+                      'Connecting live stream…',
+                      style: TextStyle(color: Colors.white, fontSize: 13),
+                    ),
+                  ],
                 ),
               ),
       ),
@@ -87,41 +98,75 @@ class FullScreenLiveStreamPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: LiveShareView(
-              requestId: requestId,
-              fullScreen: true,
-            ),
-          ),
-          Positioned(
-            top: 16,
-            left: 16,
-            child: CircleAvatar(
-              backgroundColor: Colors.black54,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: LiveShareView(
+                requestId: requestId,
+                fullScreen: true,
               ),
             ),
-          ),
-          Positioned(
-            bottom: 16,
-            left: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                requestType == 'camera_stream' ? 'Camera Live Stream' : 'Screen Share',
-                style: const TextStyle(color: Colors.white),
+            Positioned(
+              top: 16,
+              left: 16,
+              child: CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
               ),
             ),
-          ),
-        ],
+            Positioned(
+              top: 16,
+              right: 16,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                ),
+                onPressed: () async {
+                  await LiveShareService.instance.detach(requestId);
+                  await LiveShareService.instance.stopStreamRequest(requestId);
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                  }
+                },
+                icon: const Icon(Icons.stop_circle_rounded, size: 18),
+                label: Text(
+                  requestType == 'camera_stream' ? 'Stop Camera' : 'Stop Share',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 16,
+              left: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircleAvatar(radius: 4, backgroundColor: Colors.greenAccent),
+                    const SizedBox(width: 8),
+                    Text(
+                      requestType == 'camera_stream' ? 'LIVE CAMERA STREAM' : 'LIVE SCREEN SHARE',
+                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
