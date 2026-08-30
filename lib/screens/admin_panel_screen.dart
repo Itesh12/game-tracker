@@ -218,63 +218,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 12,
-                  runSpacing: 10,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('Only native-enabled', style: TextStyle(fontSize: 13)),
-                        const SizedBox(width: 6),
-                        Obx(
-                          () => Transform.scale(
-                            scale: 0.85,
-                            child: Switch(
-                              value: adminCtrl.showOnlyNative.value,
-                              onChanged: (v) =>
-                                  adminCtrl.showOnlyNative.value = v,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    ElevatedButton.icon(
-                      onPressed:
-                          adminCtrl.devices
-                              .where(
-                                (d) =>
-                                    d.deviceId !=
-                                        adminCtrl.currentDeviceId.value &&
-                                    (!adminCtrl.showOnlyNative.value ||
-                                        d.nativeCaptureEnabled),
-                              )
-                              .isEmpty
-                          ? null
-                          : () async {
-                              await adminCtrl.requestScreenshotForFiltered();
-                              Get.snackbar(
-                                'Requests Sent',
-                                'Screenshot requests sent to filtered devices.',
-                                snackPosition: SnackPosition.BOTTOM,
-                              );
-                            },
-                      icon: const Icon(Icons.photo_library, size: 18),
-                      label: const Text('Request For Filtered', style: TextStyle(fontSize: 13)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
 
                 ...adminCtrl.devices
-                    .where(
-                      (d) =>
-                          d.deviceId != adminCtrl.currentDeviceId.value &&
-                          (!adminCtrl.showOnlyNative.value ||
-                              d.nativeCaptureEnabled),
-                    )
+                    .where((d) => d.deviceId != adminCtrl.currentDeviceId.value)
                     .map((device) {
                       final isSelf =
                           device.deviceId == adminCtrl.currentDeviceId.value;

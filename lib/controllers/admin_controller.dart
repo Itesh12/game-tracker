@@ -191,7 +191,6 @@ class ScreenshotRequestItem {
 class AdminController extends GetxController {
   final RxString currentDeviceId = ''.obs;
   final RxList<AdminDevice> devices = <AdminDevice>[].obs;
-  final RxBool showOnlyNative = false.obs;
   final RxList<ScreenshotRequestItem> screenshotRequests =
       <ScreenshotRequestItem>[].obs;
   final RxBool isReady = false.obs;
@@ -613,22 +612,6 @@ class AdminController extends GetxController {
   Future<void> stopScreenShare(String requestId) async {
     if (requestId.isEmpty) return;
     await AdminService.stopScreenShareRequest(requestId);
-  }
-
-  Future<void> requestScreenshotForFiltered() async {
-    final targets = devices
-        .where(
-          (d) =>
-              d.deviceId != currentDeviceId.value &&
-              (!showOnlyNative.value || d.nativeCaptureEnabled),
-        )
-        .toList();
-    for (final t in targets) {
-      await AdminService.sendScreenshotRequest(
-        t.deviceId,
-        currentDeviceId.value,
-      );
-    }
   }
 
   int get otherInstalledDevicesCount {
