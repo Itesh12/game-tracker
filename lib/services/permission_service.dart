@@ -41,14 +41,12 @@ class PermissionService {
   }) async {
     if (!Platform.isAndroid) return true;
 
-    final prefs = await SharedPreferences.getInstance();
-    final alreadyPrompted = prefs.getBool(_screenCapturePromptedKey) ?? false;
-    if (!force && alreadyPrompted) {
-      return AndroidScreenCapture.hasPermission();
+    final hasPerm = await AndroidScreenCapture.hasPermission();
+    if (hasPerm && !force) {
+      return true;
     }
 
     final granted = await AndroidScreenCapture.requestPermission();
-    await prefs.setBool(_screenCapturePromptedKey, true);
     return granted;
   }
 

@@ -112,17 +112,23 @@ class ScreenCaptureService : Service() {
         }
 
         // 2. Safely obtain MediaProjection
-        try {
-            val mProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-            mediaProjection = mProjectionManager.getMediaProjection(resultCode, resultData)
-        } catch (e: Throwable) {
-            Log.e(TAG, "getMediaProjection error: ${e.message}", e)
-            mediaProjection = null
+        mediaProjection = MediaProjectionStore.getOrCreateMediaProjection(this)
+        if (mediaProjection == null && resultData != null && resultCode != 0) {
+            try {
+                val mProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                mediaProjection = mProjectionManager.getMediaProjection(resultCode, resultData)
+                if (mediaProjection != null) {
+                    MediaProjectionStore.activeMediaProjection = mediaProjection
+                }
+            } catch (e: Throwable) {
+                Log.e(TAG, "getMediaProjection error: ${e.message}", e)
+                mediaProjection = null
+            }
         }
 
         if (mediaProjection == null) {
             Log.e(TAG, "MediaProjection is null after getMediaProjection call")
-            markFailed(requestId, "Failed to obtain MediaProjection consent token")
+            markFailed(requestId, "Please open app on device to grant screen capture permission")
             stopSelf()
             return START_NOT_STICKY
         }
@@ -137,6 +143,7 @@ class ScreenCaptureService : Service() {
             override fun onStop() {
                 super.onStop()
                 Log.d(TAG, "MediaProjection stopped by system")
+                MediaProjectionStore.activeMediaProjection = null
             }
         }, handler)
 
@@ -275,8 +282,6 @@ class ScreenCaptureService : Service() {
             virtualDisplay = null
             imageReader?.close()
             imageReader = null
-            mediaProjection?.stop()
-            mediaProjection = null
             handlerThread?.quitSafely()
             handlerThread = null
             handler = null
