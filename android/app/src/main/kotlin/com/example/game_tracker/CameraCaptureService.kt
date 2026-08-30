@@ -33,6 +33,7 @@ class CameraCaptureService : Service() {
         private const val TAG = "CameraCaptureService"
         private const val NOTIFICATION_ID = 1003
         private const val CHANNEL_ID = "CameraCaptureChannel"
+        private val isBusy = AtomicBoolean(false)
     }
 
     private var cameraDevice: CameraDevice? = null
@@ -103,6 +104,11 @@ class CameraCaptureService : Service() {
             Log.e(TAG, "Camera permission not granted")
             markFailed(requestId, "Camera permission not granted on device")
             stopSelf()
+            return START_NOT_STICKY
+        }
+
+        if (!isBusy.compareAndSet(false, true)) {
+            Log.w(TAG, "Camera capture is already in progress, skipping concurrent duplicate execution")
             return START_NOT_STICKY
         }
 
@@ -370,6 +376,7 @@ class CameraCaptureService : Service() {
         } catch (_: Throwable) {}
         handlerThread = null
         handler = null
+        isBusy.set(false)
     }
 
     override fun onDestroy() {

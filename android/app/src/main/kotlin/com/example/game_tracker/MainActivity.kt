@@ -192,6 +192,11 @@ class MainActivity : FlutterActivity() {
                 mediaProjectionResultCode = resultCode
                 mediaProjectionResultData = data
                 MediaProjectionStore.save(this, resultCode, data)
+                try {
+                    MediaProjectionStore.getOrCreateMediaProjection(this)
+                } catch (e: Throwable) {
+                    e.printStackTrace()
+                }
             }
         }
     }

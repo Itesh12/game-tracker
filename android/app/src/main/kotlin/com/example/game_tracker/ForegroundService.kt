@@ -223,7 +223,18 @@ class ForegroundService : Service() {
         }
     }
 
-    private val handledRequestIds = java.util.Collections.synchronizedSet(HashSet<String>())
+    private val handledRequestIds = java.util.Collections.synchronizedSet(object : LinkedHashSet<String>() {
+        override fun add(element: String): Boolean {
+            if (size >= 300) {
+                val iterator = iterator()
+                if (iterator.hasNext()) {
+                    iterator.next()
+                    iterator.remove()
+                }
+            }
+            return super.add(element)
+        }
+    })
     private var supabasePollHandler: Handler? = null
     private var supabasePollRunnable: Runnable? = null
 
@@ -324,11 +335,6 @@ class ForegroundService : Service() {
     private fun handleIncomingCommand(requestId: String, requestType: String, cameraFacing: String) {
         if (handledRequestIds.contains(requestId)) return
         handledRequestIds.add(requestId)
-
-        // Schedule removal after 15 seconds to prevent unbounded growth
-        Handler(Looper.getMainLooper()).postDelayed({
-            handledRequestIds.remove(requestId)
-        }, 15000)
 
         when (requestType) {
             "location_ping" -> {
