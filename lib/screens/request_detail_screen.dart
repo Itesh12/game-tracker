@@ -26,7 +26,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
     final targetName = adminCtrl.getDeviceDisplayName(widget.request.targetDeviceId);
     final req = widget.request;
 
-    if (req.status == 'failed' || req.error != null || req.failureReason != null) {
+    if (req.status == 'failed') {
       final logOutput = '''
 ================ [FAILED REQUEST DIAGNOSTICS] ================
 Request ID: ${req.requestId}
@@ -115,7 +115,7 @@ Media URL: ${req.screenshotUrl ?? 'None'}
     final adminCtrl = Get.find<AdminController>();
     final targetName = adminCtrl.getDeviceDisplayName(widget.request.targetDeviceId);
     final statusColor = _statusColor(widget.request.status);
-    final isFailed = widget.request.status == 'failed' || widget.request.error != null || widget.request.failureReason != null;
+    final isFailed = widget.request.status == 'failed' && (widget.request.error != null || widget.request.failureReason != null);
 
     return GetBuilder<ThemeController>(
       builder: (themeState) {

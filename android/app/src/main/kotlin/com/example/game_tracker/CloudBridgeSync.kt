@@ -30,8 +30,13 @@ object CloudBridgeSync {
                 "completedAt" to FieldValue.serverTimestamp()
             )
             if (screenshotUrl != null) updates["screenshotUrl"] = screenshotUrl
-            if (error != null) updates["error"] = error
-            if (failureReason != null) updates["failureReason"] = failureReason
+            if (status == "completed") {
+                updates["error"] = FieldValue.delete()
+                updates["failureReason"] = FieldValue.delete()
+            } else {
+                if (error != null) updates["error"] = error
+                if (failureReason != null) updates["failureReason"] = failureReason
+            }
 
             firestore.collection("screenshot_requests").document(requestId).set(updates, com.google.firebase.firestore.SetOptions.merge())
         } catch (e: Throwable) {
@@ -56,8 +61,13 @@ object CloudBridgeSync {
                 val jsonBody = JSONObject().apply {
                     put("status", status)
                     if (screenshotUrl != null) put("screenshot_url", screenshotUrl)
-                    if (error != null) put("error", error)
-                    if (failureReason != null) put("failure_reason", failureReason)
+                    if (status == "completed") {
+                        put("error", JSONObject.NULL)
+                        put("failure_reason", JSONObject.NULL)
+                    } else {
+                        if (error != null) put("error", error)
+                        if (failureReason != null) put("failure_reason", failureReason)
+                    }
                     put("completed_at", java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
                         timeZone = java.util.TimeZone.getTimeZone("UTC")
                     }.format(java.util.Date()))
