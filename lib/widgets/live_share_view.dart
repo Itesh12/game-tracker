@@ -36,6 +36,7 @@ class _LiveShareViewState extends State<LiveShareView> {
 
   @override
   void dispose() {
+    _renderer.srcObject = null;
     LiveShareService.instance.detach(widget.requestId);
     _renderer.dispose();
     super.dispose();

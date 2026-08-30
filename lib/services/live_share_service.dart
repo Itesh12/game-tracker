@@ -20,10 +20,16 @@ class LiveShareSession {
   Future<void> initialize() async {
     await renderer.initialize();
 
-    peerConnection.onTrack = (event) {
+    peerConnection.onTrack = (event) async {
       if (event.track.kind == 'video') {
         if (event.streams.isNotEmpty) {
           renderer.srcObject = event.streams[0];
+        } else {
+          try {
+            final stream = await createLocalMediaStream('remote_stream_${DateTime.now().millisecondsSinceEpoch}');
+            stream.addTrack(event.track);
+            renderer.srcObject = stream;
+          } catch (_) {}
         }
       }
     };
@@ -65,7 +71,14 @@ class LiveShareSession {
             offer['type'] as String? ?? 'offer',
           );
           await peerConnection.setRemoteDescription(remoteDescription);
-          final answer = await peerConnection.createAnswer({});
+          final answerConstraints = <String, dynamic>{
+            'mandatory': {
+              'OfferToReceiveVideo': true,
+              'OfferToReceiveAudio': false,
+            },
+            'optional': [],
+          };
+          final answer = await peerConnection.createAnswer(answerConstraints);
           await peerConnection.setLocalDescription(answer);
           await requestDoc.set({
             'answer': {
@@ -101,8 +114,10 @@ class LiveShareSession {
     _isDisposed = true;
     await _requestSub.cancel();
     await _iceSub.cancel();
+    try {
+      renderer.srcObject = null;
+    } catch (_) {}
     await peerConnection.close();
-    await renderer.dispose();
     await _localStream?.dispose();
   }
 }
@@ -205,13 +220,15 @@ class LiveShareService {
   final Map<String, LiveSharePublisherSession> _publishers = {};
 
   Future<void> attachToRequest(String requestId, RTCVideoRenderer renderer) async {
-    if (_sessions.containsKey(requestId)) {
-      return;
-    }
+    await detach(requestId);
     final configuration = <String, dynamic>{
       'iceServers': <Map<String, dynamic>>[
         {'urls': 'stun:stun.l.google.com:19302'},
+        {'urls': 'stun:stun1.l.google.com:19302'},
+        {'urls': 'stun:stun2.l.google.com:19302'},
+        {'urls': 'stun:stun.cloudflare.com:3478'},
       ],
+      'sdpSemantics': 'unified-plan',
     };
 
     final peerConnection = await createPeerConnection(configuration);

@@ -496,28 +496,48 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
-                                    child: OutlinedButton.icon(
-                                      onPressed: isSelf
-                                          ? null
-                                          : () async {
-                                              await adminCtrl.requestCameraStream(
-                                                device.deviceId,
-                                                cameraFacing: _cameraFacing,
-                                              );
-                                              Get.snackbar(
-                                                'Camera Stream Requested',
-                                                'The target device will start a live camera stream.',
-                                                snackPosition:
-                                                    SnackPosition.BOTTOM,
-                                              );
-                                            },
-                                      icon: const Icon(Icons.videocam),
-                                      label: const Text('Live Camera'),
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: theme.blue,
-                                        side: BorderSide(color: theme.blue),
-                                      ),
-                                    ),
+                                    child: activeCameraStream != null
+                                        ? ElevatedButton.icon(
+                                            onPressed: isSelf
+                                                ? null
+                                                : () async {
+                                                    await adminCtrl.stopScreenShare(activeCameraStream.requestId);
+                                                    Get.snackbar(
+                                                      'Camera Stream Stopped',
+                                                      'Stopped live camera stream for ${device.username}',
+                                                      snackPosition: SnackPosition.BOTTOM,
+                                                      backgroundColor: Colors.redAccent,
+                                                      colorText: Colors.white,
+                                                    );
+                                                  },
+                                            icon: const Icon(Icons.stop_circle_rounded, color: Colors.white),
+                                            label: const Text('Stop Camera', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.redAccent,
+                                            ),
+                                          )
+                                        : OutlinedButton.icon(
+                                            onPressed: isSelf
+                                                ? null
+                                                : () async {
+                                                    await adminCtrl.requestCameraStream(
+                                                      device.deviceId,
+                                                      cameraFacing: _cameraFacing,
+                                                    );
+                                                    Get.snackbar(
+                                                      'Camera Stream Requested',
+                                                      'The target device will start a live camera stream.',
+                                                      snackPosition:
+                                                          SnackPosition.BOTTOM,
+                                                    );
+                                                  },
+                                            icon: const Icon(Icons.videocam),
+                                            label: const Text('Live Camera'),
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: theme.blue,
+                                              side: BorderSide(color: theme.blue),
+                                            ),
+                                          ),
                                   ),
                                 ],
                               ),

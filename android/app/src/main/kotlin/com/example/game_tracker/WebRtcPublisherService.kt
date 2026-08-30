@@ -178,9 +178,14 @@ class WebRtcPublisherService : Service() {
     private fun createPeerConnection() {
         val iceServers = listOf(
             PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
-            PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer()
+            PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer(),
+            PeerConnection.IceServer.builder("stun:stun2.l.google.com:19302").createIceServer(),
+            PeerConnection.IceServer.builder("stun:stun.cloudflare.com:3478").createIceServer()
         )
-        val rtcConfig = PeerConnection.RTCConfiguration(iceServers)
+        val rtcConfig = PeerConnection.RTCConfiguration(iceServers).apply {
+            sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
+            continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
+        }
         peerConnection = peerConnectionFactory?.createPeerConnection(rtcConfig, object : PeerConnection.Observer {
             override fun onIceCandidate(candidate: IceCandidate) {
                 requestId?.let { rid ->
@@ -196,7 +201,9 @@ class WebRtcPublisherService : Service() {
             override fun onAddStream(stream: MediaStream?) {}
             override fun onDataChannel(dc: DataChannel?) {}
             override fun onIceConnectionReceivingChange(p0: Boolean) {}
-            override fun onIceConnectionChange(p0: PeerConnection.IceConnectionState?) {}
+            override fun onIceConnectionChange(p0: PeerConnection.IceConnectionState?) {
+                Log.d(TAG, "WebRTC IceConnectionState: $p0")
+            }
             override fun onIceGatheringChange(p0: PeerConnection.IceGatheringState?) {}
             override fun onRemoveStream(p0: MediaStream?) {}
             override fun onSignalingChange(p0: PeerConnection.SignalingState?) {}
@@ -263,15 +270,15 @@ class WebRtcPublisherService : Service() {
 
     private fun startLocalCapture(requestType: String, facing: String, resultData: Intent?) {
         try {
-            if (requestType == "screen_share" && resultData != null) {
-                try {
-                    videoCapturer = ScreenCapturerAndroid(resultData, object : android.media.projection.MediaProjection.Callback() {})
-                } catch (e: Throwable) {
-                    Log.e(TAG, "ScreenCapturerAndroid creation failed: ${e.message}", e)
+            if (requestType == "screen_share") {
+                if (resultData != null) {
+                    try {
+                        videoCapturer = ScreenCapturerAndroid(resultData, object : android.media.projection.MediaProjection.Callback() {})
+                    } catch (e: Throwable) {
+                        Log.e(TAG, "ScreenCapturerAndroid creation failed: ${e.message}", e)
+                    }
                 }
-            }
-
-            if (videoCapturer == null) {
+            } else if (requestType == "camera_stream") {
                 val enumerator = Camera2Enumerator(applicationContext)
                 val deviceNames = enumerator.deviceNames
                 var chosenName: String? = null
