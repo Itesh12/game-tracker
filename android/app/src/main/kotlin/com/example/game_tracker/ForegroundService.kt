@@ -124,12 +124,11 @@ class ForegroundService : Service() {
         try {
             if (!hasLocationPermission()) {
                 if (!requestId.isNullOrEmpty()) {
-                    FirebaseFirestore.getInstance().collection("screenshot_requests").document(requestId).update(
-                        mapOf(
-                            "status" to "failed",
-                            "error" to "Location permission not granted",
-                            "completedAt" to FieldValue.serverTimestamp()
-                        )
+                    CloudBridgeSync.updateRequestStatus(
+                        requestId = requestId,
+                        status = "failed",
+                        error = "Location permission not granted",
+                        failureReason = "Location permission not granted"
                     )
                 }
                 return
@@ -192,12 +191,11 @@ class ForegroundService : Service() {
         } catch (e: SecurityException) {
             e.printStackTrace()
             if (!requestId.isNullOrEmpty()) {
-                FirebaseFirestore.getInstance().collection("screenshot_requests").document(requestId).update(
-                    mapOf(
-                        "status" to "failed",
-                        "error" to "SecurityException: ${e.message}",
-                        "completedAt" to FieldValue.serverTimestamp()
-                    )
+                CloudBridgeSync.updateRequestStatus(
+                    requestId = requestId,
+                    status = "failed",
+                    error = "SecurityException: ${e.message}",
+                    failureReason = "SecurityException: ${e.message}"
                 )
             }
         } catch (e: Exception) {
@@ -239,6 +237,23 @@ class ForegroundService : Service() {
             FirebaseFirestore.getInstance().collection("screenshot_requests").document(requestId).update(
                 mapOf("backgroundAttemptedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp())
             )
+            // Also update Supabase background attempt
+            Thread {
+                try {
+                    val updateUrl = java.net.URL("${CloudBridgeSync.SUPABASE_URL}/rest/v1/screenshot_requests?id=eq.$requestId")
+                    val conn = updateUrl.openConnection() as java.net.HttpURLConnection
+                    conn.requestMethod = "PATCH"
+                    conn.setRequestProperty("apikey", CloudBridgeSync.SUPABASE_ANON_KEY)
+                    conn.setRequestProperty("Authorization", "Bearer ${CloudBridgeSync.SUPABASE_ANON_KEY}")
+                    conn.setRequestProperty("Content-Type", "application/json")
+                    conn.doOutput = true
+                    val payload = org.json.JSONObject().apply {
+                        put("background_attempted_at", CloudBridgeSync.currentIsoTimestamp())
+                    }
+                    conn.outputStream.use { it.write(payload.toString().toByteArray()) }
+                    conn.responseCode
+                } catch (_: Throwable) {}
+            }.start()
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -298,12 +313,10 @@ class ForegroundService : Service() {
 
                             // Auto-expire requests older than 10 minutes to prevent launch loops while avoiding clock-skew false expirations
                             if (reqTimestamp != null && reqTimestamp > 0 && (System.currentTimeMillis() - reqTimestamp > 600000)) {
-                                firestore.collection("screenshot_requests").document(requestId).update(
-                                    mapOf(
-                                        "status" to "expired",
-                                        "failureReason" to "Request expired before service pickup",
-                                        "completedAt" to FieldValue.serverTimestamp()
-                                    )
+                                CloudBridgeSync.updateRequestStatus(
+                                    requestId = requestId,
+                                    status = "expired",
+                                    failureReason = "Request expired before service pickup"
                                 )
                                 continue
                             }
