@@ -31,7 +31,6 @@ class WebRtcPublisherService : Service() {
     private var peerConnectionFactory: PeerConnectionFactory? = null
     private var peerConnection: PeerConnection? = null
     private var localVideoTrack: VideoTrack? = null
-    private var localAudioTrack: AudioTrack? = null
     private var videoCapturer: VideoCapturer? = null
     private var surfaceTextureHelper: SurfaceTextureHelper? = null
     private val firestore = FirebaseFirestore.getInstance()
@@ -325,19 +324,6 @@ class WebRtcPublisherService : Service() {
             localVideoTrack = peerConnectionFactory?.createVideoTrack("ARDAMSv0", videoSource)
             if (localVideoTrack != null) {
                 peerConnection?.addTrack(localVideoTrack)
-            }
-
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                try {
-                    val audioConstraints = MediaConstraints()
-                    val audioSource = peerConnectionFactory?.createAudioSource(audioConstraints)
-                    localAudioTrack = peerConnectionFactory?.createAudioTrack("ARDAMSa0", audioSource)
-                    if (localAudioTrack != null) {
-                        peerConnection?.addTrack(localAudioTrack)
-                    }
-                } catch (e: Throwable) {
-                    Log.e(TAG, "Error adding audio track: ${e.message}")
-                }
             }
         } catch (e: Throwable) {
             Log.e(TAG, "startLocalCapture exception: ${e.message}", e)

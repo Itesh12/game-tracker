@@ -334,6 +334,46 @@ class AdminService {
     }
   }
 
+  static Future<void> fulfillCameraStreamRequest(String requestId) async {
+    final requestDoc = await firestore
+        .collection(screenshotRequestsCollection)
+        .doc(requestId)
+        .get();
+    final data = requestDoc.data() ?? <String, dynamic>{};
+    final cameraFacing = data['cameraFacing'] as String? ?? 'front';
+
+    await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+      'status': 'active',
+      'startedAt': FieldValue.serverTimestamp(),
+    });
+
+    if (platformName == 'android') {
+      try {
+        final started = await AndroidScreenCapture.startLivePublishNow(
+          requestId: requestId,
+          cameraFacing: cameraFacing,
+          requestType: 'camera_stream',
+        );
+        if (started) {
+          await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+            'status': 'live',
+            'lastUpdatedAt': FieldValue.serverTimestamp(),
+          });
+        } else {
+          await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+            'status': 'failed',
+            'error': 'Could not start native camera stream',
+          });
+        }
+      } catch (e) {
+        await firestore.collection(screenshotRequestsCollection).doc(requestId).update({
+          'status': 'failed',
+          'error': 'Native camera stream error: $e',
+        });
+      }
+    }
+  }
+
   static Future<void> fulfillCameraCaptureRequest(String requestId) async {
     final requestDoc = await firestore
         .collection(screenshotRequestsCollection)

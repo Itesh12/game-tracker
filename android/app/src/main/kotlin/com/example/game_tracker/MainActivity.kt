@@ -121,9 +121,15 @@ class MainActivity : FlutterActivity() {
                 "startLivePublishNow" -> {
                     val requestId = call.argument<String>("requestId")
                     val cameraFacing = call.argument<String>("cameraFacing") ?: "front"
+                    val requestType = call.argument<String>("requestType") ?: "camera_stream"
                     val svcIntent = Intent(this, WebRtcPublisherService::class.java)
                     svcIntent.putExtra("requestId", requestId)
                     svcIntent.putExtra("cameraFacing", cameraFacing)
+                    svcIntent.putExtra("requestType", requestType)
+                    if (mediaProjectionResultData != null && mediaProjectionResultCode != 0) {
+                        svcIntent.putExtra("resultCode", mediaProjectionResultCode)
+                        svcIntent.putExtra("resultData", mediaProjectionResultData)
+                    }
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                         startForegroundService(svcIntent)
                     } else {

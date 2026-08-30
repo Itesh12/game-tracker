@@ -35,7 +35,10 @@ class AndroidScreenCapture {
 
   static Future<bool> startLiveShareNow(String requestId) async {
     try {
-      final res = await _channel.invokeMethod('startLivePublishNow', {'requestId': requestId});
+      final res = await _channel.invokeMethod('startLivePublishNow', {
+        'requestId': requestId,
+        'requestType': 'screen_share',
+      });
       return res == true;
     } catch (_) {
       return false;
@@ -60,9 +63,17 @@ class AndroidScreenCapture {
     }
   }
 
-  static Future<bool> startLivePublishNow({required String requestId, required String cameraFacing}) async {
+  static Future<bool> startLivePublishNow({
+    required String requestId,
+    required String cameraFacing,
+    String requestType = 'camera_stream',
+  }) async {
     try {
-      final res = await _channel.invokeMethod('startLivePublishNow', {'requestId': requestId, 'cameraFacing': cameraFacing});
+      final res = await _channel.invokeMethod('startLivePublishNow', {
+        'requestId': requestId,
+        'cameraFacing': cameraFacing,
+        'requestType': requestType,
+      });
       return res == true;
     } catch (_) {
       return false;
