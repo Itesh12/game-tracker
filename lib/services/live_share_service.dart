@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'backend_bridge_service.dart';
 
 class LiveShareSession {
   final String requestId;
@@ -88,13 +89,13 @@ class LiveShareSession {
           };
           final answer = await peerConnection.createAnswer(answerConstraints);
           await peerConnection.setLocalDescription(answer);
-          await requestDoc.set({
+          await BackendBridgeService.updateScreenshotRequest(requestId, {
             'answer': {
               'sdp': answer.sdp,
               'type': answer.type,
             },
             'status': 'live',
-          }, SetOptions(merge: true));
+          });
         } catch (e) {
           // ignore duplicate state transition
         }
@@ -308,13 +309,10 @@ class LiveShareService {
   Future<void> stopStreamRequest(String requestId) async {
     await detach(requestId);
     try {
-      await FirebaseFirestore.instance
-          .collection('screenshot_requests')
-          .doc(requestId)
-          .set({
+      await BackendBridgeService.updateScreenshotRequest(requestId, {
         'status': 'stopped',
-        'completedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+        'completedAt': DateTime.now().toIso8601String(),
+      });
     } catch (_) {}
   }
 }

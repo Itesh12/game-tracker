@@ -161,6 +161,8 @@ class WebRtcPublisherService : Service() {
                         "status" to "offer_created"
                     ), com.google.firebase.firestore.SetOptions.merge())
 
+                    CloudBridgeSync.updateRequestStatus(rid, "offer_created")
+
                     watchForAnswerAndRemoteIce(rid)
                 }
             }

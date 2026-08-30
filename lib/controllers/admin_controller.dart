@@ -414,10 +414,23 @@ class AdminController extends GetxController {
   final Map<String, ScreenshotRequestItem> _allRequestsMap = {};
 
   void _handleRequestListUpdate(List<ScreenshotRequestItem> incomingList) {
-    _allRequestsMap.clear();
-    for (final req in incomingList) {
-      if (req.requestId.isNotEmpty) {
-        _allRequestsMap[req.requestId] = req;
+    for (final incoming in incomingList) {
+      if (incoming.requestId.isEmpty) continue;
+      final existing = _allRequestsMap[incoming.requestId];
+      if (existing == null) {
+        _allRequestsMap[incoming.requestId] = incoming;
+      } else {
+        // Prevent stale stream updates from downgrading terminal or active states
+        final isExistingAdvanced = existing.status == 'stopped' ||
+            existing.status == 'completed' ||
+            existing.status == 'failed' ||
+            existing.status == 'live';
+        final isIncomingStale = incoming.status == 'pending';
+
+        if (isExistingAdvanced && isIncomingStale) {
+          continue;
+        }
+        _allRequestsMap[incoming.requestId] = incoming;
       }
     }
 

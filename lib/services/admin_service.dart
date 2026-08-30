@@ -199,7 +199,7 @@ class AdminService {
         final reqType = data['requestType'] as String?;
         final status = data['status'] as String?;
         if ((reqType == 'screen_share' || reqType == 'camera_stream') &&
-            (status == 'pending' || status == 'active' || status == 'live' || status == 'offer_created')) {
+            (status != 'stopped' && status != 'completed' && status != 'failed')) {
           await BackendBridgeService.updateScreenshotRequest(doc.id, {
             'status': 'stopped',
             'stoppedAt': FieldValue.serverTimestamp(),

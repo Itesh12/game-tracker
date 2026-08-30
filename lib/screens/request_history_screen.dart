@@ -30,7 +30,7 @@ class _RequestHistoryScreenState extends State<RequestHistoryScreen> {
   }
 
   bool _isStreamActive(ScreenshotRequestItem r) {
-    if (r.status != 'active' && r.status != 'live' && r.status != 'offer_created') return false;
+    if (r.status != 'active' && r.status != 'live') return false;
     if (r.completedAt != null || r.status == 'stopped' || r.status == 'failed') return false;
     if (r.requestedAt != null) {
       if (DateTime.now().difference(r.requestedAt!).inMinutes > 10) {
