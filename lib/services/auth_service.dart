@@ -258,11 +258,11 @@ class AuthService {
 
     try {
       final deviceId = await AdminService.getOrCreateDeviceId();
-      final deviceUpdates = <String, dynamic>{};
+      final deviceUpdates = <String, dynamic>{'deviceId': deviceId};
       if (displayName != null) deviceUpdates['displayName'] = displayName;
       if (photoUrl != null) deviceUpdates['photoUrl'] = photoUrl;
-      if (deviceUpdates.isNotEmpty) {
-        await firestore.collection('devices').doc(deviceId).set(deviceUpdates, SetOptions(merge: true)).timeout(const Duration(seconds: 4));
+      if (deviceUpdates.length > 1) {
+        await BackendBridgeService.syncDeviceRegistration(deviceUpdates);
       }
     } catch (_) {}
 

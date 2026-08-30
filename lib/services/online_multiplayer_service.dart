@@ -119,9 +119,11 @@ class OnlineMultiplayerService {
 
     final updatedPlayers = [...room.players, newPlayer];
 
-    await roomDocRef.update({
+    final updateData = {
       'players': updatedPlayers.map((p) => p.toJson()).toList(),
-    });
+    };
+    await roomDocRef.update(updateData);
+    await BackendBridgeService.saveLudoRoomData(roomCode, updateData);
 
     return true;
   }
@@ -188,10 +190,13 @@ class OnlineMultiplayerService {
       if (updatedPlayers.isEmpty || room.hostId == playerUid) {
         // Delete room if host leaves or room becomes empty
         await roomDocRef.delete();
+        await BackendBridgeService.saveLudoRoomData(roomCode, {'status': 'deleted'});
       } else {
-        await roomDocRef.update({
+        final updateData = {
           'players': updatedPlayers.map((p) => p.toJson()).toList(),
-        });
+        };
+        await roomDocRef.update(updateData);
+        await BackendBridgeService.saveLudoRoomData(roomCode, updateData);
       }
     } catch (e) {
       debugPrint('Error leaving room: $e');
