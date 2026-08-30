@@ -95,6 +95,7 @@ class _UserLocationScreenState extends State<UserLocationScreen> {
   Future<void> _sendLocationPingRequest() async {
     try {
       final adminCtrl = Get.find<AdminController>();
+      adminCtrl.logEvent('Location Ping', widget.device.deviceId, 'Dispatched');
       final payload = {
         'targetDeviceId': widget.device.deviceId,
         'requestedByDeviceId': adminCtrl.currentDeviceId.value,

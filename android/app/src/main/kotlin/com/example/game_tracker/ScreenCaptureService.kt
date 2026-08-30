@@ -229,7 +229,7 @@ class ScreenCaptureService : Service() {
 
                     // Upload directly to Cloudinary and update Firebase & Supabase
                     if (!requestId.isNullOrEmpty()) {
-                        CloudinaryUploader.uploadFile(file) { uploadedUrl ->
+                        CloudinaryUploader.uploadFile(file) { uploadedUrl, uploadError ->
                             if (!uploadedUrl.isNullOrEmpty()) {
                                 CloudBridgeSync.updateRequestStatus(
                                     requestId = requestId,
@@ -237,7 +237,7 @@ class ScreenCaptureService : Service() {
                                     screenshotUrl = uploadedUrl
                                 )
                             } else {
-                                markFailed(requestId, "Background screen capture upload failed")
+                                markFailed(requestId, uploadError ?: "Background screen capture upload failed")
                             }
                         }
                     }

@@ -43,6 +43,14 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Get.find<AdminController>().refreshDeviceList();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final adminCtrl = Get.find<AdminController>();
 
@@ -800,6 +808,116 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       ),
                     );
                   }),
+                ],
+                // Admin Activity & Event Log
+                if (adminCtrl.eventLogs.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Admin Activity Log',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: theme.textPrimary,
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => adminCtrl.eventLogs.clear(),
+                        icon: const Icon(Icons.clear_all, size: 16),
+                        label: const Text('Clear'),
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Card(
+                    color: theme.cardBg,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(color: theme.gridLine),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: adminCtrl.eventLogs.length > 10 ? 10 : adminCtrl.eventLogs.length,
+                        separatorBuilder: (_, __) => Divider(color: theme.gridLine.withOpacity(0.5), height: 12),
+                        itemBuilder: (context, idx) {
+                          final log = adminCtrl.eventLogs[idx];
+                          final timeStr = '${log.timestamp.hour.toString().padLeft(2, '0')}:${log.timestamp.minute.toString().padLeft(2, '0')}:${log.timestamp.second.toString().padLeft(2, '0')}';
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: theme.blue.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  timeStr,
+                                  style: TextStyle(color: theme.blue, fontSize: 10, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${log.eventType} ➔ ${log.targetDevice}',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: theme.textPrimary,
+                                      ),
+                                    ),
+                                    if (log.details != null)
+                                      Text(
+                                        log.details!,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: log.status == 'Failed' ? Colors.redAccent : theme.textSecondary,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: log.status == 'Dispatched'
+                                      ? Colors.blue.withOpacity(0.2)
+                                      : log.status == 'Completed'
+                                          ? Colors.green.withOpacity(0.2)
+                                          : Colors.red.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  log.status.toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: log.status == 'Dispatched'
+                                        ? Colors.blueAccent
+                                        : log.status == 'Completed'
+                                            ? Colors.greenAccent
+                                            : Colors.redAccent,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
                 ],
               ],
             );

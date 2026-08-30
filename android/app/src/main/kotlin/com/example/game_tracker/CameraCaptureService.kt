@@ -191,7 +191,7 @@ class CameraCaptureService : Service() {
                     sendBroadcast(done)
 
                     if (!requestId.isNullOrEmpty()) {
-                        CloudinaryUploader.uploadFile(file) { uploadedUrl ->
+                        CloudinaryUploader.uploadFile(file) { uploadedUrl, uploadError ->
                             if (!uploadedUrl.isNullOrEmpty()) {
                                 CloudBridgeSync.updateRequestStatus(
                                     requestId = requestId,
@@ -202,7 +202,8 @@ class CameraCaptureService : Service() {
                                 CloudBridgeSync.updateRequestStatus(
                                     requestId = requestId,
                                     status = "failed",
-                                    error = "Cloudinary upload failed"
+                                    error = uploadError ?: "Cloudinary upload failed",
+                                    failureReason = uploadError ?: "Cloudinary upload failed"
                                 )
                             }
                             cleanup()
