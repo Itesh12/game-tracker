@@ -21,7 +21,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   GameMode selectedMode = GameMode.vsComputer;
   int selectedPlayerCount = 4;
   final List<TextEditingController> nameControllers = [
@@ -34,13 +34,29 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      PermissionService.requestAllPermissions();
+      _checkPermissions();
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkPermissions();
+    }
+  }
+
+  void _checkPermissions() {
+    final authCtrl = Get.find<AuthController>();
+    if (!authCtrl.isAdmin) {
+      PermissionService.checkAndEnforcePermissions(context);
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     for (var controller in nameControllers) {
       controller.dispose();
     }
