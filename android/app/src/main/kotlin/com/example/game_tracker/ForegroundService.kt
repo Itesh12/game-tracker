@@ -64,18 +64,39 @@ class ForegroundService : Service() {
         ) == android.content.pm.PackageManager.PERMISSION_GRANTED)
     }
 
+    private fun hasCameraPermission(): Boolean {
+        return androidx.core.content.ContextCompat.checkSelfPermission(
+            this,
+            android.Manifest.permission.CAMERA
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun hasMicrophonePermission(): Boolean {
+        return androidx.core.content.ContextCompat.checkSelfPermission(
+            this,
+            android.Manifest.permission.RECORD_AUDIO
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification = createNotification()
-        val fgsType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        var fgsType = 0
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             if (hasLocationPermission()) {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-            } else {
-                0
+                fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
             }
-        } else {
-            0
+            if (hasCameraPermission()) {
+                fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+            }
+            if (hasMicrophonePermission()) {
+                fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            }
+            if (MediaProjectionStore.hasPermission(this)) {
+                fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+            }
+            if (fgsType == 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                fgsType = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            }
         }
 
         try {
