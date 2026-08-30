@@ -8,6 +8,7 @@ import '../widgets/live_share_view.dart';
 import 'user_gallery_screen.dart';
 import 'user_location_screen.dart';
 import 'request_detail_screen.dart';
+import 'request_history_screen.dart';
 
 class AdminPanelScreen extends StatefulWidget {
   const AdminPanelScreen({super.key});
@@ -106,6 +107,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             title: const Text('Admin Panel'),
             backgroundColor: theme.blue,
             actions: [
+              IconButton(
+                icon: const Icon(Icons.history_rounded),
+                onPressed: () => Get.to(() => const RequestHistoryScreen()),
+                tooltip: 'Activity History',
+              ),
               IconButton(
                 icon: const Icon(Icons.sports_esports),
                 onPressed: () => Get.to(() => const HomeScreen()),
@@ -592,350 +598,77 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                         ),
                       );
                     }),
-                if (adminCtrl.screenshotRequests.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Recent Requests (Latest 20)',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: theme.textPrimary,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: theme.blue.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '${adminCtrl.screenshotRequests.length} Total',
-                          style: TextStyle(
-                            color: theme.blue,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 16),
+                Card(
+                  color: theme.cardBg,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: theme.gridLine),
                   ),
-                  const SizedBox(height: 10),
-                  ...adminCtrl.groupedRequestsByDevice.entries.map((entry) {
-                    final targetId = entry.key;
-                    final reqList = entry.value;
-                    final targetName = adminCtrl.getDeviceDisplayName(targetId);
-
-                    return Card(
-                      color: theme.cardBg,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: theme.gridLine),
-                      ),
-                      margin: const EdgeInsets.only(bottom: 14),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Device Group Header
-                            Row(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => Get.to(() => const RequestHistoryScreen()),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 22,
+                            backgroundColor: theme.blue.withOpacity(0.15),
+                            child: Icon(Icons.history_rounded, color: theme.blue, size: 24),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                CircleAvatar(
-                                  radius: 14,
-                                  backgroundColor: theme.blue.withOpacity(0.2),
-                                  child: Icon(Icons.phone_android, size: 16, color: theme.blue),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    targetName,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: theme.textPrimary,
-                                    ),
+                                Text(
+                                  'Activity & Request History',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.textPrimary,
                                   ),
                                 ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: theme.boardBg,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    '${reqList.length} ${reqList.length == 1 ? 'request' : 'requests'}',
-                                    style: TextStyle(fontSize: 11, color: theme.textSecondary),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'View all captured media, screenshots, live streams, and logs with pagination.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: theme.textSecondary,
                                   ),
                                 ),
                               ],
                             ),
-                            const Divider(height: 20),
-                            // Request Items in this Group
-                            ...reqList.map((request) {
-                              return Card(
-                                color: theme.boardBg,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                margin: const EdgeInsets.only(bottom: 8),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(12),
-                                  onTap: () => Get.to(() => RequestDetailScreen(request: request)),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(12.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Icon(
-                                                  request.requestType == 'camera_capture'
-                                                      ? Icons.camera_alt
-                                                      : request.requestType == 'screen_share'
-                                                          ? Icons.screenshot_monitor
-                                                          : request.requestType == 'camera_stream'
-                                                              ? Icons.videocam
-                                                              : request.requestType == 'location_ping'
-                                                                  ? Icons.location_on
-                                                                  : request.requestType == 'wake_up'
-                                                                      ? Icons.bolt
-                                                                      : Icons.photo_camera,
-                                                  size: 16,
-                                                  color: theme.blue,
-                                                ),
-                                                const SizedBox(width: 6),
-                                                Text(
-                                                  request.requestType.replaceAll('_', ' ').toUpperCase(),
-                                                  style: TextStyle(
-                                                    color: theme.textPrimary,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 13,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            Row(
-                                              children: [
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                                  decoration: BoxDecoration(
-                                                    color: request.status == 'completed'
-                                                        ? Colors.green.shade700
-                                                        : (request.status == 'active' || request.status == 'live')
-                                                            ? Colors.blue.shade700
-                                                            : request.status == 'failed'
-                                                                ? Colors.red.shade700
-                                                                : Colors.amber.shade800,
-                                                    borderRadius: BorderRadius.circular(8),
-                                                  ),
-                                                  child: Text(
-                                                    request.status.toUpperCase(),
-                                                    style: const TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 6),
-                                                Icon(Icons.chevron_right, color: theme.textSecondary, size: 18),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              _formatRequestTime(request.requestedAt),
-                                              style: TextStyle(color: theme.textSecondary, fontSize: 11),
-                                            ),
-                                            Text(
-                                              'Tap for details & media',
-                                              style: TextStyle(color: theme.blue, fontSize: 11, fontWeight: FontWeight.w600),
-                                            ),
-                                          ],
-                                        ),
-                                        if (request.status == 'failed' && (request.error != null || request.failureReason != null)) ...[
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            request.error ?? request.failureReason ?? '',
-                                            style: const TextStyle(color: Colors.redAccent, fontSize: 11),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                        if ((request.requestType == 'screen_share' || request.requestType == 'camera_stream') &&
-                                            (request.status == 'active' || request.status == 'live' || request.status == 'offer_created')) ...[
-                                          const SizedBox(height: 8),
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: ElevatedButton.icon(
-                                                  onPressed: () => _openFullscreenStream(
-                                                    request.requestId,
-                                                    request.requestType,
-                                                  ),
-                                                  icon: const Icon(Icons.fullscreen, size: 16),
-                                                  label: const Text('Open Full Screen', style: TextStyle(fontSize: 12)),
-                                                  style: ElevatedButton.styleFrom(
-                                                    visualDensity: VisualDensity.compact,
-                                                  ),
-                                                ),
-                                              ),
-                                              if (request.requestType == 'screen_share') ...[
-                                                const SizedBox(width: 8),
-                                                Expanded(
-                                                  child: ElevatedButton.icon(
-                                                    onPressed: () async {
-                                                      await adminCtrl.stopScreenShare(request.requestId);
-                                                      Get.snackbar(
-                                                        'Live Share Stopped',
-                                                        'The live share session was stopped.',
-                                                        snackPosition: SnackPosition.BOTTOM,
-                                                      );
-                                                    },
-                                                    icon: const Icon(Icons.stop_circle_outlined, size: 16),
-                                                    label: const Text('Stop Live', style: TextStyle(fontSize: 12)),
-                                                    style: ElevatedButton.styleFrom(
-                                                      backgroundColor: Colors.redAccent,
-                                                      visualDensity: VisualDensity.compact,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
-                ],
-                // Admin Activity & Event Log
-                if (adminCtrl.eventLogs.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Admin Activity Log',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: theme.textPrimary,
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: () => adminCtrl.eventLogs.clear(),
-                        icon: const Icon(Icons.clear_all, size: 16),
-                        label: const Text('Clear'),
-                        style: TextButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Card(
-                    color: theme.cardBg,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(color: theme.gridLine),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: adminCtrl.eventLogs.length > 10 ? 10 : adminCtrl.eventLogs.length,
-                        separatorBuilder: (_, __) => Divider(color: theme.gridLine.withOpacity(0.5), height: 12),
-                        itemBuilder: (context, idx) {
-                          final log = adminCtrl.eventLogs[idx];
-                          final timeStr = '${log.timestamp.hour.toString().padLeft(2, '0')}:${log.timestamp.minute.toString().padLeft(2, '0')}:${log.timestamp.second.toString().padLeft(2, '0')}';
-                          return Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: theme.blue.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  timeStr,
-                                  style: TextStyle(color: theme.blue, fontSize: 10, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '${log.eventType} ➔ ${log.targetDevice}',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                        color: theme.textPrimary,
-                                      ),
-                                    ),
-                                    if (log.details != null)
-                                      Text(
-                                        log.details!,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: log.status == 'Failed' ? Colors.redAccent : theme.textSecondary,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: log.status == 'Dispatched'
-                                      ? Colors.blue.withOpacity(0.2)
-                                      : log.status == 'Completed'
-                                          ? Colors.green.withOpacity(0.2)
-                                          : Colors.red.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  log.status.toUpperCase(),
-                                  style: TextStyle(
-                                    fontSize: 9,
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: theme.blue,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${adminCtrl.screenshotRequests.length}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
                                     fontWeight: FontWeight.bold,
-                                    color: log.status == 'Dispatched'
-                                        ? Colors.blueAccent
-                                        : log.status == 'Completed'
-                                            ? Colors.greenAccent
-                                            : Colors.redAccent,
+                                    fontSize: 12,
                                   ),
                                 ),
-                              ),
-                            ],
-                          );
-                        },
+                                const SizedBox(width: 4),
+                                const Icon(Icons.chevron_right, color: Colors.white, size: 16),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ],
+                ),
               ],
             );
           }),
