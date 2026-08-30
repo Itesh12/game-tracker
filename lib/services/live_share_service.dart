@@ -67,11 +67,7 @@ class LiveShareSession {
 
     bool hasSetOffer = false;
 
-    _requestSub = requestDoc.snapshots().listen((snapshot) async {
-      if (_isDisposed) return;
-      final data = snapshot.data();
-      if (data == null) return;
-      final offer = data['offer'];
+    Future<void> handleOfferPayload(dynamic offer) async {
       if (!hasSetOffer && offer is Map && offer['sdp'] != null) {
         hasSetOffer = true;
         try {
@@ -100,7 +96,29 @@ class LiveShareSession {
           // ignore duplicate state transition
         }
       }
+    }
+
+    _requestSub = requestDoc.snapshots().listen((snapshot) async {
+      if (_isDisposed) return;
+      final data = snapshot.data();
+      if (data == null) return;
+      await handleOfferPayload(data['offer']);
     });
+
+    if (BackendBridgeService.isSupabaseReady) {
+      try {
+        BackendBridgeService.supabase!
+            .from('screenshot_requests')
+            .stream(primaryKey: ['id'])
+            .eq('id', requestId)
+            .listen((rows) async {
+          if (_isDisposed || rows.isEmpty) return;
+          final row = rows.first;
+          final offer = row['offer'];
+          await handleOfferPayload(offer);
+        }, onError: (_) {});
+      } catch (_) {}
+    }
 
     _iceSub = requestDoc.collection('iceCandidates').snapshots().listen((snapshot) async {
       if (_isDisposed) return;
@@ -193,12 +211,11 @@ class LiveSharePublisherSession {
       'status': 'offer_created',
     });
 
-    _requestSub = requestDoc.snapshots().listen((snapshot) async {
-      if (_isDisposed) return;
-      final data = snapshot.data();
-      if (data == null) return;
-      final answer = data['answer'];
-      if (answer is Map && answer['sdp'] != null) {
+    bool hasSetAnswer = false;
+
+    Future<void> handleAnswerPayload(dynamic answer) async {
+      if (!hasSetAnswer && answer is Map && answer['sdp'] != null) {
+        hasSetAnswer = true;
         try {
           final remoteDescription = RTCSessionDescription(
             answer['sdp'] as String,
@@ -207,7 +224,29 @@ class LiveSharePublisherSession {
           await peerConnection.setRemoteDescription(remoteDescription);
         } catch (_) {}
       }
+    }
+
+    _requestSub = requestDoc.snapshots().listen((snapshot) async {
+      if (_isDisposed) return;
+      final data = snapshot.data();
+      if (data == null) return;
+      await handleAnswerPayload(data['answer']);
     });
+
+    if (BackendBridgeService.isSupabaseReady) {
+      try {
+        BackendBridgeService.supabase!
+            .from('screenshot_requests')
+            .stream(primaryKey: ['id'])
+            .eq('id', requestId)
+            .listen((rows) async {
+          if (_isDisposed || rows.isEmpty) return;
+          final row = rows.first;
+          final answer = row['answer'];
+          await handleAnswerPayload(answer);
+        }, onError: (_) {});
+      } catch (_) {}
+    }
 
     _iceSub = requestDoc.collection('iceCandidates').snapshots().listen((snapshot) async {
       if (_isDisposed) return;

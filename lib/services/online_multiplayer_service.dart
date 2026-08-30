@@ -55,20 +55,64 @@ class OnlineMultiplayerService {
   }
 
   static Future<GameRoom?> getRoom(String roomCode) async {
-    final doc = await _firestore.collection(roomCollection).doc(roomCode).get();
-    if (!doc.exists) return null;
-    return GameRoom.fromSnapshot(doc);
+    try {
+      final doc = await _firestore.collection(roomCollection).doc(roomCode).get().timeout(const Duration(seconds: 4));
+      if (doc.exists && doc.data() != null) {
+        return GameRoom.fromSnapshot(doc);
+      }
+    } catch (_) {}
+
+    if (BackendBridgeService.isSupabaseReady) {
+      try {
+        final res = await BackendBridgeService.supabase!.from('ludo_rooms').select().eq('room_code', roomCode).maybeSingle();
+        if (res != null) {
+          return GameRoom.fromJson(res);
+        }
+      } catch (_) {}
+    }
+    return null;
   }
 
   static Stream<GameRoom?> streamRoom(String roomCode) {
-    return _firestore
-        .collection(roomCollection)
-        .doc(roomCode)
-        .snapshots()
-        .map((snapshot) {
-      if (!snapshot.exists) return null;
-      return GameRoom.fromSnapshot(snapshot);
-    });
+    late final StreamController<GameRoom?> controller;
+    StreamSubscription? firestoreSub;
+    StreamSubscription? supabaseSub;
+
+    controller = StreamController<GameRoom?>.broadcast(
+      onListen: () {
+        try {
+          firestoreSub = _firestore
+              .collection(roomCollection)
+              .doc(roomCode)
+              .snapshots()
+              .listen((snapshot) {
+            if (snapshot.exists && snapshot.data() != null) {
+              controller.add(GameRoom.fromSnapshot(snapshot));
+            }
+          }, onError: (_) {});
+        } catch (_) {}
+
+        if (BackendBridgeService.isSupabaseReady) {
+          try {
+            supabaseSub = BackendBridgeService.supabase!
+                .from('ludo_rooms')
+                .stream(primaryKey: ['id'])
+                .eq('room_code', roomCode)
+                .listen((rows) {
+              if (rows.isNotEmpty) {
+                controller.add(GameRoom.fromJson(rows.first));
+              }
+            }, onError: (_) {});
+          } catch (_) {}
+        }
+      },
+      onCancel: () {
+        firestoreSub?.cancel();
+        supabaseSub?.cancel();
+      },
+    );
+
+    return controller.stream;
   }
 
   static Future<bool> joinRoom({

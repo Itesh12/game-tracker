@@ -102,4 +102,42 @@ class GameRoom {
       gameStateData: data['gameStateData'] as Map<String, dynamic>?,
     );
   }
+
+  factory GameRoom.fromJson(Map<String, dynamic> data) {
+    final playerList = (data['players'] as List<dynamic>?)
+            ?.map((p) => GameRoomPlayer.fromJson(p is Map<String, dynamic> ? p : Map<String, dynamic>.from(p as Map)))
+            .toList() ??
+        [];
+
+    DateTime? parsedCreatedAt;
+    if (data['created_at'] != null) {
+      if (data['created_at'] is Timestamp) {
+        parsedCreatedAt = (data['created_at'] as Timestamp).toDate();
+      } else if (data['created_at'] is String) {
+        parsedCreatedAt = DateTime.tryParse(data['created_at'] as String);
+      }
+    } else if (data['createdAt'] != null) {
+      if (data['createdAt'] is Timestamp) {
+        parsedCreatedAt = (data['createdAt'] as Timestamp).toDate();
+      } else if (data['createdAt'] is String) {
+        parsedCreatedAt = DateTime.tryParse(data['createdAt'] as String);
+      }
+    }
+
+    return GameRoom(
+      roomCode: data['room_code'] as String? ?? data['roomCode'] as String? ?? data['id'] as String? ?? '',
+      hostId: data['host_uid'] as String? ?? data['hostId'] as String? ?? '',
+      hostName: data['host_name'] as String? ?? data['hostName'] as String? ?? 'Host',
+      maxPlayers: (data['max_players'] as num?)?.toInt() ?? (data['maxPlayers'] as num?)?.toInt() ?? 4,
+      status: data['status'] as String? ?? 'lobby',
+      players: playerList,
+      currentTurnIndex: (data['current_turn_index'] as num?)?.toInt() ?? (data['currentTurnIndex'] as num?)?.toInt() ?? 0,
+      diceValue: (data['dice_value'] as num?)?.toInt() ?? (data['diceValue'] as num?)?.toInt() ?? 1,
+      isDiceRolled: data['is_dice_rolled'] as bool? ?? data['isDiceRolled'] as bool? ?? false,
+      isMoving: data['is_moving'] as bool? ?? data['isMoving'] as bool? ?? false,
+      consecutiveSixes: (data['consecutive_sixes'] as num?)?.toInt() ?? (data['consecutiveSixes'] as num?)?.toInt() ?? 0,
+      createdAt: parsedCreatedAt,
+      gameStateData: data['game_state_data'] is Map ? Map<String, dynamic>.from(data['game_state_data'] as Map) : (data['gameStateData'] as Map<String, dynamic>?),
+    );
+  }
 }
