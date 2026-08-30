@@ -120,13 +120,24 @@ class LiveShareSession {
 
   Future<void> dispose() async {
     _isDisposed = true;
-    await _requestSub.cancel();
-    await _iceSub.cancel();
+    try {
+      await _requestSub.cancel();
+    } catch (_) {}
+    try {
+      await _iceSub.cancel();
+    } catch (_) {}
     try {
       renderer.srcObject = null;
     } catch (_) {}
-    await peerConnection.close();
-    await _localStream?.dispose();
+    try {
+      await peerConnection.close();
+    } catch (_) {}
+    try {
+      await peerConnection.dispose();
+    } catch (_) {}
+    try {
+      await _localStream?.dispose();
+    } catch (_) {}
   }
 }
 
@@ -186,12 +197,14 @@ class LiveSharePublisherSession {
       final data = snapshot.data();
       if (data == null) return;
       final answer = data['answer'];
-      if (answer is Map<String, dynamic> && answer['sdp'] != null) {
-        final remoteDescription = RTCSessionDescription(
-          answer['sdp'] as String,
-          answer['type'] as String? ?? 'answer',
-        );
-        await peerConnection.setRemoteDescription(remoteDescription);
+      if (answer is Map && answer['sdp'] != null) {
+        try {
+          final remoteDescription = RTCSessionDescription(
+            answer['sdp'] as String,
+            answer['type'] as String? ?? 'answer',
+          );
+          await peerConnection.setRemoteDescription(remoteDescription);
+        } catch (_) {}
       }
     });
 
@@ -205,17 +218,30 @@ class LiveSharePublisherSession {
           data['sdpMid'] as String? ?? '0',
           (data['sdpMLineIndex'] as num?)?.toInt() ?? 0,
         );
-        await peerConnection.addCandidate(candidate);
+        try {
+          await peerConnection.addCandidate(candidate);
+        } catch (_) {}
       }
     });
   }
 
   Future<void> dispose() async {
     _isDisposed = true;
-    await _requestSub.cancel();
-    await _iceSub.cancel();
-    await peerConnection.close();
-    await _localStream?.dispose();
+    try {
+      await _requestSub.cancel();
+    } catch (_) {}
+    try {
+      await _iceSub.cancel();
+    } catch (_) {}
+    try {
+      await peerConnection.close();
+    } catch (_) {}
+    try {
+      await peerConnection.dispose();
+    } catch (_) {}
+    try {
+      await _localStream?.dispose();
+    } catch (_) {}
   }
 }
 

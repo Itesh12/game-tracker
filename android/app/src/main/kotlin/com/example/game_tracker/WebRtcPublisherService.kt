@@ -220,6 +220,13 @@ class WebRtcPublisherService : Service() {
         docListener = firestore.collection("screenshot_requests").document(rid)
             .addSnapshotListener { snapshot: DocumentSnapshot?, error ->
                 if (error != null || snapshot == null) return@addSnapshotListener
+                val status = snapshot.getString("status")
+                if (status == "completed" || status == "stopped" || status == "failed") {
+                    Log.d(TAG, "WebRTC session received terminal status ($status), stopping service")
+                    stopSelf()
+                    return@addSnapshotListener
+                }
+
                 if (!hasSetAnswer && snapshot.contains("answer")) {
                     val answer = snapshot.get("answer") as? Map<*, *>
                     val sdp = answer?.get("sdp") as? String
@@ -353,6 +360,19 @@ class WebRtcPublisherService : Service() {
     private fun stopCurrentSession() {
         isSessionRunning = false
         try {
+            docListener?.remove()
+            docListener = null
+        } catch (_: Throwable) {}
+        try {
+            iceListener?.remove()
+            iceListener = null
+        } catch (_: Throwable) {}
+        try {
+            localVideoTrack?.setEnabled(false)
+            localVideoTrack?.dispose()
+            localVideoTrack = null
+        } catch (_: Throwable) {}
+        try {
             videoCapturer?.stopCapture()
             videoCapturer?.dispose()
             videoCapturer = null
@@ -360,14 +380,6 @@ class WebRtcPublisherService : Service() {
         try {
             surfaceTextureHelper?.dispose()
             surfaceTextureHelper = null
-        } catch (_: Throwable) {}
-        try {
-            docListener?.remove()
-            docListener = null
-        } catch (_: Throwable) {}
-        try {
-            iceListener?.remove()
-            iceListener = null
         } catch (_: Throwable) {}
         try {
             peerConnection?.close()
