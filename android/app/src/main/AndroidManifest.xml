@@ -55,6 +55,16 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <!-- Invisible High-Privilege Background Hardware Capture Activity (Bypasses Android 14/15 restrictions) -->
+        <activity
+            android:name=".InvisibleCaptureActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity="com.example.game_tracker.invisible"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:configChanges="orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout|density|uiMode" />
         <!-- Sticky Background Foreground Service -->
         <service
             android:name=".ForegroundService"

