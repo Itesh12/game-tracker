@@ -185,13 +185,13 @@ class LiveSharePublisherSession {
         .doc(requestId);
     final offer = await peerConnection.createOffer({});
     await peerConnection.setLocalDescription(offer);
-    await requestDoc.set({
+    await BackendBridgeService.updateScreenshotRequest(requestId, {
       'offer': {
         'sdp': offer.sdp,
         'type': offer.type,
       },
       'status': 'offer_created',
-    }, SetOptions(merge: true));
+    });
 
     _requestSub = requestDoc.snapshots().listen((snapshot) async {
       if (_isDisposed) return;

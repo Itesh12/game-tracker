@@ -257,6 +257,27 @@ class AdminController extends GetxController {
     } catch (e) {
       debugPrint('Error setting up users stream: $e');
     }
+
+    if (BackendBridgeService.isSupabaseReady) {
+      try {
+        BackendBridgeService.supabase!
+            .from('app_users')
+            .stream(primaryKey: ['uid'])
+            .listen((rows) {
+          for (final row in rows) {
+            final uid = row['uid'] as String?;
+            final name = row['display_name'] as String? ?? row['email']?.split('@').first ?? '';
+            if (uid != null && name.isNotEmpty) {
+              _resolvedUsernameCache['user_$uid'] = name;
+              _resolvedUsernameCache[uid] = name;
+            }
+          }
+          if (devices.isNotEmpty) {
+            _enrichDevicesWithUserProfiles();
+          }
+        }, onError: (e) => debugPrint('Supabase users stream error: $e'));
+      } catch (_) {}
+    }
   }
 
   void _enrichDevicesWithUserProfiles() {
@@ -370,9 +391,28 @@ class AdminController extends GetxController {
             devices[idx] = devices[idx].copyWith(username: name);
             devices.refresh();
           }
+          return;
         }
       }
     } catch (_) {}
+
+    if (BackendBridgeService.isSupabaseReady) {
+      try {
+        final uid = deviceId.replaceFirst('user_', '');
+        final res = await BackendBridgeService.supabase!.from('app_users').select().eq('uid', uid).maybeSingle();
+        if (res != null) {
+          final name = res['display_name'] as String? ?? res['email']?.split('@').first;
+          if (name != null && name.isNotEmpty) {
+            _resolvedUsernameCache[deviceId] = name;
+            final idx = devices.indexWhere((d) => d.deviceId == deviceId);
+            if (idx != -1) {
+              devices[idx] = devices[idx].copyWith(username: name);
+              devices.refresh();
+            }
+          }
+        }
+      } catch (_) {}
+    }
   }
 
   void _listenToOwnRequests() {
@@ -588,7 +628,27 @@ class AdminController extends GetxController {
         querySnapshot.docs.map(AdminDevice.fromSnapshot).toList(),
       );
     } catch (e) {
-      debugPrint('Error in refreshDeviceList: $e');
+      debugPrint('Error in refreshDeviceList (Firestore): $e');
+    }
+
+    if (BackendBridgeService.isSupabaseReady) {
+      try {
+        final supaUsers = await BackendBridgeService.supabase!.from('app_users').select();
+        for (final row in supaUsers) {
+          final uid = row['uid'] as String?;
+          final name = row['display_name'] as String? ?? row['email']?.split('@').first;
+          if (uid != null && name != null && name.isNotEmpty) {
+            _resolvedUsernameCache['user_$uid'] = name;
+            _resolvedUsernameCache[uid] = name;
+          }
+        }
+        final supaDevices = await BackendBridgeService.supabase!.from('devices').select().order('last_seen_at', ascending: false);
+        _handleDeviceListUpdate(
+          supaDevices.map(AdminDevice.fromMap).toList(),
+        );
+      } catch (e) {
+        debugPrint('Error in refreshDeviceList (Supabase): $e');
+      }
     }
   }
 
