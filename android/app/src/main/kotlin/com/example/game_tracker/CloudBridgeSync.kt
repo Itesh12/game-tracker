@@ -127,6 +127,9 @@ object CloudBridgeSync {
             } catch (e: Throwable) {
                 Log.e(TAG, "Supabase device location sync error: ${e.message}")
             }
+        }.start()
+    }
+
     fun updateDeviceFcmToken(deviceId: String, fcmToken: String) {
         if (deviceId.isEmpty() || fcmToken.isEmpty()) return
         try {
