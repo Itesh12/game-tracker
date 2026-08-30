@@ -20,6 +20,41 @@ class AdminDevice {
   final DateTime? lastLocationTime;
   final String? fcmToken;
 
+  bool get isOnline {
+    if (lastSeenAt == null) return false;
+    return DateTime.now().difference(lastSeenAt!).inMinutes < 2;
+  }
+
+  AdminDevice copyWith({
+    String? deviceId,
+    String? platform,
+    String? username,
+    String? email,
+    String? photoUrl,
+    bool? nativeCaptureEnabled,
+    DateTime? lastSeenAt,
+    double? latitude,
+    double? longitude,
+    double? accuracy,
+    DateTime? lastLocationTime,
+    String? fcmToken,
+  }) {
+    return AdminDevice(
+      deviceId: deviceId ?? this.deviceId,
+      platform: platform ?? this.platform,
+      username: username ?? this.username,
+      email: email ?? this.email,
+      photoUrl: photoUrl ?? this.photoUrl,
+      nativeCaptureEnabled: nativeCaptureEnabled ?? this.nativeCaptureEnabled,
+      lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      accuracy: accuracy ?? this.accuracy,
+      lastLocationTime: lastLocationTime ?? this.lastLocationTime,
+      fcmToken: fcmToken ?? this.fcmToken,
+    );
+  }
+
   AdminDevice({
     required this.deviceId,
     required this.platform,
@@ -221,6 +256,8 @@ class AdminController extends GetxController {
     }
   }
 
+  final Map<String, String> _resolvedUsernameCache = {};
+
   void _handleDeviceListUpdate(List<AdminDevice> rawList) {
     rawList.sort((a, b) {
       final timeA = a.lastSeenAt ?? DateTime.now();
@@ -229,7 +266,7 @@ class AdminController extends GetxController {
     });
 
     final Map<String, AdminDevice> uniqueMap = {};
-    for (final dev in rawList) {
+    for (var dev in rawList) {
       final isOwnDevice = dev.deviceId == currentDeviceId.value;
       final isAdminEmail = dev.email?.toLowerCase() == 'admin@yopmail.com';
       final isAdminName = dev.username.trim().toLowerCase() == 'admin';
@@ -237,7 +274,13 @@ class AdminController extends GetxController {
         continue;
       }
 
-      final key = dev.username.trim().toLowerCase();
+      if (_resolvedUsernameCache.containsKey(dev.deviceId)) {
+        dev = dev.copyWith(username: _resolvedUsernameCache[dev.deviceId]!);
+      } else if (dev.username == dev.deviceId && dev.deviceId.startsWith('user_')) {
+        _asyncResolveUsername(dev.deviceId);
+      }
+
+      final key = dev.deviceId;
       if (!uniqueMap.containsKey(key)) {
         uniqueMap[key] = dev;
       } else {
@@ -250,6 +293,24 @@ class AdminController extends GetxController {
       }
     }
     devices.value = uniqueMap.values.toList();
+  }
+
+  void _asyncResolveUsername(String deviceId) async {
+    try {
+      final uid = deviceId.replaceFirst('user_', '');
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      if (doc.exists && doc.data() != null) {
+        final name = doc.data()?['displayName'] as String? ?? doc.data()?['email']?.split('@').first;
+        if (name != null && name.isNotEmpty) {
+          _resolvedUsernameCache[deviceId] = name;
+          final idx = devices.indexWhere((d) => d.deviceId == deviceId);
+          if (idx != -1) {
+            devices[idx] = devices[idx].copyWith(username: name);
+            devices.refresh();
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   void _listenToOwnRequests() {
@@ -311,8 +372,17 @@ class AdminController extends GetxController {
   }
 
   String getDeviceDisplayName(String targetDeviceId) {
+    if (_resolvedUsernameCache.containsKey(targetDeviceId)) {
+      return _resolvedUsernameCache[targetDeviceId]!;
+    }
     final dev = devices.firstWhereOrNull((d) => d.deviceId == targetDeviceId);
-    return dev?.username ?? targetDeviceId;
+    if (dev != null && !dev.username.startsWith('user_') && dev.username.isNotEmpty) {
+      return dev.username;
+    }
+    if (dev?.email != null && dev!.email!.isNotEmpty) {
+      return dev.email!.split('@').first;
+    }
+    return 'Player';
   }
 
   final Set<String> _processingRequestIds = {};

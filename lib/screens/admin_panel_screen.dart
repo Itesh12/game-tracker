@@ -266,7 +266,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                 children: [
                                   CircleAvatar(
                                     radius: 18,
-                                    backgroundColor: theme.blue,
+                                    backgroundColor: device.isOnline ? Colors.green.shade600 : Colors.grey.shade700,
                                     child: const Icon(Icons.person, color: Colors.white, size: 20),
                                   ),
                                   const SizedBox(width: 10),
@@ -274,28 +274,62 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          isSelf ? 'Admin (${device.username})' : device.username,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                            color: theme.textPrimary,
-                                          ),
+                                        Row(
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                isSelf ? 'Admin (${device.username})' : device.username,
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 16,
+                                                  color: theme.textPrimary,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            // Live / Offline Status Badge
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: device.isOnline ? Colors.green.shade700 : Colors.grey.shade800,
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Container(
+                                                    width: 6,
+                                                    height: 6,
+                                                    decoration: BoxDecoration(
+                                                      shape: BoxShape.circle,
+                                                      color: device.isOnline ? Colors.greenAccent : Colors.grey.shade400,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    device.isOnline ? 'LIVE' : 'OFFLINE',
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 9,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        Text(
-                                          'ID: ${device.deviceId}',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: theme.textSecondary,
+                                        if (device.email != null && device.email!.isNotEmpty)
+                                          Text(
+                                            device.email!,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: theme.textSecondary,
+                                            ),
                                           ),
-                                        ),
                                       ],
                                     ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.photo_library, color: Colors.blueAccent),
-                                    onPressed: () => Get.to(() => UserGalleryScreen(device: device)),
-                                    tooltip: 'View User Gallery',
                                   ),
                                   Chip(
                                     label: Text(device.platform.toUpperCase()),

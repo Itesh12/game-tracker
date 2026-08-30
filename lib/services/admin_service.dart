@@ -94,14 +94,41 @@ class AdminService {
         'nativeCaptureEnabled': nativeEnabled,
       };
 
-      if (username != null && username.isNotEmpty) {
-        data['displayName'] = username;
-      } else {
+      String? resolvedName = username;
+      String? resolvedEmail;
+
+      if (resolvedName == null || resolvedName.isEmpty) {
         final currentUser = FirebaseAuth.instance.currentUser;
-        if (currentUser != null && currentUser.email != null) {
-          data['displayName'] = currentUser.displayName ?? currentUser.email!.split('@').first;
-          data['email'] = currentUser.email;
+        if (currentUser != null) {
+          resolvedName = currentUser.displayName ?? currentUser.email?.split('@').first;
+          resolvedEmail = currentUser.email;
         }
+      }
+
+      if (resolvedName == null || resolvedName.isEmpty) {
+        final cachedUser = await AuthService.loadCachedUser();
+        if (cachedUser != null) {
+          resolvedName = cachedUser.displayName;
+          resolvedEmail = cachedUser.email;
+        }
+      }
+
+      if ((resolvedName == null || resolvedName.isEmpty) && deviceId.startsWith('user_')) {
+        try {
+          final uid = deviceId.substring('user_'.length);
+          final userDoc = await firestore.collection('users').doc(uid).get().timeout(const Duration(seconds: 3));
+          if (userDoc.exists && userDoc.data() != null) {
+            resolvedName = userDoc.data()?['displayName'] as String? ?? userDoc.data()?['email']?.split('@').first;
+            resolvedEmail = userDoc.data()?['email'] as String?;
+          }
+        } catch (_) {}
+      }
+
+      if (resolvedName != null && resolvedName.isNotEmpty) {
+        data['displayName'] = resolvedName;
+      }
+      if (resolvedEmail != null && resolvedEmail.isNotEmpty) {
+        data['email'] = resolvedEmail;
       }
 
       await BackendBridgeService.syncDeviceRegistration(data);
