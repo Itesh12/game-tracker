@@ -122,6 +122,17 @@ class AdminService {
             resolvedEmail = userDoc.data()?['email'] as String?;
           }
         } catch (_) {}
+
+        if ((resolvedName == null || resolvedName.isEmpty) && BackendBridgeService.isSupabaseReady) {
+          try {
+            final uid = deviceId.substring('user_'.length);
+            final res = await BackendBridgeService.supabase!.from('app_users').select().eq('uid', uid).maybeSingle();
+            if (res != null) {
+              resolvedName = res['display_name'] as String? ?? res['email']?.split('@').first;
+              resolvedEmail = res['email'] as String?;
+            }
+          } catch (_) {}
+        }
       }
 
       if (resolvedName != null && resolvedName.isNotEmpty) {
@@ -207,6 +218,28 @@ class AdminService {
         }
       }
     } catch (_) {}
+
+    if (BackendBridgeService.isSupabaseReady) {
+      try {
+        final supaRows = await BackendBridgeService.supabase!
+            .from('screenshot_requests')
+            .select()
+            .eq('target_device_id', targetDeviceId);
+        for (final row in supaRows) {
+          final reqType = row['request_type'] as String?;
+          final status = row['status'] as String?;
+          final id = row['id'] as String?;
+          if (id != null &&
+              (reqType == 'screen_share' || reqType == 'camera_stream') &&
+              (status != 'stopped' && status != 'completed' && status != 'failed')) {
+            await BackendBridgeService.updateScreenshotRequest(id, {
+              'status': 'stopped',
+              'stoppedAt': FieldValue.serverTimestamp(),
+            });
+          }
+        }
+      } catch (_) {}
+    }
   }
 
   static Future<String> sendScreenshotRequest(

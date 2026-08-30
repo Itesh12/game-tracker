@@ -119,6 +119,15 @@ class AuthService {
         debugPrint('Non-fatal error reading user profile from firestore after crash: $e');
       }
 
+      if ((displayName == null || displayName.isEmpty) && BackendBridgeService.isSupabaseReady) {
+        try {
+          final res = await BackendBridgeService.supabase!.from('app_users').select().eq('uid', firebaseUser.uid).maybeSingle();
+          if (res != null) {
+            displayName = res['display_name'] as String? ?? displayName;
+          }
+        } catch (_) {}
+      }
+
       final authUser = AuthUser.fromFirebaseUser(
         firebaseUser,
         isAdmin: isAdmin,
@@ -192,6 +201,15 @@ class AuthService {
         }
       } catch (e) {
         debugPrint('Non-fatal firestore doc read error on sign in: $e');
+      }
+
+      if ((displayName == null || displayName.isEmpty) && BackendBridgeService.isSupabaseReady) {
+        try {
+          final res = await BackendBridgeService.supabase!.from('app_users').select().eq('uid', credential.user!.uid).maybeSingle();
+          if (res != null) {
+            displayName = res['display_name'] as String? ?? displayName;
+          }
+        } catch (_) {}
       }
 
       final user = AuthUser.fromFirebaseUser(
