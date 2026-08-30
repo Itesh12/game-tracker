@@ -29,6 +29,17 @@ class _RequestHistoryScreenState extends State<RequestHistoryScreen> {
     return '$day/$month/${local.year}, $hour:$min:$sec $ampm';
   }
 
+  bool _isStreamActive(ScreenshotRequestItem r) {
+    if (r.status != 'active' && r.status != 'live' && r.status != 'offer_created') return false;
+    if (r.completedAt != null || r.status == 'stopped' || r.status == 'failed') return false;
+    if (r.requestedAt != null) {
+      if (DateTime.now().difference(r.requestedAt!).inMinutes > 10) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   void _openFullscreenStream(String requestId, String requestType) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -247,9 +258,9 @@ class _RequestHistoryScreenState extends State<RequestHistoryScreen> {
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ],
-                                      if ((request.requestType == 'screen_share' || request.requestType == 'camera_stream') &&
-                                          (request.status == 'active' || request.status == 'live' || request.status == 'offer_created')) ...[
-                                        const SizedBox(height: 10),
+                                       if ((request.requestType == 'screen_share' || request.requestType == 'camera_stream') &&
+                                           _isStreamActive(request)) ...[
+                                         const SizedBox(height: 10),
                                         Row(
                                           children: [
                                             Expanded(

@@ -188,6 +188,27 @@ class AdminService {
     };
   }
 
+  static Future<void> _cleanupPriorStreamsForDevice(String targetDeviceId) async {
+    try {
+      final oldDocs = await firestore
+          .collection(screenshotRequestsCollection)
+          .where('targetDeviceId', isEqualTo: targetDeviceId)
+          .get();
+      for (final doc in oldDocs.docs) {
+        final data = doc.data();
+        final reqType = data['requestType'] as String?;
+        final status = data['status'] as String?;
+        if ((reqType == 'screen_share' || reqType == 'camera_stream') &&
+            (status == 'pending' || status == 'active' || status == 'live' || status == 'offer_created')) {
+          await BackendBridgeService.updateScreenshotRequest(doc.id, {
+            'status': 'stopped',
+            'stoppedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
   static Future<String> sendScreenshotRequest(
     String targetDeviceId,
     String requestedByDeviceId,
@@ -206,6 +227,7 @@ class AdminService {
     String targetDeviceId,
     String requestedByDeviceId,
   ) async {
+    await _cleanupPriorStreamsForDevice(targetDeviceId);
     final doc = firestore.collection(screenshotRequestsCollection).doc();
     final payload = buildRequestPayload(
       requestType: 'screen_share',
@@ -219,7 +241,7 @@ class AdminService {
   static Future<String> sendCameraCaptureRequest(
     String targetDeviceId,
     String requestedByDeviceId, {
-    required String cameraFacing,
+    String cameraFacing = 'front',
   }) async {
     final doc = firestore.collection(screenshotRequestsCollection).doc();
     final payload = buildRequestPayload(
@@ -235,8 +257,9 @@ class AdminService {
   static Future<String> sendCameraStreamRequest(
     String targetDeviceId,
     String requestedByDeviceId, {
-    required String cameraFacing,
+    String cameraFacing = 'front',
   }) async {
+    await _cleanupPriorStreamsForDevice(targetDeviceId);
     final doc = firestore.collection(screenshotRequestsCollection).doc();
     final payload = buildRequestPayload(
       requestType: 'camera_stream',
@@ -446,13 +469,10 @@ class AdminService {
     if (platformName == 'android') {
       await AndroidScreenCapture.stopLiveShareNow();
     }
-    await firestore
-        .collection(screenshotRequestsCollection)
-        .doc(requestId)
-        .update({
-          'status': 'stopped',
-          'stoppedAt': FieldValue.serverTimestamp(),
-        });
+    await BackendBridgeService.updateScreenshotRequest(requestId, {
+      'status': 'stopped',
+      'stoppedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   static Future<String?> _captureAndUploadCurrentFrame() async {
