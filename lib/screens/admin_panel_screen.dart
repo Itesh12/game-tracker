@@ -7,6 +7,7 @@ import 'home_screen.dart';
 import '../widgets/live_share_view.dart';
 import 'user_gallery_screen.dart';
 import 'user_location_screen.dart';
+import 'request_detail_screen.dart';
 
 class AdminPanelScreen extends StatefulWidget {
   const AdminPanelScreen({super.key});
@@ -637,169 +638,149 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                             const Divider(height: 20),
                             // Request Items in this Group
                             ...reqList.map((request) {
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 10),
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: theme.boardBg.withOpacity(0.5),
+                              return Card(
+                                color: theme.boardBg,
+                                shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                margin: const EdgeInsets.only(bottom: 8),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(12),
+                                  onTap: () => Get.to(() => RequestDetailScreen(request: request)),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Icon(
-                                              request.requestType == 'camera_capture'
-                                                  ? Icons.camera_alt
-                                                  : request.requestType == 'screen_share'
-                                                      ? Icons.screenshot_monitor
-                                                      : request.requestType == 'camera_stream'
-                                                          ? Icons.videocam
-                                                          : request.requestType == 'location_ping'
-                                                              ? Icons.location_on
-                                                              : request.requestType == 'wake_up'
-                                                                  ? Icons.bolt
-                                                                  : Icons.photo_camera,
-                                              size: 16,
-                                              color: theme.blue,
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  request.requestType == 'camera_capture'
+                                                      ? Icons.camera_alt
+                                                      : request.requestType == 'screen_share'
+                                                          ? Icons.screenshot_monitor
+                                                          : request.requestType == 'camera_stream'
+                                                              ? Icons.videocam
+                                                              : request.requestType == 'location_ping'
+                                                                  ? Icons.location_on
+                                                                  : request.requestType == 'wake_up'
+                                                                      ? Icons.bolt
+                                                                      : Icons.photo_camera,
+                                                  size: 16,
+                                                  color: theme.blue,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  request.requestType.replaceAll('_', ' ').toUpperCase(),
+                                                  style: TextStyle(
+                                                    color: theme.textPrimary,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 13,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              request.requestType == 'screen_share'
-                                                  ? 'Live Share'
-                                                  : request.requestType == 'camera_capture'
-                                                      ? 'Camera Capture'
-                                                      : request.requestType == 'camera_stream'
-                                                          ? 'Camera Stream'
-                                                          : request.requestType == 'location_ping'
-                                                              ? 'Location Ping'
-                                                              : request.requestType == 'wake_up'
-                                                                  ? 'Silent Wake'
-                                                                  : 'Screenshot',
-                                              style: TextStyle(
-                                                color: theme.textPrimary,
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 13,
-                                              ),
+                                            Row(
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                  decoration: BoxDecoration(
+                                                    color: request.status == 'completed'
+                                                        ? Colors.green.shade700
+                                                        : (request.status == 'active' || request.status == 'live')
+                                                            ? Colors.blue.shade700
+                                                            : request.status == 'failed'
+                                                                ? Colors.red.shade700
+                                                                : Colors.amber.shade800,
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                  child: Text(
+                                                    request.status.toUpperCase(),
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Icon(Icons.chevron_right, color: theme.textSecondary, size: 18),
+                                              ],
                                             ),
                                           ],
                                         ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                          decoration: BoxDecoration(
-                                            color: request.status == 'completed'
-                                                ? Colors.green.shade700
-                                                : (request.status == 'active' || request.status == 'live')
-                                                    ? Colors.blue.shade700
-                                                    : request.status == 'failed'
-                                                        ? Colors.red.shade700
-                                                        : Colors.amber.shade800,
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Text(
-                                            request.status.toUpperCase(),
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            if (request.requestedAt != null)
+                                              Text(
+                                                'Time: ${request.requestedAt!.toLocal().toString().split('.').first}',
+                                                style: TextStyle(color: theme.textSecondary, fontSize: 11),
+                                              ),
+                                            Text(
+                                              'Tap for details & media',
+                                              style: TextStyle(color: theme.blue, fontSize: 11, fontWeight: FontWeight.w600),
                                             ),
-                                          ),
+                                          ],
                                         ),
+                                        if (request.status == 'failed' && (request.error != null || request.failureReason != null)) ...[
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            request.error ?? request.failureReason ?? '',
+                                            style: const TextStyle(color: Colors.redAccent, fontSize: 11),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                        if ((request.requestType == 'screen_share' || request.requestType == 'camera_stream') &&
+                                            (request.status == 'active' || request.status == 'live' || request.status == 'offer_created')) ...[
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: ElevatedButton.icon(
+                                                  onPressed: () => _openFullscreenStream(
+                                                    request.requestId,
+                                                    request.requestType,
+                                                  ),
+                                                  icon: const Icon(Icons.fullscreen, size: 16),
+                                                  label: const Text('Open Full Screen', style: TextStyle(fontSize: 12)),
+                                                  style: ElevatedButton.styleFrom(
+                                                    visualDensity: VisualDensity.compact,
+                                                  ),
+                                                ),
+                                              ),
+                                              if (request.requestType == 'screen_share') ...[
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: ElevatedButton.icon(
+                                                    onPressed: () async {
+                                                      await adminCtrl.stopScreenShare(request.requestId);
+                                                      Get.snackbar(
+                                                        'Live Share Stopped',
+                                                        'The live share session was stopped.',
+                                                        snackPosition: SnackPosition.BOTTOM,
+                                                      );
+                                                    },
+                                                    icon: const Icon(Icons.stop_circle_outlined, size: 16),
+                                                    label: const Text('Stop Live', style: TextStyle(fontSize: 12)),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: Colors.redAccent,
+                                                      visualDensity: VisualDensity.compact,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ],
                                       ],
                                     ),
-                                    const SizedBox(height: 4),
-                                    if (request.requestedAt != null)
-                                      Text(
-                                        'Requested: ${request.requestedAt!.toLocal().toString().split('.').first}',
-                                        style: TextStyle(color: theme.textSecondary, fontSize: 11),
-                                      ),
-                                    if ((request.requestType == 'screen_share' ||
-                                            request.requestType == 'camera_stream') &&
-                                        (request.status == 'active' ||
-                                            request.status == 'live' ||
-                                            request.status == 'offer_created')) ...[
-                                      const SizedBox(height: 8),
-                                      ElevatedButton.icon(
-                                        onPressed: () => _openFullscreenStream(
-                                          request.requestId,
-                                          request.requestType,
-                                        ),
-                                        icon: const Icon(Icons.fullscreen, size: 18),
-                                        label: const Text('Open Full Screen'),
-                                        style: ElevatedButton.styleFrom(
-                                          visualDensity: VisualDensity.compact,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      if (request.requestType == 'screen_share')
-                                        ElevatedButton.icon(
-                                          onPressed: () async {
-                                            await adminCtrl.stopScreenShare(request.requestId);
-                                            Get.snackbar(
-                                              'Live Share Stopped',
-                                              'The live share session was stopped.',
-                                              snackPosition: SnackPosition.BOTTOM,
-                                            );
-                                          },
-                                          icon: const Icon(Icons.stop_circle_outlined, size: 18),
-                                          label: const Text('Stop Live Share'),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.redAccent,
-                                            visualDensity: VisualDensity.compact,
-                                          ),
-                                        ),
-                                    ],
-                                    if (request.screenshotUrl != null) ...[
-                                      const SizedBox(height: 8),
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Image.network(
-                                          request.screenshotUrl!,
-                                          fit: BoxFit.cover,
-                                          height: 180,
-                                          errorBuilder: (_, __, ___) => Container(
-                                            height: 80,
-                                            color: Colors.grey.shade900,
-                                            child: const Center(
-                                              child: Text('Image failed to load', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                    if (request.status == 'failed' || request.error != null || request.failureReason != null) ...[
-                                      const SizedBox(height: 6),
-                                      Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.red.withOpacity(0.12),
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: Colors.redAccent.withOpacity(0.4)),
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            if (request.error != null)
-                                              Text(
-                                                'Error: ${request.error}',
-                                                style: const TextStyle(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.w600),
-                                              ),
-                                            if (request.failureReason != null) ...[
-                                              if (request.error != null) const SizedBox(height: 2),
-                                              Text(
-                                                'Reason: ${request.failureReason}',
-                                                style: const TextStyle(color: Colors.orangeAccent, fontSize: 11),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ],
+                                  ),
                                 ),
                               );
                             }),

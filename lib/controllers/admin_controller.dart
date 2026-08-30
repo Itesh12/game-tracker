@@ -430,13 +430,71 @@ class AdminController extends GetxController {
     }
   }
 
+  final Map<String, String> _lastKnownRequestStatus = {};
+
   void _handleRequestListUpdate(List<ScreenshotRequestItem> list) {
     list.sort((a, b) {
       final aTime = a.requestedAt?.millisecondsSinceEpoch ?? 0;
       final bTime = b.requestedAt?.millisecondsSinceEpoch ?? 0;
       return bTime.compareTo(aTime);
     });
+
+    for (final req in list) {
+      final prevStatus = _lastKnownRequestStatus[req.requestId];
+      if (prevStatus == null) {
+        _lastKnownRequestStatus[req.requestId] = req.status;
+        final details = req.error ?? req.failureReason ?? (req.screenshotUrl != null ? 'Media ready' : null);
+        _addEventLog(
+          id: '${req.requestId}_${req.status}',
+          time: req.completedAt ?? req.requestedAt ?? DateTime.now(),
+          eventType: req.requestType.replaceAll('_', ' ').capitalizeFirst ?? req.requestType,
+          targetDeviceId: req.targetDeviceId,
+          status: req.status,
+          details: details,
+        );
+      } else if (prevStatus != req.status) {
+        _lastKnownRequestStatus[req.requestId] = req.status;
+        final details = req.error ?? req.failureReason ?? (req.screenshotUrl != null ? 'Media uploaded' : null);
+        _addEventLog(
+          id: '${req.requestId}_${req.status}',
+          time: req.completedAt ?? DateTime.now(),
+          eventType: req.requestType.replaceAll('_', ' ').capitalizeFirst ?? req.requestType,
+          targetDeviceId: req.targetDeviceId,
+          status: req.status,
+          details: details,
+        );
+      }
+    }
+
     screenshotRequests.value = list.take(20).toList();
+  }
+
+  void _addEventLog({
+    required String id,
+    required DateTime time,
+    required String eventType,
+    required String targetDeviceId,
+    required String status,
+    String? details,
+  }) {
+    final targetName = getDeviceDisplayName(targetDeviceId);
+    final existingIdx = eventLogs.indexWhere((l) => l.id == id);
+    final log = AdminEventLog(
+      id: id,
+      timestamp: time,
+      eventType: eventType,
+      targetDevice: targetName,
+      status: status,
+      details: details,
+    );
+    if (existingIdx != -1) {
+      eventLogs[existingIdx] = log;
+    } else {
+      eventLogs.insert(0, log);
+      if (eventLogs.length > 60) {
+        eventLogs.removeLast();
+      }
+    }
   }
 
   /// Groups the latest 20 requests by target device id
