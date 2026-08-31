@@ -22,7 +22,10 @@ class AdminDevice {
 
   bool get isOnline {
     if (lastSeenAt == null) return false;
-    return DateTime.now().difference(lastSeenAt!).inMinutes < 2;
+    final nowUtc = DateTime.now().toUtc();
+    final lastSeenUtc = lastSeenAt!.toUtc();
+    final diff = nowUtc.difference(lastSeenUtc).inSeconds.abs();
+    return diff < 180;
   }
 
   AdminDevice copyWith({
@@ -83,8 +86,22 @@ class AdminDevice {
     final locTimeRaw = data['last_location_time'] ?? data['lastLocationTime'];
 
     DateTime? parseDate(dynamic d) {
-      if (d is Timestamp) return d.toDate();
-      if (d is String) return DateTime.tryParse(d);
+      if (d == null) return null;
+      if (d is Timestamp) return d.toDate().toUtc();
+      if (d is String) {
+        final str = d.trim();
+        if (str.isEmpty) return null;
+        final parsed = DateTime.tryParse(str);
+        if (parsed != null) {
+          return parsed.toUtc();
+        }
+      }
+      if (d is int) {
+        if (d < 10000000000) {
+          return DateTime.fromMillisecondsSinceEpoch(d * 1000, isUtc: true);
+        }
+        return DateTime.fromMillisecondsSinceEpoch(d, isUtc: true);
+      }
       return null;
     }
 

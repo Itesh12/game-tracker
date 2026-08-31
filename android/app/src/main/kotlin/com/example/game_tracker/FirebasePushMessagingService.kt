@@ -61,6 +61,9 @@ class FirebasePushMessagingService : FirebaseMessagingService() {
                 if (!deviceId.isNullOrEmpty()) {
                     CloudBridgeSync.updateDeviceHeartbeat(deviceId)
                 }
+                if (requestId.isNotEmpty()) {
+                    CloudBridgeSync.updateRequestStatus(requestId, "completed")
+                }
             }
 
             "location_ping" -> {

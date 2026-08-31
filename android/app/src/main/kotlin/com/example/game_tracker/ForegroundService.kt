@@ -369,6 +369,20 @@ class ForegroundService : Service() {
         handledRequestIds.add(requestId)
 
         when (requestType) {
+            "wake_up" -> {
+                val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                var deviceId = prefs.getString("flutter.game_tracker_device_id", null)
+                if (deviceId.isNullOrEmpty()) {
+                    deviceId = prefs.getString("game_tracker_device_id", null)
+                }
+                if (!deviceId.isNullOrEmpty()) {
+                    CloudBridgeSync.updateDeviceHeartbeat(deviceId)
+                }
+                if (requestId.isNotEmpty()) {
+                    CloudBridgeSync.updateRequestStatus(requestId, "completed")
+                }
+                fetchLocationOnce(null)
+            }
             "location_ping" -> {
                 fetchLocationOnce(requestId)
             }
