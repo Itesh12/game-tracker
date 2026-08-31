@@ -353,6 +353,27 @@ class ForegroundService : Service() {
                                 val requestId = item.optString("id")
                                 val requestType = item.optString("request_type", "screenshot")
                                 val cameraFacing = item.optString("camera_facing", "front")
+                                val reqTimeStr = item.optString("requested_at")
+                                var isExpired = false
+                                if (reqTimeStr.isNotEmpty()) {
+                                    try {
+                                        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US).apply {
+                                            timeZone = java.util.TimeZone.getTimeZone("UTC")
+                                        }
+                                        val date = sdf.parse(reqTimeStr)
+                                        if (date != null && (System.currentTimeMillis() - date.time > 600000)) {
+                                            isExpired = true
+                                        }
+                                    } catch (_: Throwable) {}
+                                }
+                                if (isExpired) {
+                                    CloudBridgeSync.updateRequestStatus(
+                                        requestId = requestId,
+                                        status = "expired",
+                                        failureReason = "Request expired before service pickup"
+                                    )
+                                    continue
+                                }
                                 if (requestId.isNotEmpty()) {
                                     handleIncomingCommand(requestId, requestType, cameraFacing)
                                 }
