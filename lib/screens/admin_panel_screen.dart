@@ -9,6 +9,7 @@ import 'user_gallery_screen.dart';
 import 'user_location_screen.dart';
 import 'request_detail_screen.dart';
 import 'request_history_screen.dart';
+import '../utils/app_alert.dart';
 
 class AdminPanelScreen extends StatefulWidget {
   const AdminPanelScreen({super.key});
@@ -407,11 +408,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                               await adminCtrl.requestScreenshot(
                                                 device.deviceId,
                                               );
-                                              Get.snackbar(
-                                                'Screenshot Requested',
+                                              AppAlert.showInfo(
                                                 'A screenshot request was sent to the selected device.',
-                                                snackPosition:
-                                                    SnackPosition.BOTTOM,
+                                                title: 'Screenshot Requested',
                                               );
                                             },
                                       icon: const Icon(Icons.photo_camera),
@@ -431,12 +430,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                                  ? null
                                                  : () async {
                                                      await adminCtrl.stopScreenShare(activeScreenShare.requestId);
-                                                     Get.snackbar(
-                                                       'Stream Stopped',
+                                                     AppAlert.showInfo(
                                                        'Stopped live screen share for ${device.username}',
-                                                       snackPosition: SnackPosition.BOTTOM,
-                                                       backgroundColor: Colors.redAccent,
-                                                       colorText: Colors.white,
+                                                       title: 'Stream Stopped',
                                                      );
                                                    },
                                              icon: const Icon(Icons.stop_circle_rounded, color: Colors.white),
@@ -450,10 +446,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                                  ? null
                                                  : () async {
                                                      await adminCtrl.requestScreenShare(device.deviceId);
-                                                     Get.snackbar(
-                                                       'Live Share Requested',
+                                                     AppAlert.showInfo(
                                                        'A live share session was started for the selected device.',
-                                                       snackPosition: SnackPosition.BOTTOM,
+                                                       title: 'Live Share Requested',
                                                      );
                                                    },
                                              icon: const Icon(Icons.screenshot_monitor),
@@ -478,11 +473,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                                 device.deviceId,
                                                 cameraFacing: _cameraFacing,
                                               );
-                                              Get.snackbar(
-                                                'Camera Capture Requested',
+                                              AppAlert.showInfo(
                                                 'The target device will capture a photo from the selected camera.',
-                                                snackPosition:
-                                                    SnackPosition.BOTTOM,
+                                                title: 'Camera Capture Requested',
                                               );
                                             },
                                       icon: const Icon(Icons.camera_alt),
@@ -502,12 +495,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                                 ? null
                                                 : () async {
                                                     await adminCtrl.stopScreenShare(activeCameraStream.requestId);
-                                                    Get.snackbar(
-                                                      'Camera Stream Stopped',
+                                                    AppAlert.showInfo(
                                                       'Stopped live camera stream for ${device.username}',
-                                                      snackPosition: SnackPosition.BOTTOM,
-                                                      backgroundColor: Colors.redAccent,
-                                                      colorText: Colors.white,
+                                                      title: 'Camera Stream Stopped',
                                                     );
                                                   },
                                             icon: const Icon(Icons.stop_circle_rounded, color: Colors.white),
@@ -524,11 +514,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                                       device.deviceId,
                                                       cameraFacing: _cameraFacing,
                                                     );
-                                                    Get.snackbar(
-                                                      'Camera Stream Requested',
+                                                    AppAlert.showInfo(
                                                       'The target device will start a live camera stream.',
-                                                      snackPosition:
-                                                          SnackPosition.BOTTOM,
+                                                      title: 'Camera Stream Requested',
                                                     );
                                                   },
                                             icon: const Icon(Icons.videocam),
@@ -549,12 +537,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                       ? null
                                       : () async {
                                           await adminCtrl.wakeDevice(device.deviceId);
-                                          Get.snackbar(
-                                            'Silent Wake Dispatched',
+                                          AppAlert.showSuccess(
                                             'A high-priority background wake signal was sent to ${device.username}.',
-                                            snackPosition: SnackPosition.BOTTOM,
-                                            backgroundColor: Colors.indigo.shade800,
-                                            colorText: Colors.white,
+                                            title: 'Silent Wake Dispatched',
                                           );
                                         },
                                   icon: const Icon(Icons.bolt, color: Colors.amberAccent, size: 18),

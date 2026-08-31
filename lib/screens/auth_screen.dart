@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/theme_controller.dart';
 import '../services/admin_service.dart';
+import '../utils/app_alert.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -45,7 +46,7 @@ class _AuthScreenState extends State<AuthScreen> {
         setState(() => signupPhotoUrl = url);
       }
     } catch (e) {
-      Get.snackbar('Upload Failed', e.toString(), snackPosition: SnackPosition.BOTTOM);
+      AppAlert.showError(e.toString(), title: 'Upload Failed');
     } finally {
       setState(() => isUploadingPhoto = false);
     }
@@ -111,20 +112,14 @@ class _AuthScreenState extends State<AuthScreen> {
               try {
                 await authCtrl.resetPassword(email);
                 Get.back();
-                Get.snackbar(
-                  'Password Reset Sent',
+                AppAlert.showSuccess(
                   'A password reset link has been sent to $email.',
-                  snackPosition: SnackPosition.TOP,
-                  backgroundColor: Colors.green,
-                  colorText: Colors.white,
+                  title: 'Password Reset Sent',
                 );
               } catch (e) {
-                Get.snackbar(
-                  'Reset Failed',
+                AppAlert.showError(
                   e.toString(),
-                  snackPosition: SnackPosition.BOTTOM,
-                  backgroundColor: Colors.redAccent,
-                  colorText: Colors.white,
+                  title: 'Reset Failed',
                 );
               }
             },
@@ -387,12 +382,9 @@ class _AuthScreenState extends State<AuthScreen> {
                               final name = nameController.text.trim();
 
                               if (email.isEmpty || password.isEmpty) {
-                                Get.snackbar(
-                                  'Input Required',
+                                AppAlert.showWarning(
                                   'Please fill in all required fields.',
-                                  backgroundColor: Colors.orangeAccent,
-                                  colorText: Colors.white,
-                                  snackPosition: SnackPosition.BOTTOM,
+                                  title: 'Input Required',
                                 );
                                 return;
                               }
@@ -415,12 +407,9 @@ class _AuthScreenState extends State<AuthScreen> {
                                   );
                                 }
                               } catch (error) {
-                                Get.snackbar(
-                                  'Authentication Failed',
+                                AppAlert.showError(
                                   error.toString(),
-                                  backgroundColor: Colors.redAccent,
-                                  colorText: Colors.white,
-                                  snackPosition: SnackPosition.BOTTOM,
+                                  title: 'Authentication Failed',
                                 );
                               }
                             },

@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../controllers/admin_controller.dart';
 import '../controllers/theme_controller.dart';
+import '../utils/app_alert.dart';
 
 class RequestDetailScreen extends StatefulWidget {
   final ScreenshotRequestItem request;
@@ -141,13 +142,9 @@ Media URL: ${req.screenshotUrl ?? 'None'}
                 tooltip: 'Copy Diagnostics Log',
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: _getDiagnosticsText()));
-                  Get.snackbar(
-                    'Diagnostics Copied',
+                  AppAlert.showSuccess(
                     'Request error logs copied to clipboard.',
-                    snackPosition: SnackPosition.BOTTOM,
-                    backgroundColor: Colors.blueGrey.shade900,
-                    colorText: Colors.white,
-                    duration: const Duration(seconds: 2),
+                    title: 'Diagnostics Copied',
                   );
                 },
               ),
@@ -359,7 +356,7 @@ Media URL: ${req.screenshotUrl ?? 'None'}
                               TextButton.icon(
                                 onPressed: () {
                                   Clipboard.setData(ClipboardData(text: _getDiagnosticsText()));
-                                  Get.snackbar('Copied', 'Error logs copied to clipboard.');
+                                  AppAlert.showSuccess('Error logs copied to clipboard.', title: 'Copied');
                                 },
                                 icon: const Icon(Icons.copy, size: 14, color: Colors.redAccent),
                                 label: const Text('Copy', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
@@ -412,12 +409,9 @@ Media URL: ${req.screenshotUrl ?? 'None'}
                       await adminCtrl.requestScreenshot(widget.request.targetDeviceId);
                     }
                     Get.back();
-                    Get.snackbar(
-                      'Request Dispatched',
+                    AppAlert.showInfo(
                       'Re-sent ${widget.request.requestType} command to $targetName',
-                      snackPosition: SnackPosition.BOTTOM,
-                      backgroundColor: Colors.indigo.shade800,
-                      colorText: Colors.white,
+                      title: 'Request Dispatched',
                     );
                   },
                   icon: const Icon(Icons.refresh_rounded),

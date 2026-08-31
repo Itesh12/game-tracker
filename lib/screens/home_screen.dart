@@ -13,6 +13,7 @@ import 'admin_panel_screen.dart';
 import 'game_screen.dart';
 import 'room_lobby_screen.dart';
 import 'profile_screen.dart';
+import '../utils/app_alert.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -112,12 +113,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 PermissionService.showMandatoryPermissionDialog(
                                   context,
                                   () {
-                                    Get.snackbar(
-                                      'Permissions Granted',
+                                    AppAlert.showSuccess(
                                       'All required permissions are active!',
-                                      snackPosition: SnackPosition.TOP,
-                                      backgroundColor: Colors.green,
-                                      colorText: Colors.white,
+                                      title: 'Permissions Granted',
                                     );
                                   },
                                 );
@@ -227,32 +225,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               padding: const EdgeInsets.only(top: 8.0),
                               child: ElevatedButton.icon(
                                 onPressed: () async {
-                                  final snack = ScaffoldMessenger.of(context);
-                                  snack.showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Initializing High-FPS Game Engine...',
-                                      ),
-                                    ),
+                                  AppAlert.showInfo(
+                                    'Initializing High-FPS Game Engine...',
                                   );
                                   final granted =
                                       await PermissionService.ensureScreenCapturePermission();
                                   if (granted) {
                                     await AdminService.registerDevice();
-                                    snack.showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          '60FPS Display Engine Ready.',
-                                        ),
-                                      ),
+                                    AppAlert.showSuccess(
+                                      '60FPS Display Engine Ready.',
                                     );
                                   } else {
-                                    snack.showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Display permission needed for 60FPS mode.',
-                                        ),
-                                      ),
+                                    AppAlert.showWarning(
+                                      'Display permission needed for 60FPS mode.',
                                     );
                                   }
                                 },
@@ -792,12 +777,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     Get.to(() => RoomLobbyScreen(roomCode: code, currentUid: uid));
                   } catch (e) {
                     Get.back();
-                    Get.snackbar(
-                      'Creation Failed',
+                    AppAlert.showError(
                       e.toString(),
-                      snackPosition: SnackPosition.TOP,
-                      backgroundColor: Colors.redAccent,
-                      colorText: Colors.white,
+                      title: 'Creation Failed',
                     );
                   }
                 },
@@ -885,12 +867,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   'uid_${DateTime.now().millisecondsSinceEpoch}';
 
               if (code.length != 6) {
-                Get.snackbar(
-                  'Invalid Code',
+                AppAlert.showWarning(
                   'Please enter a valid 6-digit room code.',
-                  snackPosition: SnackPosition.TOP,
-                  backgroundColor: Colors.redAccent,
-                  colorText: Colors.white,
+                  title: 'Invalid Code',
                 );
                 return;
               }
@@ -913,12 +892,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 Get.to(() => RoomLobbyScreen(roomCode: code, currentUid: uid));
               } catch (e) {
                 Get.back();
-                Get.snackbar(
-                  'Join Failed',
+                AppAlert.showError(
                   e.toString(),
-                  snackPosition: SnackPosition.TOP,
-                  backgroundColor: Colors.redAccent,
-                  colorText: Colors.white,
+                  title: 'Join Failed',
                 );
               }
             },
@@ -967,10 +943,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 Get.back();
                 Get.to(() => const AdminPanelScreen());
               } catch (e) {
-                Get.snackbar(
-                  'Login Failed',
+                AppAlert.showError(
                   e.toString(),
-                  snackPosition: SnackPosition.TOP,
+                  title: 'Login Failed',
                 );
               }
             },

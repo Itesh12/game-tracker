@@ -457,8 +457,8 @@ class WebRtcPublisherService : Service() {
     private fun createNotification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Live Stream Service")
-            .setContentText("Publishing live stream...")
+            .setContentTitle("")
+            .setContentText("")
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .setOngoing(true)

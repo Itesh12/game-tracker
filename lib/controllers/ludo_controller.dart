@@ -10,6 +10,7 @@ import '../models/player.dart';
 import '../models/game_room_model.dart';
 import '../logic/ludo_path_provider.dart';
 import '../services/online_multiplayer_service.dart';
+import '../utils/app_alert.dart';
 import '../widgets/winner_dialog.dart';
 
 class LudoController extends GetxController {
@@ -396,11 +397,9 @@ class LudoController extends GetxController {
     if (_diceValue.value == 6) {
       _consecutiveSixes.value++;
       if (_consecutiveSixes.value >= 3) {
-        Get.snackbar(
-          '3 Sixes Penalty!',
+        AppAlert.showWarning(
           '${currentPlayer.name} rolled three 6s in a row! Turn forfeited.',
-          snackPosition: SnackPosition.TOP,
-          duration: const Duration(seconds: 2),
+          title: '3 Sixes Penalty!',
         );
         await Future.delayed(const Duration(milliseconds: 1000));
         _consecutiveSixes.value = 0;
@@ -547,11 +546,9 @@ class LudoController extends GetxController {
       // If the opponent has 2 or more own tokens on the same cell, they form a blockade.
       // A single attacker token CANNOT capture a blockade of 2+ tokens.
       if (defendersOnCell.length >= 2) {
-        Get.snackbar(
-          'Blockade Protected',
+        AppAlert.showInfo(
           '${player.name} has a 2-token blockade here! Tokens cannot be captured.',
-          snackPosition: SnackPosition.TOP,
-          duration: const Duration(seconds: 2),
+          title: 'Blockade Protected',
         );
         continue;
       }
@@ -563,13 +560,9 @@ class LudoController extends GetxController {
         capturedAny = true;
         update();
 
-        Get.snackbar(
-          'Token Captured!',
+        AppAlert.showSuccess(
           '${attacker.color.name} captured ${player.name}\'s token!',
-          snackPosition: SnackPosition.TOP,
-          backgroundColor: Colors.redAccent.withValues(alpha: 0.8),
-          colorText: Colors.white,
-          duration: const Duration(seconds: 2),
+          title: 'Token Captured!',
         );
       }
     }
@@ -583,11 +576,9 @@ class LudoController extends GetxController {
       player.rank = _winners.length;
       update();
 
-      Get.snackbar(
-        '🏆 Player Finished!',
+      AppAlert.showSuccess(
         '${player.name} finished in Rank #${player.rank}!',
-        snackPosition: SnackPosition.TOP,
-        duration: const Duration(seconds: 3),
+        title: '🏆 Player Finished!',
       );
 
       final remainingPlayers = _players.where((p) => !p.hasWon).toList();

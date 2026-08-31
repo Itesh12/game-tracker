@@ -4,6 +4,7 @@ import '../controllers/admin_controller.dart';
 import '../controllers/theme_controller.dart';
 import '../widgets/live_share_view.dart';
 import 'request_detail_screen.dart';
+import '../utils/app_alert.dart';
 
 class RequestHistoryScreen extends StatefulWidget {
   const RequestHistoryScreen({super.key});
@@ -106,12 +107,9 @@ class _RequestHistoryScreenState extends State<RequestHistoryScreen> {
                           onPressed: () async {
                             Get.back();
                             await adminCtrl.clearAllRequests();
-                            Get.snackbar(
-                              'Requests Cleared',
-                              'All requests have been permanently removed from both databases.',
-                              snackPosition: SnackPosition.BOTTOM,
-                              backgroundColor: Colors.redAccent.shade700,
-                              colorText: Colors.white,
+                            AppAlert.showSuccess(
+                              'All requests have been permanently removed.',
+                              title: 'Requests Cleared',
                             );
                           },
                           child: const Text('Clear All', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -126,11 +124,9 @@ class _RequestHistoryScreenState extends State<RequestHistoryScreen> {
                 tooltip: 'Refresh',
                 onPressed: () {
                   adminCtrl.refreshDeviceList();
-                  Get.snackbar(
-                    'Refreshed',
+                  AppAlert.showInfo(
                     'Synced latest requests and devices.',
-                    snackPosition: SnackPosition.BOTTOM,
-                    duration: const Duration(seconds: 1),
+                    title: 'Refreshed',
                   );
                 },
               ),
@@ -326,10 +322,9 @@ class _RequestHistoryScreenState extends State<RequestHistoryScreen> {
                                               child: ElevatedButton.icon(
                                                 onPressed: () async {
                                                   await adminCtrl.stopScreenShare(request.requestId);
-                                                  Get.snackbar(
-                                                    'Stream Stopped',
+                                                  AppAlert.showInfo(
                                                     'Stopped ${request.requestType} successfully.',
-                                                    snackPosition: SnackPosition.BOTTOM,
+                                                    title: 'Stream Stopped',
                                                   );
                                                 },
                                                 icon: const Icon(Icons.stop_circle_outlined, size: 16),

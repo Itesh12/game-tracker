@@ -6,6 +6,7 @@ import '../controllers/admin_controller.dart';
 import '../controllers/theme_controller.dart';
 import '../services/admin_service.dart';
 import '../services/backend_bridge_service.dart';
+import '../utils/app_alert.dart';
 
 class UserLocationScreen extends StatefulWidget {
   const UserLocationScreen({
@@ -56,13 +57,7 @@ class _UserLocationScreenState extends State<UserLocationScreen> {
     final Uri googleMapsUri =
         Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
     if (!await launchUrl(googleMapsUri, mode: LaunchMode.externalApplication)) {
-      Get.snackbar(
-        'Launch Failed',
-        'Could not open Google Maps.',
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.redAccent,
-        colorText: Colors.white,
-      );
+      AppAlert.showError('Could not open Google Maps.', title: 'Launch Failed');
     }
   }
 
@@ -76,22 +71,12 @@ class _UserLocationScreenState extends State<UserLocationScreen> {
       );
       await BackendBridgeService.createScreenshotRequest(payload);
 
-      Get.snackbar(
-        'Ping Sent Successfully',
+      AppAlert.showSuccess(
         'Target device has been pinged for a fresh GPS location update.',
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.blueAccent,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 3),
+        title: 'Ping Sent Successfully',
       );
     } catch (e) {
-      Get.snackbar(
-        'Ping Failed',
-        e.toString(),
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.redAccent,
-        colorText: Colors.white,
-      );
+      AppAlert.showError(e.toString(), title: 'Ping Failed');
     }
   }
 

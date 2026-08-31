@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../controllers/admin_controller.dart';
 import '../controllers/theme_controller.dart';
 import '../services/admin_service.dart';
+import '../utils/app_alert.dart';
 
 class UserGalleryScreen extends StatelessWidget {
   const UserGalleryScreen({
@@ -143,9 +144,8 @@ class UserGalleryScreen extends StatelessWidget {
     );
 
     if (result == true) {
-      Get.snackbar('Deleting...', 'Removing image from Cloudinary and database', snackPosition: SnackPosition.BOTTOM);
       await AdminService.deleteCapturedImage(item.requestId, item.screenshotUrl);
-      Get.snackbar('Deleted', 'Image deleted successfully', snackPosition: SnackPosition.BOTTOM);
+      AppAlert.showSuccess('Image deleted successfully', title: 'Deleted');
       return true;
     }
     return false;

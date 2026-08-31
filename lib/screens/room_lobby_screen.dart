@@ -5,6 +5,7 @@ import '../controllers/ludo_controller.dart';
 import '../controllers/theme_controller.dart';
 import '../models/game_room_model.dart';
 import '../services/online_multiplayer_service.dart';
+import '../utils/app_alert.dart';
 import 'game_screen.dart';
 
 
@@ -54,12 +55,9 @@ class RoomLobbyScreen extends StatelessWidget {
               if (room == null) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   Get.back();
-                  Get.snackbar(
-                    'Room Closed',
+                  AppAlert.showError(
                     'The room was closed by the host.',
-                    snackPosition: SnackPosition.TOP,
-                    backgroundColor: Colors.redAccent,
-                    colorText: Colors.white,
+                    title: 'Room Closed',
                   );
                 });
                 return const SizedBox.shrink();
@@ -142,11 +140,9 @@ class RoomLobbyScreen extends StatelessWidget {
                                   icon: const Icon(Icons.copy, color: Colors.blueAccent),
                                   onPressed: () {
                                     Clipboard.setData(ClipboardData(text: room.roomCode));
-                                    Get.snackbar(
-                                      'Code Copied!',
+                                    AppAlert.showSuccess(
                                       'Invite code ${room.roomCode} copied to clipboard.',
-                                      snackPosition: SnackPosition.TOP,
-                                      duration: const Duration(seconds: 2),
+                                      title: 'Code Copied!',
                                     );
                                   },
                                   tooltip: 'Copy Invite Code',
@@ -292,12 +288,9 @@ class RoomLobbyScreen extends StatelessWidget {
                                 try {
                                   await OnlineMultiplayerService.startGame(roomCode);
                                 } catch (e) {
-                                  Get.snackbar(
-                                    'Cannot Start Game',
+                                  AppAlert.showError(
                                     e.toString(),
-                                    snackPosition: SnackPosition.TOP,
-                                    backgroundColor: Colors.redAccent,
-                                    colorText: Colors.white,
+                                    title: 'Cannot Start Game',
                                   );
                                 }
                               }

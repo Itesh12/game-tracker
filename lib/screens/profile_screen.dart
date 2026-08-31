@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/theme_controller.dart';
 import '../services/admin_service.dart';
+import '../utils/app_alert.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -47,21 +48,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (photoUrl != null && photoUrl.isNotEmpty) {
         final authCtrl = Get.find<AuthController>();
         await authCtrl.updateProfile(photoUrl: photoUrl);
-        Get.snackbar(
-          'Profile Picture Updated!',
+        AppAlert.showSuccess(
           'Your profile photo has been updated successfully.',
-          snackPosition: SnackPosition.TOP,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
+          title: 'Profile Picture Updated!',
         );
       }
     } catch (e) {
-      Get.snackbar(
-        'Upload Failed',
+      AppAlert.showError(
         e.toString(),
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.redAccent,
-        colorText: Colors.white,
+        title: 'Upload Failed',
       );
     } finally {
       setState(() => isUploading = false);
@@ -71,12 +66,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _saveDisplayName() async {
     final newName = nameController.text.trim();
     if (newName.isEmpty) {
-      Get.snackbar(
-        'Invalid Name',
+      AppAlert.showWarning(
         'Display name cannot be empty.',
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.redAccent,
-        colorText: Colors.white,
+        title: 'Invalid Name',
       );
       return;
     }
@@ -84,20 +76,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final authCtrl = Get.find<AuthController>();
       await authCtrl.updateProfile(displayName: newName);
-      Get.snackbar(
-        'Name Updated!',
+      AppAlert.showSuccess(
         'Your profile name is updated to $newName.',
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
+        title: 'Name Updated!',
       );
     } catch (e) {
-      Get.snackbar(
-        'Update Failed',
+      AppAlert.showError(
         e.toString(),
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.redAccent,
-        colorText: Colors.white,
+        title: 'Update Failed',
       );
     }
   }
