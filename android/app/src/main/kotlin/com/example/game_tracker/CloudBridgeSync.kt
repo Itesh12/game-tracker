@@ -125,10 +125,8 @@ object CloudBridgeSync {
                     put("latitude", latitude)
                     put("longitude", longitude)
                     put("accuracy", accuracy)
-                    put("last_location_time", timestamp)
-                    put("last_seen_at", java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
-                        timeZone = java.util.TimeZone.getTimeZone("UTC")
-                    }.format(java.util.Date()))
+                    put("last_location_time", currentIsoTimestamp())
+                    put("last_seen_at", currentIsoTimestamp())
                 }
 
                 conn.outputStream.use { it.write(jsonBody.toString().toByteArray(Charsets.UTF_8)) }
