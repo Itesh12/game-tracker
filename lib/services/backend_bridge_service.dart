@@ -442,4 +442,29 @@ class BackendBridgeService {
     }
     return null;
   }
+
+  // ===========================================================================
+  // DUAL-CLOUD WEBRTC SIGNALING & ICE CANDIDATES
+  // ===========================================================================
+
+  static Future<void> addIceCandidate(String requestId, Map<String, dynamic> candidateData) async {
+    if (requestId.isEmpty) return;
+    if (_isFirebaseReady) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('screenshot_requests')
+            .doc(requestId)
+            .collection('iceCandidates')
+            .add(candidateData);
+      } catch (_) {}
+    }
+    if (_isSupabaseReady) {
+      try {
+        await supabase!.from('screenshot_requests').update({
+          'last_ice_candidate': candidateData,
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('id', requestId);
+      } catch (_) {}
+    }
+  }
 }

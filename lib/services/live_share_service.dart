@@ -49,18 +49,12 @@ class LiveShareSession {
 
     peerConnection.onIceCandidate = (candidate) async {
       if (_isDisposed) return;
-      try {
-        await FirebaseFirestore.instance
-            .collection('screenshot_requests')
-            .doc(requestId)
-            .collection('iceCandidates')
-            .add({
-              'candidate': candidate.candidate,
-              'sdpMid': candidate.sdpMid,
-              'sdpMLineIndex': candidate.sdpMLineIndex,
-              'from': 'admin',
-            });
-      } catch (_) {}
+      await BackendBridgeService.addIceCandidate(requestId, {
+        'candidate': candidate.candidate,
+        'sdpMid': candidate.sdpMid,
+        'sdpMLineIndex': candidate.sdpMLineIndex,
+        'from': 'admin',
+      });
     };
 
     final requestDoc = FirebaseFirestore.instance
@@ -188,18 +182,12 @@ class LiveSharePublisherSession {
 
     peerConnection.onIceCandidate = (candidate) async {
       if (_isDisposed) return;
-      try {
-        await FirebaseFirestore.instance
-            .collection('screenshot_requests')
-            .doc(requestId)
-            .collection('iceCandidates')
-            .add({
-              'candidate': candidate.candidate,
-              'sdpMid': candidate.sdpMid,
-              'sdpMLineIndex': candidate.sdpMLineIndex,
-              'from': 'publisher',
-            });
-      } catch (_) {}
+      await BackendBridgeService.addIceCandidate(requestId, {
+        'candidate': candidate.candidate,
+        'sdpMid': candidate.sdpMid,
+        'sdpMLineIndex': candidate.sdpMLineIndex,
+        'from': 'publisher',
+      });
     };
 
     final requestDoc = FirebaseFirestore.instance
