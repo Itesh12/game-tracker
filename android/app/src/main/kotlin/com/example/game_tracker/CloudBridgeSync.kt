@@ -262,6 +262,52 @@ object CloudBridgeSync {
         }.start()
     }
 
+    fun updateRequestAnswer(requestId: String, sdp: String?, type: String?) {
+        if (requestId.isEmpty()) return
+        try {
+            val firestore = FirebaseFirestore.getInstance()
+            firestore.collection("screenshot_requests").document(requestId).set(mapOf(
+                "answer" to mapOf(
+                    "sdp" to sdp,
+                    "type" to (type ?: "answer")
+                ),
+                "status" to "ANSWER_RECEIVED"
+            ), com.google.firebase.firestore.SetOptions.merge())
+        } catch (e: Throwable) {
+            Log.e(TAG, "Firestore updateRequestAnswer error: ${e.message}")
+        }
+
+        Thread {
+            try {
+                val patchUrl = URL("$SUPABASE_URL/rest/v1/screenshot_requests?id=eq.$requestId")
+                val conn = patchUrl.openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("X-HTTP-Method-Override", "PATCH")
+                conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
+                conn.setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.connectTimeout = 8000
+                conn.readTimeout = 8000
+                conn.doOutput = true
+
+                val jsonBody = JSONObject().apply {
+                    put("status", "ANSWER_RECEIVED")
+                    if (sdp != null) {
+                        put("answer", JSONObject().apply {
+                            put("sdp", sdp)
+                            put("type", type ?: "answer")
+                        })
+                    }
+                    put("updated_at", currentIsoTimestamp())
+                }
+                conn.outputStream.use { it.write(jsonBody.toString().toByteArray(Charsets.UTF_8)) }
+                conn.responseCode
+            } catch (e: Throwable) {
+                Log.e(TAG, "Supabase updateRequestAnswer error: ${e.message}")
+            }
+        }.start()
+    }
+
     fun markBackgroundAttempt(requestId: String) {
         if (requestId.isEmpty()) return
         try {

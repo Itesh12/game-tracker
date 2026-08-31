@@ -67,14 +67,7 @@ class FirestoreTransport : SignalingTransport {
     }
 
     override fun sendAnswer(sessionId: String, sdp: String, type: String) {
-        firestore.collection("screenshot_requests").document(sessionId).set(
-            mapOf(
-                "answer" to mapOf("sdp" to sdp, "type" to type),
-                "status" to "ANSWER_RECEIVED"
-            ),
-            SetOptions.merge()
-        )
-        CloudBridgeSync.updateRequestStatus(sessionId, "live")
+        CloudBridgeSync.updateRequestAnswer(sessionId, sdp, type)
     }
 
     override fun sendIceCandidate(sessionId: String, candidate: String, sdpMid: String, sdpMLineIndex: Int, from: String) {
