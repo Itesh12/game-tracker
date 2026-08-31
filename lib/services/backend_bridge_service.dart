@@ -250,13 +250,15 @@ class BackendBridgeService {
         BackendConfig.backendMode != BackendMode.firebaseOnly) {
       try {
         final Map<String, dynamic> supabaseUpdates = {};
-        if (updates.containsKey('status'))
+        if (updates.containsKey('status')) {
           supabaseUpdates['status'] = updates['status'];
+        }
         if (updates.containsKey('screenshotUrl')) {
           supabaseUpdates['screenshot_url'] = updates['screenshotUrl'];
         }
-        if (updates.containsKey('error'))
+        if (updates.containsKey('error')) {
           supabaseUpdates['error'] = updates['error'];
+        }
         if (updates.containsKey('failureReason')) {
           supabaseUpdates['failure_reason'] = updates['failureReason'];
         }

@@ -246,8 +246,6 @@ class _MandatoryPermissionDialogState extends State<_MandatoryPermissionDialog> 
 
   @override
   Widget build(BuildContext context) {
-    final allGranted = _items.isNotEmpty && _items.every((item) => item.isGranted);
-
     return PopScope(
       canPop: false,
       child: Dialog(
