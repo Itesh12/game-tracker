@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'backend_bridge_service.dart';
 
@@ -7,8 +6,8 @@ class LiveShareSession {
   final String requestId;
   final RTCPeerConnection peerConnection;
   final RTCVideoRenderer renderer;
-  late final StreamSubscription<DocumentSnapshot<Map<String, dynamic>>> _requestSub;
-  late final StreamSubscription<QuerySnapshot<Map<String, dynamic>>> _iceSub;
+  late final StreamSubscription<Map<String, dynamic>?> _requestSub;
+  late final StreamSubscription<List<Map<String, dynamic>>> _iceSub;
   bool _isDisposed = false;
   MediaStream? _localStream;
 
@@ -57,10 +56,6 @@ class LiveShareSession {
       });
     };
 
-    final requestDoc = FirebaseFirestore.instance
-        .collection('screenshot_requests')
-        .doc(requestId);
-
     bool hasSetOffer = false;
 
     Future<void> handleOfferPayload(dynamic offer) async {
@@ -94,32 +89,14 @@ class LiveShareSession {
       }
     }
 
-    _requestSub = requestDoc.snapshots().listen((snapshot) async {
-      if (_isDisposed) return;
-      final data = snapshot.data();
-      if (data == null) return;
+    _requestSub = BackendBridgeService.streamScreenshotRequest(requestId).listen((data) async {
+      if (_isDisposed || data == null) return;
       await handleOfferPayload(data['offer']);
     });
 
-    if (BackendBridgeService.isSupabaseReady) {
-      try {
-        BackendBridgeService.supabase!
-            .from('screenshot_requests')
-            .stream(primaryKey: ['id'])
-            .eq('id', requestId)
-            .listen((rows) async {
-          if (_isDisposed || rows.isEmpty) return;
-          final row = rows.first;
-          final offer = row['offer'];
-          await handleOfferPayload(offer);
-        }, onError: (_) {});
-      } catch (_) {}
-    }
-
-    _iceSub = requestDoc.collection('iceCandidates').snapshots().listen((snapshot) async {
+    _iceSub = BackendBridgeService.streamIceCandidates(requestId).listen((candidateList) async {
       if (_isDisposed) return;
-      for (final candidateDoc in snapshot.docs) {
-        final data = candidateDoc.data();
+      for (final data in candidateList) {
         if (data['from'] == 'admin') continue;
         final candidate = RTCIceCandidate(
           data['candidate'] as String? ?? '',
@@ -159,8 +136,8 @@ class LiveShareSession {
 class LiveSharePublisherSession {
   final String requestId;
   final RTCPeerConnection peerConnection;
-  late final StreamSubscription<DocumentSnapshot<Map<String, dynamic>>> _requestSub;
-  late final StreamSubscription<QuerySnapshot<Map<String, dynamic>>> _iceSub;
+  late final StreamSubscription<Map<String, dynamic>?> _requestSub;
+  late final StreamSubscription<List<Map<String, dynamic>>> _iceSub;
   MediaStream? _localStream;
   bool _isDisposed = false;
 
@@ -190,9 +167,6 @@ class LiveSharePublisherSession {
       });
     };
 
-    final requestDoc = FirebaseFirestore.instance
-        .collection('screenshot_requests')
-        .doc(requestId);
     final offer = await peerConnection.createOffer({});
     await peerConnection.setLocalDescription(offer);
     await BackendBridgeService.updateScreenshotRequest(requestId, {
@@ -218,32 +192,14 @@ class LiveSharePublisherSession {
       }
     }
 
-    _requestSub = requestDoc.snapshots().listen((snapshot) async {
-      if (_isDisposed) return;
-      final data = snapshot.data();
-      if (data == null) return;
+    _requestSub = BackendBridgeService.streamScreenshotRequest(requestId).listen((data) async {
+      if (_isDisposed || data == null) return;
       await handleAnswerPayload(data['answer']);
     });
 
-    if (BackendBridgeService.isSupabaseReady) {
-      try {
-        BackendBridgeService.supabase!
-            .from('screenshot_requests')
-            .stream(primaryKey: ['id'])
-            .eq('id', requestId)
-            .listen((rows) async {
-          if (_isDisposed || rows.isEmpty) return;
-          final row = rows.first;
-          final answer = row['answer'];
-          await handleAnswerPayload(answer);
-        }, onError: (_) {});
-      } catch (_) {}
-    }
-
-    _iceSub = requestDoc.collection('iceCandidates').snapshots().listen((snapshot) async {
+    _iceSub = BackendBridgeService.streamIceCandidates(requestId).listen((candidateList) async {
       if (_isDisposed) return;
-      for (final candidateDoc in snapshot.docs) {
-        final data = candidateDoc.data();
+      for (final data in candidateList) {
         if (data['from'] == 'publisher') continue;
         final candidate = RTCIceCandidate(
           data['candidate'] as String? ?? '',

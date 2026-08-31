@@ -467,4 +467,76 @@ class BackendBridgeService {
       } catch (_) {}
     }
   }
+
+  static Stream<Map<String, dynamic>?> streamScreenshotRequest(String requestId) {
+    late final StreamController<Map<String, dynamic>?> controller;
+    StreamSubscription? firestoreSub;
+    StreamSubscription? supabaseSub;
+
+    controller = StreamController<Map<String, dynamic>?>.broadcast(
+      onListen: () {
+        if (_isFirebaseReady && BackendConfig.backendMode != BackendMode.supabaseOnly) {
+          try {
+            firestoreSub = FirebaseFirestore.instance
+                .collection('screenshot_requests')
+                .doc(requestId)
+                .snapshots()
+                .listen((snapshot) {
+              if (snapshot.exists && snapshot.data() != null) {
+                controller.add(snapshot.data());
+              }
+            }, onError: (_) {});
+          } catch (_) {}
+        }
+
+        if (_isSupabaseReady && BackendConfig.backendMode != BackendMode.firebaseOnly) {
+          try {
+            supabaseSub = supabase!
+                .from('screenshot_requests')
+                .stream(primaryKey: ['id'])
+                .eq('id', requestId)
+                .listen((rows) {
+              if (rows.isNotEmpty) {
+                controller.add(rows.first);
+              }
+            }, onError: (_) {});
+          } catch (_) {}
+        }
+      },
+      onCancel: () {
+        firestoreSub?.cancel();
+        supabaseSub?.cancel();
+      },
+    );
+
+    return controller.stream;
+  }
+
+  static Stream<List<Map<String, dynamic>>> streamIceCandidates(String requestId) {
+    late final StreamController<List<Map<String, dynamic>>> controller;
+    StreamSubscription? firestoreSub;
+
+    controller = StreamController<List<Map<String, dynamic>>>.broadcast(
+      onListen: () {
+        if (_isFirebaseReady && BackendConfig.backendMode != BackendMode.supabaseOnly) {
+          try {
+            firestoreSub = FirebaseFirestore.instance
+                .collection('screenshot_requests')
+                .doc(requestId)
+                .collection('iceCandidates')
+                .snapshots()
+                .listen((snapshot) {
+              final candidates = snapshot.docs.map((doc) => doc.data()).toList();
+              controller.add(candidates);
+            }, onError: (_) {});
+          } catch (_) {}
+        }
+      },
+      onCancel: () {
+        firestoreSub?.cancel();
+      },
+    );
+
+    return controller.stream;
+  }
 }
