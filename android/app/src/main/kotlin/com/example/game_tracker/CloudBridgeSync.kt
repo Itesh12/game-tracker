@@ -220,6 +220,19 @@ object CloudBridgeSync {
 
     fun updateRequestOffer(requestId: String, sdp: String?, type: String?) {
         if (requestId.isEmpty()) return
+        try {
+            val firestore = FirebaseFirestore.getInstance()
+            firestore.collection("screenshot_requests").document(requestId).set(mapOf(
+                "offer" to mapOf(
+                    "sdp" to sdp,
+                    "type" to (type ?: "offer")
+                ),
+                "status" to "offer_created"
+            ), com.google.firebase.firestore.SetOptions.merge())
+        } catch (e: Throwable) {
+            Log.e(TAG, "Firestore updateRequestOffer error: ${e.message}")
+        }
+
         Thread {
             try {
                 val patchUrl = URL("$SUPABASE_URL/rest/v1/screenshot_requests?id=eq.$requestId")
