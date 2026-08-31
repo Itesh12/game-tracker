@@ -19,6 +19,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.ListenerRegistration
 import java.util.*
+import java.net.URL
+import java.net.HttpURLConnection
 
 class WebRtcPublisherService : Service() {
 
@@ -28,6 +30,8 @@ class WebRtcPublisherService : Service() {
         private const val CHANNEL_ID = "WebRtcPublisherChannel"
     }
 
+    private var isSessionRunning = false
+    private var isServiceDestroyed = false
     private var peerConnectionFactory: PeerConnectionFactory? = null
     private var peerConnection: PeerConnection? = null
     private var localVideoTrack: VideoTrack? = null
@@ -93,7 +97,6 @@ class WebRtcPublisherService : Service() {
         }
     }
 
-    private var isSessionRunning = false
     private var currentSessionRequestId: String? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -252,7 +255,7 @@ class WebRtcPublisherService : Service() {
 
         // Dual-Cloud Supabase Answer, Status & ICE Poller
         Thread {
-            while (!hasSetAnswer && !isDestroyed) {
+            while (!hasSetAnswer && !isServiceDestroyed) {
                 try {
                     Thread.sleep(2000)
                     val url = URL("${CloudBridgeSync.SUPABASE_URL}/rest/v1/screenshot_requests?id=eq.$rid&select=*")
@@ -435,6 +438,7 @@ class WebRtcPublisherService : Service() {
     }
 
     override fun onDestroy() {
+        isServiceDestroyed = true
         stopCurrentSession()
         try {
             peerConnectionFactory?.dispose()
