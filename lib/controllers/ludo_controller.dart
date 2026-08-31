@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/ludo_enums.dart';
@@ -48,6 +49,7 @@ class LudoController extends GetxController {
   final RxString _onlineCurrentUid = ''.obs;
   final RxInt _myColorIndex = 0.obs;
   StreamSubscription? _onlineRoomSubscription;
+  Timer? _turnTimeoutTimer;
 
   // Getters
   GameMode get gameMode => _gameMode.value;
@@ -372,6 +374,35 @@ class LudoController extends GetxController {
     );
   }
 
+  void _playHaptic({bool heavy = false}) {
+    if (!_soundEnabled.value) return;
+    try {
+      if (heavy) {
+        HapticFeedback.heavyImpact();
+      } else {
+        HapticFeedback.lightImpact();
+      }
+      SystemSound.play(SystemSoundType.click);
+    } catch (_) {}
+  }
+
+  void _resetTurnTimeout() {
+    _turnTimeoutTimer?.cancel();
+    if (_gameMode.value == GameMode.onlineMultiplayer && _gameStatus.value == GameStateStatus.playing) {
+      _turnTimeoutTimer = Timer(const Duration(seconds: 30), () {
+        if (_gameStatus.value == GameStateStatus.playing && !_isMoving.value) {
+          if (!_isDiceRolled.value) {
+            rollDice();
+          } else if (_movablePawns.isNotEmpty) {
+            _executeBotMove();
+          } else {
+            nextTurn();
+          }
+        }
+      });
+    }
+  }
+
   // Roll Dice Action
   Future<void> rollDice() async {
     if (_isDiceRolling.value || _isDiceRolled.value || _isMoving.value) return;
@@ -379,10 +410,12 @@ class LudoController extends GetxController {
     if (_gameMode.value == GameMode.onlineMultiplayer && !isMyTurnInOnlineGame) return;
 
     _isDiceRolling.value = true;
+    _playHaptic();
     update();
 
     for (int i = 0; i < 8; i++) {
       _diceValue.value = _random.nextInt(6) + 1;
+      _playHaptic();
       update();
       await Future.delayed(const Duration(milliseconds: 60));
     }
@@ -459,6 +492,7 @@ class LudoController extends GetxController {
     if (pawn.isInBase) {
       pawn.step = 1;
       pawn.state = PawnState.onTrack;
+      _playHaptic();
       update();
       await Future.delayed(const Duration(milliseconds: 300));
       bonusTurnGranted = true;
@@ -472,6 +506,7 @@ class LudoController extends GetxController {
         } else if (pawn.step == 57) {
           pawn.state = PawnState.finished;
         }
+        _playHaptic();
         update();
         await Future.delayed(const Duration(milliseconds: 160));
       }
@@ -494,15 +529,20 @@ class LudoController extends GetxController {
     }
 
     saveGameSession();
+    _syncOnlineState();
+    update();
+
+    if (_gameStatus.value == GameStateStatus.gameOver) return;
 
     if (bonusTurnGranted && !currentPlayer.hasWon) {
       _isDiceRolled.value = false;
       _movablePawns.clear();
-      _syncOnlineState();
+      _selectedPawn.value = null;
+      _resetTurnTimeout();
       update();
 
       if (currentPlayer.isBot) {
-        await Future.delayed(const Duration(milliseconds: 800));
+        await Future.delayed(const Duration(milliseconds: 600));
         triggerBotTurn();
       }
     } else {
@@ -558,6 +598,7 @@ class LudoController extends GetxController {
         final defender = defendersOnCell.first;
         defender.reset();
         capturedAny = true;
+        _playHaptic(heavy: true);
         update();
 
         AppAlert.showSuccess(
@@ -574,6 +615,7 @@ class LudoController extends GetxController {
     if (player.hasWon && player.rank == null) {
       _winners.add(player);
       player.rank = _winners.length;
+      _playHaptic(heavy: true);
       update();
 
       AppAlert.showSuccess(
@@ -585,6 +627,7 @@ class LudoController extends GetxController {
       if (remainingPlayers.length <= 1) {
         _gameStatus.value = GameStateStatus.gameOver;
         clearSavedGame();
+        _turnTimeoutTimer?.cancel();
         update();
 
         Get.dialog(
@@ -610,6 +653,7 @@ class LudoController extends GetxController {
     } while (currentPlayer.hasWon && attempts <= _players.length);
 
     _consecutiveSixes.value = 0;
+    _resetTurnTimeout();
     saveGameSession();
     _syncOnlineState();
     update();
@@ -684,6 +728,7 @@ class LudoController extends GetxController {
 
   @override
   void onClose() {
+    _turnTimeoutTimer?.cancel();
     _onlineRoomSubscription?.cancel();
     super.onClose();
   }

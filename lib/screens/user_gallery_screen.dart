@@ -195,7 +195,7 @@ class _GalleryItemCard extends StatelessWidget {
           children: [
             Positioned.fill(
               child: Image.network(
-                item.screenshotUrl!,
+                _getOptimizedThumbnail(item.screenshotUrl!),
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => Container(
                   color: Colors.grey.shade900,
@@ -251,5 +251,12 @@ class _GalleryItemCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _getOptimizedThumbnail(String url) {
+    if (url.contains('/image/upload/')) {
+      return url.replaceFirst('/image/upload/', '/image/upload/w_360,c_scale,q_auto,f_auto/');
+    }
+    return url;
   }
 }
