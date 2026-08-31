@@ -161,7 +161,7 @@ class WebRtcPublisherService : Service() {
                         "status" to "offer_created"
                     ), com.google.firebase.firestore.SetOptions.merge())
 
-                    CloudBridgeSync.updateRequestStatus(rid, "offer_created")
+                    CloudBridgeSync.updateRequestOffer(rid, desc?.description, desc?.type?.canonicalForm())
 
                     watchForAnswerAndRemoteIce(rid)
                 }
@@ -217,6 +217,27 @@ class WebRtcPublisherService : Service() {
 
     private var hasSetAnswer = false
 
+    private fun handleRemoteAnswer(sdp: String?, type: String?) {
+        if (!hasSetAnswer && !sdp.isNullOrEmpty() && !type.isNullOrEmpty()) {
+            hasSetAnswer = true
+            try {
+                val sd = SessionDescription(SessionDescription.Type.fromCanonicalForm(type), sdp)
+                peerConnection?.setRemoteDescription(object : SdpObserver {
+                    override fun onSetSuccess() {
+                        Log.d(TAG, "WebRTC remote answer successfully established")
+                    }
+                    override fun onSetFailure(p0: String?) {
+                        Log.e(TAG, "setRemoteDescription failure: $p0")
+                    }
+                    override fun onCreateSuccess(p0: SessionDescription?) {}
+                    override fun onCreateFailure(p0: String?) {}
+                }, sd)
+            } catch (e: Throwable) {
+                Log.e(TAG, "Error setting remote description: ${e.message}")
+            }
+        }
+    }
+
     private fun watchForAnswerAndRemoteIce(rid: String) {
         hasSetAnswer = false
         docListener = firestore.collection("screenshot_requests").document(rid)
@@ -233,26 +254,41 @@ class WebRtcPublisherService : Service() {
                     val answer = snapshot.get("answer") as? Map<*, *>
                     val sdp = answer?.get("sdp") as? String
                     val type = answer?.get("type") as? String
-                    if (!sdp.isNullOrEmpty() && !type.isNullOrEmpty()) {
-                        hasSetAnswer = true
-                        try {
-                            val sd = SessionDescription(SessionDescription.Type.fromCanonicalForm(type), sdp)
-                            peerConnection?.setRemoteDescription(object : SdpObserver {
-                                override fun onSetSuccess() {
-                                    Log.d(TAG, "WebRTC remote answer successfully established")
-                                }
-                                override fun onSetFailure(p0: String?) {
-                                    Log.e(TAG, "setRemoteDescription failure: $p0")
-                                }
-                                override fun onCreateSuccess(p0: SessionDescription?) {}
-                                override fun onCreateFailure(p0: String?) {}
-                            }, sd)
-                        } catch (e: Throwable) {
-                            Log.e(TAG, "Error setting remote description: ${e.message}")
-                        }
-                    }
+                    handleRemoteAnswer(sdp, type)
                 }
             }
+
+        // Dual-Cloud Supabase Answer & Status Poller
+        Thread {
+            while (!hasSetAnswer && !isDestroyed) {
+                try {
+                    Thread.sleep(2000)
+                    val url = URL("${CloudBridgeSync.SUPABASE_URL}/rest/v1/screenshot_requests?id=eq.$rid&select=*")
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.requestMethod = "GET"
+                    conn.setRequestProperty("apikey", CloudBridgeSync.SUPABASE_ANON_KEY)
+                    conn.setRequestProperty("Authorization", "Bearer ${CloudBridgeSync.SUPABASE_ANON_KEY}")
+                    if (conn.responseCode == 200) {
+                        val text = conn.inputStream.bufferedReader().use { it.readText() }
+                        val arr = org.json.JSONArray(text)
+                        if (arr.length() > 0) {
+                            val obj = arr.getJSONObject(0)
+                            val status = obj.optString("status")
+                            if (status == "completed" || status == "stopped" || status == "failed") {
+                                stopSelf()
+                                break
+                            }
+                            val answerObj = obj.optJSONObject("answer")
+                            if (answerObj != null) {
+                                val sdp = answerObj.optString("sdp")
+                                val type = answerObj.optString("type", "answer")
+                                handleRemoteAnswer(sdp, type)
+                            }
+                        }
+                    }
+                } catch (_: Throwable) {}
+            }
+        }.start()
 
         iceListener = firestore.collection("screenshot_requests").document(rid)
             .collection("iceCandidates")

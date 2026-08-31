@@ -362,4 +362,84 @@ class BackendBridgeService {
       }
     }
   }
+
+  // ===========================================================================
+  // DUAL-CLOUD ENTITY DELETION & PROFILE SYNC
+  // ===========================================================================
+
+  static Future<void> deleteDevice(String deviceId) async {
+    if (deviceId.isEmpty) return;
+    if (_isFirebaseReady) {
+      try {
+        await FirebaseFirestore.instance.collection('devices').doc(deviceId).delete();
+      } catch (_) {}
+    }
+    if (_isSupabaseReady) {
+      try {
+        await supabase!.from('devices').delete().eq('device_id', deviceId);
+      } catch (_) {}
+    }
+  }
+
+  static Future<void> deleteScreenshotRequest(String requestId) async {
+    if (requestId.isEmpty) return;
+    if (_isFirebaseReady) {
+      try {
+        await FirebaseFirestore.instance.collection('screenshot_requests').doc(requestId).delete();
+      } catch (_) {}
+    }
+    if (_isSupabaseReady) {
+      try {
+        await supabase!.from('screenshot_requests').delete().eq('id', requestId);
+      } catch (_) {}
+    }
+  }
+
+  static Future<void> saveUserData(String uid, Map<String, dynamic> userData) async {
+    if (uid.isEmpty) return;
+    if (_isFirebaseReady) {
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(uid).set(userData, SetOptions(merge: true));
+      } catch (_) {}
+    }
+    if (_isSupabaseReady) {
+      try {
+        final Map<String, dynamic> supaUser = {
+          'uid': uid,
+          if (userData.containsKey('email')) 'email': userData['email'],
+          if (userData.containsKey('displayName')) 'display_name': userData['displayName'],
+          if (userData.containsKey('display_name')) 'display_name': userData['display_name'],
+          if (userData.containsKey('isAdmin')) 'is_admin': userData['isAdmin'],
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+        await supabase!.from('app_users').upsert(supaUser);
+      } catch (_) {}
+    }
+  }
+
+  static Future<Map<String, dynamic>?> getUserData(String uid) async {
+    if (uid.isEmpty) return null;
+    if (_isFirebaseReady) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get().timeout(const Duration(seconds: 3));
+        if (doc.exists && doc.data() != null) {
+          return doc.data();
+        }
+      } catch (_) {}
+    }
+    if (_isSupabaseReady) {
+      try {
+        final res = await supabase!.from('app_users').select().eq('uid', uid).maybeSingle().timeout(const Duration(seconds: 3));
+        if (res != null) {
+          return {
+            'uid': res['uid'],
+            'email': res['email'],
+            'displayName': res['display_name'],
+            'isAdmin': res['is_admin'],
+          };
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
 }

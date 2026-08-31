@@ -221,10 +221,7 @@ class AdminController extends GetxController {
           currentUser.email?.toLowerCase() == 'admin@yopmail.com') {
         try {
           final adminDevId = 'user_${currentUser.uid}';
-          await FirebaseFirestore.instance
-              .collection('devices')
-              .doc(adminDevId)
-              .delete();
+          await BackendBridgeService.deleteDevice(adminDevId);
         } catch (_) {}
       } else {
         await AdminService.registerDevice();

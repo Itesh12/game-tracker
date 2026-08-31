@@ -370,61 +370,25 @@ class AuthService {
   }
 
   static Future<void> _ensureUserDocument(AuthUser user) async {
-    try {
-      await firestore.collection(usersCollection).doc(user.uid).set(
-        {
-          'uid': user.uid,
-          'email': user.email,
-          'displayName': user.displayName,
-          'photoUrl': user.photoUrl,
-          'isAdmin': user.isAdmin,
-          'lastActiveAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
-    } catch (_) {}
-
-    // Dual-mirror to Supabase
-    if (BackendBridgeService.isSupabaseReady) {
-      try {
-        await BackendBridgeService.supabase!.from('app_users').upsert({
-          'uid': user.uid,
-          'email': user.email,
-          'display_name': user.displayName,
-          'is_admin': user.isAdmin,
-          'updated_at': DateTime.now().toIso8601String(),
-        }).timeout(const Duration(seconds: 3));
-      } catch (_) {}
-    }
+    await BackendBridgeService.saveUserData(user.uid, {
+      'uid': user.uid,
+      'email': user.email,
+      'displayName': user.displayName,
+      'photoUrl': user.photoUrl,
+      'isAdmin': user.isAdmin,
+      'lastActiveAt': FieldValue.serverTimestamp(),
+    });
   }
 
   static Future<void> syncUser(AuthUser user) async {
-    try {
-      await firestore.collection(usersCollection).doc(user.uid).set(
-        {
-          'uid': user.uid,
-          'email': user.email,
-          'displayName': user.displayName,
-          'photoUrl': user.photoUrl,
-          'isAdmin': user.isAdmin,
-          'lastActiveAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      ).timeout(const Duration(seconds: 3));
-    } catch (_) {}
-
-    // Dual-mirror to Supabase
-    if (BackendBridgeService.isSupabaseReady) {
-      try {
-        await BackendBridgeService.supabase!.from('app_users').upsert({
-          'uid': user.uid,
-          'email': user.email,
-          'display_name': user.displayName,
-          'is_admin': user.isAdmin,
-          'updated_at': DateTime.now().toIso8601String(),
-        }).timeout(const Duration(seconds: 3));
-      } catch (_) {}
-    }
+    await BackendBridgeService.saveUserData(user.uid, {
+      'uid': user.uid,
+      'email': user.email,
+      'displayName': user.displayName,
+      'photoUrl': user.photoUrl,
+      'isAdmin': user.isAdmin,
+      'lastActiveAt': FieldValue.serverTimestamp(),
+    });
   }
 
   static Future<bool> _cachedEmailMatches(String email) async {

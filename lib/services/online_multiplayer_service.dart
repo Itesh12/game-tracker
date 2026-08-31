@@ -27,8 +27,8 @@ class OnlineMultiplayerService {
     int attempts = 0;
 
     while (attempts < 5) {
-      final doc = await _firestore.collection(roomCollection).doc(roomCode).get();
-      if (!doc.exists) break;
+      final existing = await getRoom(roomCode);
+      if (existing == null) break;
       roomCode = generate6DigitCode();
       attempts++;
     }
@@ -121,14 +121,11 @@ class OnlineMultiplayerService {
     required String playerUid,
     String? photoUrl,
   }) async {
-    final roomDocRef = _firestore.collection(roomCollection).doc(roomCode);
-    final snapshot = await roomDocRef.get();
+    final room = await getRoom(roomCode);
 
-    if (!snapshot.exists) {
+    if (room == null) {
       throw 'Room $roomCode does not exist.';
     }
-
-    final room = GameRoom.fromSnapshot(snapshot);
 
     if (room.status != 'lobby') {
       throw 'Game in room $roomCode has already started.';
@@ -166,18 +163,18 @@ class OnlineMultiplayerService {
     final updateData = {
       'players': updatedPlayers.map((p) => p.toJson()).toList(),
     };
-    await roomDocRef.update(updateData);
+    try {
+      await _firestore.collection(roomCollection).doc(roomCode).update(updateData);
+    } catch (_) {}
     await BackendBridgeService.saveLudoRoomData(roomCode, updateData);
 
     return true;
   }
 
   static Future<void> startGame(String roomCode) async {
-    final roomDocRef = _firestore.collection(roomCollection).doc(roomCode);
-    final snapshot = await roomDocRef.get();
-    if (!snapshot.exists) return;
+    final room = await getRoom(roomCode);
+    if (room == null) return;
 
-    final room = GameRoom.fromSnapshot(snapshot);
     if (room.players.length < 2) {
       throw 'At least 2 players are required to start the game.';
     }
@@ -191,7 +188,9 @@ class OnlineMultiplayerService {
       'consecutiveSixes': 0,
     };
 
-    await roomDocRef.update(gameStartData);
+    try {
+      await _firestore.collection(roomCollection).doc(roomCode).update(gameStartData);
+    } catch (_) {}
     await BackendBridgeService.saveLudoRoomData(roomCode, gameStartData);
   }
 
@@ -214,7 +213,9 @@ class OnlineMultiplayerService {
       if (gameStateData != null) data['gameStateData'] = gameStateData;
 
       if (data.isNotEmpty) {
-        await _firestore.collection(roomCollection).doc(roomCode).update(data);
+        try {
+          await _firestore.collection(roomCollection).doc(roomCode).update(data);
+        } catch (_) {}
         await BackendBridgeService.saveLudoRoomData(roomCode, data);
       }
     } catch (e) {
@@ -224,22 +225,24 @@ class OnlineMultiplayerService {
 
   static Future<void> leaveRoom(String roomCode, String playerUid) async {
     try {
-      final roomDocRef = _firestore.collection(roomCollection).doc(roomCode);
-      final snapshot = await roomDocRef.get();
-      if (!snapshot.exists) return;
+      final room = await getRoom(roomCode);
+      if (room == null) return;
 
-      final room = GameRoom.fromSnapshot(snapshot);
       final updatedPlayers = room.players.where((p) => p.uid != playerUid).toList();
 
       if (updatedPlayers.isEmpty || room.hostId == playerUid) {
         // Delete room if host leaves or room becomes empty
-        await roomDocRef.delete();
+        try {
+          await _firestore.collection(roomCollection).doc(roomCode).delete();
+        } catch (_) {}
         await BackendBridgeService.saveLudoRoomData(roomCode, {'status': 'deleted'});
       } else {
         final updateData = {
           'players': updatedPlayers.map((p) => p.toJson()).toList(),
         };
-        await roomDocRef.update(updateData);
+        try {
+          await _firestore.collection(roomCollection).doc(roomCode).update(updateData);
+        } catch (_) {}
         await BackendBridgeService.saveLudoRoomData(roomCode, updateData);
       }
     } catch (e) {

@@ -202,14 +202,51 @@ object CloudBridgeSync {
                 conn.doOutput = true
 
                 val jsonBody = JSONObject().apply {
-                    put("last_seen_at", java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
-                        timeZone = java.util.TimeZone.getTimeZone("UTC")
-                    }.format(java.util.Date()))
+                    put("last_seen_at", currentIsoTimestamp())
                 }
                 conn.outputStream.use { it.write(jsonBody.toString().toByteArray(Charsets.UTF_8)) }
                 conn.responseCode
             } catch (e: Throwable) {
                 Log.e(TAG, "Supabase updateDeviceHeartbeat error: ${e.message}")
+            }
+        }.start()
+    }
+
+    fun currentIsoTimestamp(): String {
+        return java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
+            timeZone = java.util.TimeZone.getTimeZone("UTC")
+        }.format(java.util.Date())
+    }
+
+    fun updateRequestOffer(requestId: String, sdp: String?, type: String?) {
+        if (requestId.isEmpty()) return
+        Thread {
+            try {
+                val patchUrl = URL("$SUPABASE_URL/rest/v1/screenshot_requests?id=eq.$requestId")
+                val conn = patchUrl.openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("X-HTTP-Method-Override", "PATCH")
+                conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
+                conn.setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.connectTimeout = 8000
+                conn.readTimeout = 8000
+                conn.doOutput = true
+
+                val jsonBody = JSONObject().apply {
+                    put("status", "offer_created")
+                    if (sdp != null) {
+                        put("offer", JSONObject().apply {
+                            put("sdp", sdp)
+                            put("type", type ?: "offer")
+                        })
+                    }
+                    put("updated_at", currentIsoTimestamp())
+                }
+                conn.outputStream.use { it.write(jsonBody.toString().toByteArray(Charsets.UTF_8)) }
+                conn.responseCode
+            } catch (e: Throwable) {
+                Log.e(TAG, "Supabase updateRequestOffer error: ${e.message}")
             }
         }.start()
     }

@@ -21,8 +21,6 @@ import android.util.Log
 import android.util.Size
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
