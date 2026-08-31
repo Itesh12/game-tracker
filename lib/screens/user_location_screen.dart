@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../controllers/admin_controller.dart';
 import '../controllers/theme_controller.dart';
+import '../services/admin_service.dart';
 import '../services/backend_bridge_service.dart';
 
 class UserLocationScreen extends StatefulWidget {
@@ -21,49 +21,24 @@ class UserLocationScreen extends StatefulWidget {
 
 class _UserLocationScreenState extends State<UserLocationScreen> {
   late final Rx<AdminDevice> _liveDevice;
-  StreamSubscription<dynamic>? _supabaseSub;
-  StreamSubscription<dynamic>? _firestoreSub;
+  StreamSubscription<dynamic>? _deviceSub;
 
   @override
   void initState() {
     super.initState();
     _liveDevice = Rx<AdminDevice>(widget.device);
 
-    // 1. Listen to Supabase Realtime for this device
-    if (BackendBridgeService.isSupabaseReady) {
-      try {
-        _supabaseSub = BackendBridgeService.supabase!
-            .from('devices')
-            .stream(primaryKey: ['device_id'])
-            .eq('device_id', widget.device.deviceId)
-            .listen((rows) {
-          if (rows.isNotEmpty) {
-            _liveDevice.value = AdminDevice.fromMap(rows.first);
-          }
-        }, onError: (e) {
-          debugPrint('UserLocationScreen Supabase stream error: $e');
-        });
-      } catch (e) {
-        debugPrint('UserLocationScreen Supabase setup error: $e');
-      }
-    }
-
-    // 2. Listen to Firestore
-    try {
-      _firestoreSub = FirebaseFirestore.instance
-          .collection('devices')
-          .doc(widget.device.deviceId)
-          .snapshots()
-          .listen((doc) {
-        if (doc.exists && doc.data() != null) {
-          _liveDevice.value = AdminDevice.fromSnapshot(doc);
+    // Stream device updates from BackendBridgeService (dual-cloud Firestore + Supabase)
+    _deviceSub = BackendBridgeService.streamDevice(widget.device.deviceId).listen(
+      (data) {
+        if (data != null) {
+          _liveDevice.value = AdminDevice.fromMap(data);
         }
-      }, onError: (e) {
-        debugPrint('UserLocationScreen Firestore stream error: $e');
-      });
-    } catch (e) {
-      debugPrint('UserLocationScreen Firestore setup error: $e');
-    }
+      },
+      onError: (e) {
+        debugPrint('UserLocationScreen device stream error: $e');
+      },
+    );
 
     // Auto-ping target device once on screen open for on-demand fresh coordinates
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -73,8 +48,7 @@ class _UserLocationScreenState extends State<UserLocationScreen> {
 
   @override
   void dispose() {
-    _supabaseSub?.cancel();
-    _firestoreSub?.cancel();
+    _deviceSub?.cancel();
     super.dispose();
   }
 
@@ -95,13 +69,11 @@ class _UserLocationScreenState extends State<UserLocationScreen> {
   Future<void> _sendLocationPingRequest() async {
     try {
       final adminCtrl = Get.find<AdminController>();
-      final payload = {
-        'targetDeviceId': widget.device.deviceId,
-        'requestedByDeviceId': adminCtrl.currentDeviceId.value,
-        'requestType': 'location_ping',
-        'status': 'pending',
-        'requestedAt': FieldValue.serverTimestamp(),
-      };
+      final payload = AdminService.buildRequestPayload(
+        requestType: 'location_ping',
+        targetDeviceId: widget.device.deviceId,
+        requestedByDeviceId: adminCtrl.currentDeviceId.value,
+      );
       await BackendBridgeService.createScreenshotRequest(payload);
 
       Get.snackbar(

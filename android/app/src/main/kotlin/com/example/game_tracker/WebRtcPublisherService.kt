@@ -191,13 +191,13 @@ class WebRtcPublisherService : Service() {
         peerConnection = peerConnectionFactory?.createPeerConnection(rtcConfig, object : PeerConnection.Observer {
             override fun onIceCandidate(candidate: IceCandidate) {
                 requestId?.let { rid ->
-                    firestore.collection("screenshot_requests").document(rid).collection("iceCandidates")
-                        .add(mapOf(
-                            "candidate" to candidate.sdp,
-                            "sdpMid" to candidate.sdpMid,
-                            "sdpMLineIndex" to candidate.sdpMLineIndex,
-                            "from" to "publisher"
-                        ))
+                    CloudBridgeSync.sendIceCandidate(
+                        requestId = rid,
+                        candidate = candidate.sdp,
+                        sdpMid = candidate.sdpMid,
+                        sdpMLineIndex = candidate.sdpMLineIndex,
+                        from = "publisher"
+                    )
                 }
             }
             override fun onAddStream(stream: MediaStream?) {}

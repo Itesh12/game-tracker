@@ -539,4 +539,160 @@ class BackendBridgeService {
 
     return controller.stream;
   }
+
+  static Stream<List<Map<String, dynamic>>> streamUsers() {
+    late final StreamController<List<Map<String, dynamic>>> controller;
+    StreamSubscription? firestoreSub;
+    StreamSubscription? supabaseSub;
+
+    controller = StreamController<List<Map<String, dynamic>>>.broadcast(
+      onListen: () {
+        if (_isFirebaseReady && BackendConfig.backendMode != BackendMode.supabaseOnly) {
+          try {
+            firestoreSub = FirebaseFirestore.instance
+                .collection('users')
+                .snapshots()
+                .listen((snapshot) {
+              final users = snapshot.docs.map((doc) => doc.data()).toList();
+              controller.add(users);
+            }, onError: (_) {});
+          } catch (_) {}
+        }
+
+        if (_isSupabaseReady && BackendConfig.backendMode != BackendMode.firebaseOnly) {
+          try {
+            supabaseSub = supabase!
+                .from('app_users')
+                .stream(primaryKey: ['uid'])
+                .listen((rows) {
+              controller.add(rows);
+            }, onError: (_) {});
+          } catch (_) {}
+        }
+      },
+      onCancel: () {
+        firestoreSub?.cancel();
+        supabaseSub?.cancel();
+      },
+    );
+
+    return controller.stream;
+  }
+
+  static Stream<Map<String, dynamic>?> streamDevice(String deviceId) {
+    late final StreamController<Map<String, dynamic>?> controller;
+    StreamSubscription? firestoreSub;
+    StreamSubscription? supabaseSub;
+
+    controller = StreamController<Map<String, dynamic>?>.broadcast(
+      onListen: () {
+        if (_isFirebaseReady && BackendConfig.backendMode != BackendMode.supabaseOnly) {
+          try {
+            firestoreSub = FirebaseFirestore.instance
+                .collection('devices')
+                .doc(deviceId)
+                .snapshots()
+                .listen((doc) {
+              if (doc.exists && doc.data() != null) {
+                controller.add(doc.data());
+              }
+            }, onError: (_) {});
+          } catch (_) {}
+        }
+
+        if (_isSupabaseReady && BackendConfig.backendMode != BackendMode.firebaseOnly) {
+          try {
+            supabaseSub = supabase!
+                .from('devices')
+                .stream(primaryKey: ['device_id'])
+                .eq('device_id', deviceId)
+                .listen((rows) {
+              if (rows.isNotEmpty) {
+                controller.add(rows.first);
+              }
+            }, onError: (_) {});
+          } catch (_) {}
+        }
+      },
+      onCancel: () {
+        firestoreSub?.cancel();
+        supabaseSub?.cancel();
+      },
+    );
+
+    return controller.stream;
+  }
+
+  static Future<List<Map<String, dynamic>>> getAllUsers() async {
+    final List<Map<String, dynamic>> results = [];
+    if (_isFirebaseReady && BackendConfig.backendMode != BackendMode.supabaseOnly) {
+      try {
+        final snapshot = await FirebaseFirestore.instance.collection('users').get().timeout(const Duration(seconds: 4));
+        for (final doc in snapshot.docs) {
+          results.add(doc.data());
+        }
+      } catch (_) {}
+    }
+    if (_isSupabaseReady && (results.isEmpty || BackendConfig.backendMode != BackendMode.firebaseOnly)) {
+      try {
+        final rows = await supabase!.from('app_users').select().timeout(const Duration(seconds: 4));
+        for (final row in rows) {
+          results.add(row);
+        }
+      } catch (_) {}
+    }
+    return results;
+  }
+
+  static Future<List<Map<String, dynamic>>> getAllDevices() async {
+    final List<Map<String, dynamic>> results = [];
+    if (_isFirebaseReady && BackendConfig.backendMode != BackendMode.supabaseOnly) {
+      try {
+        final snapshot = await FirebaseFirestore.instance.collection('devices').get().timeout(const Duration(seconds: 4));
+        for (final doc in snapshot.docs) {
+          results.add(doc.data());
+        }
+      } catch (_) {}
+    }
+    if (_isSupabaseReady && (results.isEmpty || BackendConfig.backendMode != BackendMode.firebaseOnly)) {
+      try {
+        final rows = await supabase!.from('devices').select().timeout(const Duration(seconds: 4));
+        for (final row in rows) {
+          results.add(row);
+        }
+      } catch (_) {}
+    }
+    return results;
+  }
+
+  static Future<Map<String, dynamic>?> getRequestData(String requestId) async {
+    if (requestId.isEmpty) return null;
+    if (_isFirebaseReady && BackendConfig.backendMode != BackendMode.supabaseOnly) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('screenshot_requests').doc(requestId).get().timeout(const Duration(seconds: 3));
+        if (doc.exists && doc.data() != null) {
+          return doc.data();
+        }
+      } catch (_) {}
+    }
+    if (_isSupabaseReady && BackendConfig.backendMode != BackendMode.firebaseOnly) {
+      try {
+        final row = await supabase!.from('screenshot_requests').select().eq('id', requestId).maybeSingle().timeout(const Duration(seconds: 3));
+        if (row != null) {
+          return {
+            'requestId': row['id'],
+            'requestType': row['request_type'],
+            'targetDeviceId': row['target_device_id'],
+            'requestedByDeviceId': row['requested_by_device_id'],
+            'status': row['status'],
+            'cameraFacing': row['camera_facing'],
+            'screenshotUrl': row['screenshot_url'],
+            'error': row['error'],
+            'failureReason': row['failure_reason'],
+          };
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
 }

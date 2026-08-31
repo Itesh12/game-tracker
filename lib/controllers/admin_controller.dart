@@ -196,7 +196,7 @@ class AdminController extends GetxController {
   final RxBool isReady = false.obs;
 
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _devicesSubscription;
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _usersSubscription;
+  StreamSubscription<dynamic>? _usersSubscription;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
       _requestsSubscription;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
@@ -233,48 +233,22 @@ class AdminController extends GetxController {
 
   void _listenToUsers() {
     _usersSubscription?.cancel();
-    try {
-      _usersSubscription = FirebaseFirestore.instance.collection('users').snapshots().listen(
-        (snapshot) {
-          for (final doc in snapshot.docs) {
-            final data = doc.data();
-            final uid = doc.id;
-            final name = data['displayName'] as String? ?? data['display_name'] as String? ?? data['email']?.split('@').first ?? '';
-            if (name.isNotEmpty) {
-              _resolvedUsernameCache['user_$uid'] = name;
-              _resolvedUsernameCache[uid] = name;
-            }
+    _usersSubscription = BackendBridgeService.streamUsers().listen(
+      (userList) {
+        for (final data in userList) {
+          final uid = data['uid'] as String? ?? data['id'] as String?;
+          final name = data['displayName'] as String? ?? data['display_name'] as String? ?? (data['email'] as String?)?.split('@').first ?? '';
+          if (uid != null && name.isNotEmpty) {
+            _resolvedUsernameCache['user_$uid'] = name;
+            _resolvedUsernameCache[uid] = name;
           }
-          if (devices.isNotEmpty) {
-            _enrichDevicesWithUserProfiles();
-          }
-        },
-        onError: (e) => debugPrint('Error listening to users: $e'),
-      );
-    } catch (e) {
-      debugPrint('Error setting up users stream: $e');
-    }
-
-    if (BackendBridgeService.isSupabaseReady) {
-      try {
-        BackendBridgeService.supabase!
-            .from('app_users')
-            .stream(primaryKey: ['uid'])
-            .listen((rows) {
-          for (final row in rows) {
-            final uid = row['uid'] as String?;
-            final name = row['display_name'] as String? ?? row['email']?.split('@').first ?? '';
-            if (uid != null && name.isNotEmpty) {
-              _resolvedUsernameCache['user_$uid'] = name;
-              _resolvedUsernameCache[uid] = name;
-            }
-          }
-          if (devices.isNotEmpty) {
-            _enrichDevicesWithUserProfiles();
-          }
-        }, onError: (e) => debugPrint('Supabase users stream error: $e'));
-      } catch (_) {}
-    }
+        }
+        if (devices.isNotEmpty) {
+          _enrichDevicesWithUserProfiles();
+        }
+      },
+      onError: (e) => debugPrint('Error listening to users: $e'),
+    );
   }
 
   void _enrichDevicesWithUserProfiles() {
@@ -378,9 +352,9 @@ class AdminController extends GetxController {
   void _asyncResolveUsername(String deviceId) async {
     try {
       final uid = deviceId.replaceFirst('user_', '');
-      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-      if (doc.exists && doc.data() != null) {
-        final name = doc.data()?['displayName'] as String? ?? doc.data()?['email']?.split('@').first;
+      final data = await BackendBridgeService.getUserData(uid);
+      if (data != null) {
+        final name = data['displayName'] as String? ?? data['display_name'] as String? ?? (data['email'] as String?)?.split('@').first;
         if (name != null && name.isNotEmpty) {
           _resolvedUsernameCache[deviceId] = name;
           final idx = devices.indexWhere((d) => d.deviceId == deviceId);
@@ -392,24 +366,6 @@ class AdminController extends GetxController {
         }
       }
     } catch (_) {}
-
-    if (BackendBridgeService.isSupabaseReady) {
-      try {
-        final uid = deviceId.replaceFirst('user_', '');
-        final res = await BackendBridgeService.supabase!.from('app_users').select().eq('uid', uid).maybeSingle();
-        if (res != null) {
-          final name = res['display_name'] as String? ?? res['email']?.split('@').first;
-          if (name != null && name.isNotEmpty) {
-            _resolvedUsernameCache[deviceId] = name;
-            final idx = devices.indexWhere((d) => d.deviceId == deviceId);
-            if (idx != -1) {
-              devices[idx] = devices[idx].copyWith(username: name);
-              devices.refresh();
-            }
-          }
-        }
-      } catch (_) {}
-    }
   }
 
   void _listenToOwnRequests() {
@@ -606,46 +562,22 @@ class AdminController extends GetxController {
 
   Future<void> refreshDeviceList() async {
     try {
-      final usersSnapshot = await FirebaseFirestore.instance.collection('users').get();
-      for (final doc in usersSnapshot.docs) {
-        final data = doc.data();
-        final uid = doc.id;
-        final name = data['displayName'] as String? ?? data['display_name'] as String? ?? data['email']?.split('@').first;
-        if (name != null && name.isNotEmpty) {
+      final usersList = await BackendBridgeService.getAllUsers();
+      for (final data in usersList) {
+        final uid = data['uid'] as String? ?? data['id'] as String?;
+        final name = data['displayName'] as String? ?? data['display_name'] as String? ?? (data['email'] as String?)?.split('@').first;
+        if (uid != null && name != null && name.isNotEmpty) {
           _resolvedUsernameCache['user_$uid'] = name;
           _resolvedUsernameCache[uid] = name;
         }
       }
 
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('devices')
-          .orderBy('lastSeenAt', descending: true)
-          .get();
+      final devicesList = await BackendBridgeService.getAllDevices();
       _handleDeviceListUpdate(
-        querySnapshot.docs.map(AdminDevice.fromSnapshot).toList(),
+        devicesList.map(AdminDevice.fromMap).toList(),
       );
     } catch (e) {
-      debugPrint('Error in refreshDeviceList (Firestore): $e');
-    }
-
-    if (BackendBridgeService.isSupabaseReady) {
-      try {
-        final supaUsers = await BackendBridgeService.supabase!.from('app_users').select();
-        for (final row in supaUsers) {
-          final uid = row['uid'] as String?;
-          final name = row['display_name'] as String? ?? row['email']?.split('@').first;
-          if (uid != null && name != null && name.isNotEmpty) {
-            _resolvedUsernameCache['user_$uid'] = name;
-            _resolvedUsernameCache[uid] = name;
-          }
-        }
-        final supaDevices = await BackendBridgeService.supabase!.from('devices').select().order('last_seen_at', ascending: false);
-        _handleDeviceListUpdate(
-          supaDevices.map(AdminDevice.fromMap).toList(),
-        );
-      } catch (e) {
-        debugPrint('Error in refreshDeviceList (Supabase): $e');
-      }
+      debugPrint('Error in refreshDeviceList: $e');
     }
   }
 

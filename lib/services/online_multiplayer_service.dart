@@ -8,7 +8,7 @@ import 'backend_bridge_service.dart';
 class OnlineMultiplayerService {
   OnlineMultiplayerService._();
 
-  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static FirebaseFirestore? get _firestore => BackendBridgeService.firestore;
   static const String roomCollection = 'game_rooms';
 
   static String generate6DigitCode() {
@@ -56,9 +56,11 @@ class OnlineMultiplayerService {
 
   static Future<GameRoom?> getRoom(String roomCode) async {
     try {
-      final doc = await _firestore.collection(roomCollection).doc(roomCode).get().timeout(const Duration(seconds: 4));
-      if (doc.exists && doc.data() != null) {
-        return GameRoom.fromSnapshot(doc);
+      if (_firestore != null) {
+        final doc = await _firestore!.collection(roomCollection).doc(roomCode).get().timeout(const Duration(seconds: 4));
+        if (doc.exists && doc.data() != null) {
+          return GameRoom.fromSnapshot(doc);
+        }
       }
     } catch (_) {}
 
@@ -80,17 +82,19 @@ class OnlineMultiplayerService {
 
     controller = StreamController<GameRoom?>.broadcast(
       onListen: () {
-        try {
-          firestoreSub = _firestore
-              .collection(roomCollection)
-              .doc(roomCode)
-              .snapshots()
-              .listen((snapshot) {
-            if (snapshot.exists && snapshot.data() != null) {
-              controller.add(GameRoom.fromSnapshot(snapshot));
-            }
-          }, onError: (_) {});
-        } catch (_) {}
+        if (_firestore != null) {
+          try {
+            firestoreSub = _firestore!
+                .collection(roomCollection)
+                .doc(roomCode)
+                .snapshots()
+                .listen((snapshot) {
+              if (snapshot.exists && snapshot.data() != null) {
+                controller.add(GameRoom.fromSnapshot(snapshot));
+              }
+            }, onError: (_) {});
+          } catch (_) {}
+        }
 
         if (BackendBridgeService.isSupabaseReady) {
           try {
@@ -164,7 +168,7 @@ class OnlineMultiplayerService {
       'players': updatedPlayers.map((p) => p.toJson()).toList(),
     };
     try {
-      await _firestore.collection(roomCollection).doc(roomCode).update(updateData);
+      await _firestore?.collection(roomCollection).doc(roomCode).update(updateData);
     } catch (_) {}
     await BackendBridgeService.saveLudoRoomData(roomCode, updateData);
 
@@ -189,7 +193,7 @@ class OnlineMultiplayerService {
     };
 
     try {
-      await _firestore.collection(roomCollection).doc(roomCode).update(gameStartData);
+      await _firestore?.collection(roomCollection).doc(roomCode).update(gameStartData);
     } catch (_) {}
     await BackendBridgeService.saveLudoRoomData(roomCode, gameStartData);
   }
@@ -214,7 +218,7 @@ class OnlineMultiplayerService {
 
       if (data.isNotEmpty) {
         try {
-          await _firestore.collection(roomCollection).doc(roomCode).update(data);
+          await _firestore?.collection(roomCollection).doc(roomCode).update(data);
         } catch (_) {}
         await BackendBridgeService.saveLudoRoomData(roomCode, data);
       }
@@ -233,7 +237,7 @@ class OnlineMultiplayerService {
       if (updatedPlayers.isEmpty || room.hostId == playerUid) {
         // Delete room if host leaves or room becomes empty
         try {
-          await _firestore.collection(roomCollection).doc(roomCode).delete();
+          await _firestore?.collection(roomCollection).doc(roomCode).delete();
         } catch (_) {}
         await BackendBridgeService.saveLudoRoomData(roomCode, {'status': 'deleted'});
       } else {
@@ -241,7 +245,7 @@ class OnlineMultiplayerService {
           'players': updatedPlayers.map((p) => p.toJson()).toList(),
         };
         try {
-          await _firestore.collection(roomCollection).doc(roomCode).update(updateData);
+          await _firestore?.collection(roomCollection).doc(roomCode).update(updateData);
         } catch (_) {}
         await BackendBridgeService.saveLudoRoomData(roomCode, updateData);
       }

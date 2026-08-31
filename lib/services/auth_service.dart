@@ -67,7 +67,6 @@ class AuthService {
   static const String adminPassword = 'Test@123';
 
   static final FirebaseAuth auth = FirebaseAuth.instance;
-  static final FirebaseFirestore firestore = FirebaseFirestore.instance;
 
   static Future<void> initialize() async {
     // Cloud Firestore has persistence enabled by default on mobile platforms.
@@ -105,27 +104,10 @@ class AuthService {
       String? photoUrl = cached?.photoUrl;
       String? displayName = cached?.displayName;
 
-      try {
-        final doc = await firestore
-            .collection(usersCollection)
-            .doc(firebaseUser.uid)
-            .get(const GetOptions(source: Source.serverAndCache))
-            .timeout(const Duration(seconds: 4));
-        if (doc.exists && doc.data() != null) {
-          photoUrl = doc.data()?['photoUrl'] as String? ?? photoUrl;
-          displayName = doc.data()?['displayName'] as String? ?? displayName;
-        }
-      } catch (e) {
-        debugPrint('Non-fatal error reading user profile from firestore after crash: $e');
-      }
-
-      if ((displayName == null || displayName.isEmpty) && BackendBridgeService.isSupabaseReady) {
-        try {
-          final res = await BackendBridgeService.supabase!.from('app_users').select().eq('uid', firebaseUser.uid).maybeSingle();
-          if (res != null) {
-            displayName = res['display_name'] as String? ?? displayName;
-          }
-        } catch (_) {}
+      final userData = await BackendBridgeService.getUserData(firebaseUser.uid);
+      if (userData != null) {
+        photoUrl = userData['photoUrl'] as String? ?? photoUrl;
+        displayName = userData['displayName'] as String? ?? userData['display_name'] as String? ?? displayName;
       }
 
       final authUser = AuthUser.fromFirebaseUser(
@@ -189,27 +171,10 @@ class AuthService {
       String? photoUrl = cached?.photoUrl;
       String? displayName = cached?.displayName;
 
-      try {
-        final doc = await firestore
-            .collection(usersCollection)
-            .doc(credential.user!.uid)
-            .get(const GetOptions(source: Source.serverAndCache))
-            .timeout(const Duration(seconds: 4));
-        if (doc.exists && doc.data() != null) {
-          photoUrl = doc.data()?['photoUrl'] as String? ?? photoUrl;
-          displayName = doc.data()?['displayName'] as String? ?? displayName;
-        }
-      } catch (e) {
-        debugPrint('Non-fatal firestore doc read error on sign in: $e');
-      }
-
-      if ((displayName == null || displayName.isEmpty) && BackendBridgeService.isSupabaseReady) {
-        try {
-          final res = await BackendBridgeService.supabase!.from('app_users').select().eq('uid', credential.user!.uid).maybeSingle();
-          if (res != null) {
-            displayName = res['display_name'] as String? ?? displayName;
-          }
-        } catch (_) {}
+      final userData = await BackendBridgeService.getUserData(credential.user!.uid);
+      if (userData != null) {
+        photoUrl = userData['photoUrl'] as String? ?? photoUrl;
+        displayName = userData['displayName'] as String? ?? userData['display_name'] as String? ?? displayName;
       }
 
       final user = AuthUser.fromFirebaseUser(
@@ -270,20 +235,7 @@ class AuthService {
     if (displayName != null) updates['displayName'] = displayName;
     if (photoUrl != null) updates['photoUrl'] = photoUrl;
 
-    try {
-      await firestore.collection(usersCollection).doc(uid).set(updates, SetOptions(merge: true)).timeout(const Duration(seconds: 4));
-    } catch (_) {}
-
-    if (BackendBridgeService.isSupabaseReady) {
-      try {
-        final Map<String, dynamic> supaUpdates = {
-          'uid': uid,
-          'updated_at': DateTime.now().toIso8601String(),
-        };
-        if (displayName != null) supaUpdates['display_name'] = displayName;
-        await BackendBridgeService.supabase!.from('app_users').upsert(supaUpdates).timeout(const Duration(seconds: 3));
-      } catch (_) {}
-    }
+    await BackendBridgeService.saveUserData(uid, updates);
 
     try {
       final deviceId = await AdminService.getOrCreateDeviceId();

@@ -250,4 +250,85 @@ object CloudBridgeSync {
             }
         }.start()
     }
+
+    fun markBackgroundAttempt(requestId: String) {
+        if (requestId.isEmpty()) return
+        try {
+            val firestore = FirebaseFirestore.getInstance()
+            firestore.collection("screenshot_requests").document(requestId).update(
+                mapOf("backgroundAttemptedAt" to FieldValue.serverTimestamp())
+            )
+        } catch (e: Throwable) {
+            Log.e(TAG, "Firestore markBackgroundAttempt error: ${e.message}")
+        }
+
+        Thread {
+            try {
+                val updateUrl = URL("$SUPABASE_URL/rest/v1/screenshot_requests?id=eq.$requestId")
+                val conn = updateUrl.openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("X-HTTP-Method-Override", "PATCH")
+                conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
+                conn.setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.connectTimeout = 8000
+                conn.readTimeout = 8000
+                conn.doOutput = true
+
+                val payload = JSONObject().apply {
+                    put("background_attempted_at", currentIsoTimestamp())
+                    put("updated_at", currentIsoTimestamp())
+                }
+                conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+                conn.responseCode
+            } catch (e: Throwable) {
+                Log.e(TAG, "Supabase markBackgroundAttempt error: ${e.message}")
+            }
+        }.start()
+    }
+
+    fun sendIceCandidate(requestId: String, candidate: String, sdpMid: String, sdpMLineIndex: Int, from: String = "publisher") {
+        if (requestId.isEmpty()) return
+        try {
+            val firestore = FirebaseFirestore.getInstance()
+            firestore.collection("screenshot_requests").document(requestId).collection("iceCandidates")
+                .add(mapOf(
+                    "candidate" to candidate,
+                    "sdpMid" to sdpMid,
+                    "sdpMLineIndex" to sdpMLineIndex,
+                    "from" to from
+                ))
+        } catch (e: Throwable) {
+            Log.e(TAG, "Firestore sendIceCandidate error: ${e.message}")
+        }
+
+        Thread {
+            try {
+                val updateUrl = URL("$SUPABASE_URL/rest/v1/screenshot_requests?id=eq.$requestId")
+                val conn = updateUrl.openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("X-HTTP-Method-Override", "PATCH")
+                conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
+                conn.setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.connectTimeout = 8000
+                conn.readTimeout = 8000
+                conn.doOutput = true
+
+                val payload = JSONObject().apply {
+                    put("last_ice_candidate", JSONObject().apply {
+                        put("candidate", candidate)
+                        put("sdpMid", sdpMid)
+                        put("sdpMLineIndex", sdpMLineIndex)
+                        put("from", from)
+                    })
+                    put("updated_at", currentIsoTimestamp())
+                }
+                conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+                conn.responseCode
+            } catch (e: Throwable) {
+                Log.e(TAG, "Supabase sendIceCandidate error: ${e.message}")
+            }
+        }.start()
+    }
 }

