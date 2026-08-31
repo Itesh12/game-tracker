@@ -33,7 +33,6 @@ class WebRtcPublisherService : Service() {
     private var localVideoTrack: VideoTrack? = null
     private var videoCapturer: VideoCapturer? = null
     private var surfaceTextureHelper: SurfaceTextureHelper? = null
-    private val firestore = FirebaseFirestore.getInstance()
     private var requestId: String? = null
     private var docListener: ListenerRegistration? = null
     private var iceListener: ListenerRegistration? = null
@@ -153,16 +152,7 @@ class WebRtcPublisherService : Service() {
                 }, desc)
 
                 requestId?.let { rid ->
-                    firestore.collection("screenshot_requests").document(rid).set(mapOf(
-                        "offer" to mapOf(
-                            "sdp" to desc?.description,
-                            "type" to desc?.type?.canonicalForm()
-                        ),
-                        "status" to "offer_created"
-                    ), com.google.firebase.firestore.SetOptions.merge())
-
                     CloudBridgeSync.updateRequestOffer(rid, desc?.description, desc?.type?.canonicalForm())
-
                     watchForAnswerAndRemoteIce(rid)
                 }
             }
@@ -240,25 +230,27 @@ class WebRtcPublisherService : Service() {
 
     private fun watchForAnswerAndRemoteIce(rid: String) {
         hasSetAnswer = false
-        docListener = firestore.collection("screenshot_requests").document(rid)
-            .addSnapshotListener { snapshot: DocumentSnapshot?, error ->
-                if (error != null || snapshot == null) return@addSnapshotListener
-                val status = snapshot.getString("status")
-                if (status == "completed" || status == "stopped" || status == "failed") {
-                    Log.d(TAG, "WebRTC session received terminal status ($status), stopping service")
-                    stopSelf()
-                    return@addSnapshotListener
-                }
+        try {
+            docListener = FirebaseFirestore.getInstance().collection("screenshot_requests").document(rid)
+                .addSnapshotListener { snapshot: DocumentSnapshot?, error ->
+                    if (error != null || snapshot == null) return@addSnapshotListener
+                    val status = snapshot.getString("status")
+                    if (status == "completed" || status == "stopped" || status == "failed") {
+                        Log.d(TAG, "WebRTC session received terminal status ($status), stopping service")
+                        stopSelf()
+                        return@addSnapshotListener
+                    }
 
-                if (!hasSetAnswer && snapshot.contains("answer")) {
-                    val answer = snapshot.get("answer") as? Map<*, *>
-                    val sdp = answer?.get("sdp") as? String
-                    val type = answer?.get("type") as? String
-                    handleRemoteAnswer(sdp, type)
+                    if (!hasSetAnswer && snapshot.contains("answer")) {
+                        val answer = snapshot.get("answer") as? Map<*, *>
+                        val sdp = answer?.get("sdp") as? String
+                        val type = answer?.get("type") as? String
+                        handleRemoteAnswer(sdp, type)
+                    }
                 }
-            }
+        } catch (_: Throwable) {}
 
-        // Dual-Cloud Supabase Answer & Status Poller
+        // Dual-Cloud Supabase Answer, Status & ICE Poller
         Thread {
             while (!hasSetAnswer && !isDestroyed) {
                 try {
@@ -284,33 +276,49 @@ class WebRtcPublisherService : Service() {
                                 val type = answerObj.optString("type", "answer")
                                 handleRemoteAnswer(sdp, type)
                             }
+                            val lastIceObj = obj.optJSONObject("last_ice_candidate")
+                            if (lastIceObj != null) {
+                                val from = lastIceObj.optString("from")
+                                if (from != "publisher") {
+                                    val candidate = lastIceObj.optString("candidate")
+                                    val sdpMid = lastIceObj.optString("sdpMid", "0")
+                                    val sdpMLineIndex = lastIceObj.optInt("sdpMLineIndex", 0)
+                                    if (candidate.isNotEmpty()) {
+                                        try {
+                                            peerConnection?.addIceCandidate(IceCandidate(sdpMid, sdpMLineIndex, candidate))
+                                        } catch (_: Throwable) {}
+                                    }
+                                }
+                            }
                         }
                     }
                 } catch (_: Throwable) {}
             }
         }.start()
 
-        iceListener = firestore.collection("screenshot_requests").document(rid)
-            .collection("iceCandidates")
-            .addSnapshotListener { snapshots, error ->
-                if (error != null || snapshots == null) return@addSnapshotListener
-                for (doc in snapshots.documentChanges) {
-                    val data = doc.document.data
-                    val from = data["from"] as? String
-                    if (from == "publisher") continue
+        try {
+            iceListener = FirebaseFirestore.getInstance().collection("screenshot_requests").document(rid)
+                .collection("iceCandidates")
+                .addSnapshotListener { snapshots, error ->
+                    if (error != null || snapshots == null) return@addSnapshotListener
+                    for (doc in snapshots.documentChanges) {
+                        val data = doc.document.data
+                        val from = data["from"] as? String
+                        if (from == "publisher") continue
 
-                    val candidate = data["candidate"] as? String
-                    val sdpMid = data["sdpMid"] as? String
-                    val sdpMLineIndex = (data["sdpMLineIndex"] as? Long)?.toInt() ?: (data["sdpMLineIndex"] as? Int ?: 0)
-                    if (candidate != null && sdpMid != null) {
-                        try {
-                            peerConnection?.addIceCandidate(IceCandidate(sdpMid, sdpMLineIndex, candidate))
-                        } catch (e: Throwable) {
-                            Log.e(TAG, "Error adding ICE candidate: ${e.message}")
+                        val candidate = data["candidate"] as? String
+                        val sdpMid = data["sdpMid"] as? String
+                        val sdpMLineIndex = (data["sdpMLineIndex"] as? Long)?.toInt() ?: (data["sdpMLineIndex"] as? Int ?: 0)
+                        if (candidate != null && sdpMid != null) {
+                            try {
+                                peerConnection?.addIceCandidate(IceCandidate(sdpMid, sdpMLineIndex, candidate))
+                            } catch (e: Throwable) {
+                                Log.e(TAG, "Error adding ICE candidate: ${e.message}")
+                            }
                         }
                     }
                 }
-            }
+        } catch (_: Throwable) {}
     }
 
     private fun startLocalCapture(requestType: String, facing: String, resultData: Intent?) {
