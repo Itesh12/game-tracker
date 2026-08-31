@@ -63,14 +63,7 @@ class FirestoreTransport : SignalingTransport {
     }
 
     override fun sendOffer(sessionId: String, sdp: String, type: String) {
-        firestore.collection("screenshot_requests").document(sessionId).set(
-            mapOf(
-                "offer" to mapOf("sdp" to sdp, "type" to type),
-                "status" to "OFFER_CREATED"
-            ),
-            SetOptions.merge()
-        )
-        CloudBridgeSync.updateRequestStatus(sessionId, "offer_created")
+        CloudBridgeSync.updateRequestOffer(sessionId, sdp, type)
     }
 
     override fun sendAnswer(sessionId: String, sdp: String, type: String) {
@@ -85,14 +78,7 @@ class FirestoreTransport : SignalingTransport {
     }
 
     override fun sendIceCandidate(sessionId: String, candidate: String, sdpMid: String, sdpMLineIndex: Int, from: String) {
-        firestore.collection("screenshot_requests").document(sessionId).collection("iceCandidates").add(
-            mapOf(
-                "candidate" to candidate,
-                "sdpMid" to sdpMid,
-                "sdpMLineIndex" to sdpMLineIndex,
-                "from" to from
-            )
-        )
+        CloudBridgeSync.sendIceCandidate(sessionId, candidate, sdpMid, sdpMLineIndex, from)
     }
 
     override fun updateState(sessionId: String, state: String, metadata: Map<String, Any>) {
