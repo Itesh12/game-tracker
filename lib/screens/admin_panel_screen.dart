@@ -69,25 +69,13 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   Widget build(BuildContext context) {
     final adminCtrl = Get.find<AdminController>();
 
-    final now = DateTime.now();
-    final sortedRequests = List<ScreenshotRequestItem>.from(adminCtrl.screenshotRequests)
-      ..sort((a, b) {
-        final timeA = a.requestedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final timeB = b.requestedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        return timeB.compareTo(timeA);
-      });
-
     ScreenshotRequestItem? activeLiveRequest;
-    for (final request in sortedRequests) {
-      final reqTime = request.requestedAt;
-      final isRecent = reqTime == null || now.difference(reqTime).inMinutes < 5;
+    for (final request in adminCtrl.screenshotRequests) {
       if ((request.requestType == 'screen_share' ||
               request.requestType == 'camera_stream') &&
           (request.status == 'active' ||
               request.status == 'live' ||
-              request.status == 'offer_created') &&
-          request.requestedByDeviceId == adminCtrl.currentDeviceId.value &&
-          isRecent) {
+              request.status == 'offer_created')) {
         activeLiveRequest = request;
         break;
       }
