@@ -31,6 +31,10 @@ class LiveShareSession {
         kind: RTCRtpMediaType.RTCRtpMediaTypeVideo,
         init: RTCRtpTransceiverInit(direction: TransceiverDirection.RecvOnly),
       );
+      await peerConnection.addTransceiver(
+        kind: RTCRtpMediaType.RTCRtpMediaTypeAudio,
+        init: RTCRtpTransceiverInit(direction: TransceiverDirection.RecvOnly),
+      );
     } catch (_) {}
 
     peerConnection.onTrack = (event) async {
@@ -47,12 +51,19 @@ class LiveShareSession {
             renderer.srcObject = stream;
           } catch (_) {}
         }
+      } else if (event.track.kind == 'audio') {
+        try {
+          event.track.enabled = true;
+        } catch (_) {}
       }
     };
 
     peerConnection.onAddStream = (stream) {
       try {
         for (final track in stream.getVideoTracks()) {
+          track.enabled = true;
+        }
+        for (final track in stream.getAudioTracks()) {
           track.enabled = true;
         }
       } catch (_) {}
@@ -94,7 +105,7 @@ class LiveShareSession {
           final answerConstraints = <String, dynamic>{
             'mandatory': {
               'OfferToReceiveVideo': true,
-              'OfferToReceiveAudio': false,
+              'OfferToReceiveAudio': true,
             },
             'optional': [],
           };

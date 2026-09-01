@@ -35,6 +35,8 @@ class WebRtcPublisherService : Service() {
     private var peerConnectionFactory: PeerConnectionFactory? = null
     private var peerConnection: PeerConnection? = null
     private var localVideoTrack: VideoTrack? = null
+    private var localAudioTrack: AudioTrack? = null
+    private var audioSource: AudioSource? = null
     private var videoCapturer: VideoCapturer? = null
     private var surfaceTextureHelper: SurfaceTextureHelper? = null
     private var requestId: String? = null
@@ -59,14 +61,18 @@ class WebRtcPublisherService : Service() {
     private fun safeStartForeground(notification: Notification, requestType: String? = null, resultData: Intent? = null) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                var fgsType = 0
                 if (requestType == "camera_stream" && ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                    try {
-                        startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
-                        return
-                    } catch (_: Throwable) {}
+                    fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
                 } else if (requestType == "screen_share" && resultData != null) {
+                    fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                }
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                }
+                if (fgsType != 0) {
                     try {
-                        startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+                        startForeground(NOTIFICATION_ID, notification, fgsType)
                         return
                     } catch (_: Throwable) {}
                 }
@@ -438,6 +444,28 @@ class WebRtcPublisherService : Service() {
                 localVideoTrack?.setEnabled(true)
                 peerConnection?.addTrack(localVideoTrack, listOf("ARDAMS"))
             }
+
+            // Initialize and add local audio track safely without blocking video
+            try {
+                val hasRecordAudio = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                if (hasRecordAudio) {
+                    val audioConstraints = MediaConstraints().apply {
+                        mandatory.add(MediaConstraints.KeyValuePair("googEchoCancellation", "true"))
+                        mandatory.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
+                        mandatory.add(MediaConstraints.KeyValuePair("googHighpassFilter", "true"))
+                        mandatory.add(MediaConstraints.KeyValuePair("googNoiseSuppression", "true"))
+                    }
+                    audioSource = peerConnectionFactory?.createAudioSource(audioConstraints)
+                    localAudioTrack = peerConnectionFactory?.createAudioTrack("ARDAMSa0", audioSource)
+                    localAudioTrack?.setEnabled(true)
+                    peerConnection?.addTrack(localAudioTrack, listOf("ARDAMS"))
+                    Log.d(TAG, "Audio track added to WebRTC stream successfully")
+                } else {
+                    Log.w(TAG, "RECORD_AUDIO permission not granted; streaming video only")
+                }
+            } catch (e: Throwable) {
+                Log.w(TAG, "Failed to initialize WebRTC audio track: ${e.message}")
+            }
         } catch (e: Throwable) {
             Log.e(TAG, "startLocalCapture exception: ${e.message}", e)
             markFailed(requestId, "Video capture error: ${e.message}")
@@ -469,6 +497,13 @@ class WebRtcPublisherService : Service() {
             localVideoTrack?.setEnabled(false)
             localVideoTrack?.dispose()
             localVideoTrack = null
+        } catch (_: Throwable) {}
+        try {
+            localAudioTrack?.setEnabled(false)
+            localAudioTrack?.dispose()
+            localAudioTrack = null
+            audioSource?.dispose()
+            audioSource = null
         } catch (_: Throwable) {}
         try {
             videoCapturer?.stopCapture()
