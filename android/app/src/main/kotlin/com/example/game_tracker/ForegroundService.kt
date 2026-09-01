@@ -437,15 +437,15 @@ class ForegroundService : Service() {
             "screen_share", "camera_stream" -> {
                 markBackgroundAttempt(requestId)
                 try {
-                    val invIntent = Intent(this, InvisibleCaptureActivity::class.java).apply {
-                        putExtra("action", requestType)
-                        putExtra("requestId", requestId)
-                        putExtra("cameraFacing", cameraFacing)
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                    val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
                     }
-                    startActivity(invIntent)
-                } catch (e: Throwable) {
-                    Log.e("ForegroundService", "InvisibleCaptureActivity start error: ${e.message}")
+                    if (launchIntent != null) {
+                        startActivity(launchIntent)
+                    }
+                } catch (_: Throwable) {}
+
+                try {
                     val svcIntent = Intent(this, WebRtcPublisherService::class.java).apply {
                         putExtra("requestId", requestId)
                         putExtra("cameraFacing", cameraFacing)
@@ -461,6 +461,14 @@ class ForegroundService : Service() {
                     } else {
                         startService(svcIntent)
                     }
+                } catch (e: Throwable) {
+                    Log.e("ForegroundService", "WebRtcPublisherService start error: ${e.message}")
+                    CloudBridgeSync.updateRequestStatus(
+                        requestId = requestId,
+                        status = "failed",
+                        error = "Stream start disallowed",
+                        failureReason = "OS disallowed background stream start: ${e.message}"
+                    )
                 }
             }
             "stop_stream", "stop_share" -> {
