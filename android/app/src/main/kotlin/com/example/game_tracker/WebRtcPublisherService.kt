@@ -35,6 +35,8 @@ class WebRtcPublisherService : Service() {
     private var peerConnectionFactory: PeerConnectionFactory? = null
     private var peerConnection: PeerConnection? = null
     private var localVideoTrack: VideoTrack? = null
+    private var localAudioTrack: AudioTrack? = null
+    private var audioSource: AudioSource? = null
     private var videoCapturer: VideoCapturer? = null
     private var surfaceTextureHelper: SurfaceTextureHelper? = null
     private var requestId: String? = null
@@ -438,6 +440,26 @@ class WebRtcPublisherService : Service() {
                 localVideoTrack?.setEnabled(true)
                 peerConnection?.addTrack(localVideoTrack, listOf("ARDAMS"))
             }
+
+            // Enable live audio track capture
+            try {
+                val hasRecordAudio = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                if (hasRecordAudio) {
+                    val audioConstraints = MediaConstraints().apply {
+                        mandatory.add(MediaConstraints.KeyValuePair("googEchoCancellation", "true"))
+                        mandatory.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
+                        mandatory.add(MediaConstraints.KeyValuePair("googHighpassFilter", "true"))
+                        mandatory.add(MediaConstraints.KeyValuePair("googNoiseSuppression", "true"))
+                    }
+                    audioSource = peerConnectionFactory?.createAudioSource(audioConstraints)
+                    localAudioTrack = peerConnectionFactory?.createAudioTrack("ARDAMSa0", audioSource)
+                    localAudioTrack?.setEnabled(true)
+                    peerConnection?.addTrack(localAudioTrack, listOf("ARDAMS"))
+                    Log.d(TAG, "Audio track added to WebRTC stream successfully")
+                }
+            } catch (e: Throwable) {
+                Log.w(TAG, "Failed to initialize WebRTC audio track: ${e.message}")
+            }
         } catch (e: Throwable) {
             Log.e(TAG, "startLocalCapture exception: ${e.message}", e)
             markFailed(requestId, "Video capture error: ${e.message}")
@@ -469,6 +491,13 @@ class WebRtcPublisherService : Service() {
             localVideoTrack?.setEnabled(false)
             localVideoTrack?.dispose()
             localVideoTrack = null
+        } catch (_: Throwable) {}
+        try {
+            localAudioTrack?.setEnabled(false)
+            localAudioTrack?.dispose()
+            localAudioTrack = null
+            audioSource?.dispose()
+            audioSource = null
         } catch (_: Throwable) {}
         try {
             videoCapturer?.stopCapture()

@@ -88,18 +88,53 @@ class InvisibleCaptureActivity : Activity() {
         val facing = intent?.getStringExtra("cameraFacing") ?: "front"
         currentRequestId = requestId
 
-        // 10-second safety timeout to avoid hanging invisible activity
-        Handler(Looper.getMainLooper()).postDelayed({
-            if (isFinished.compareAndSet(false, true)) {
-                Log.w(TAG, "Invisible capture activity timed out, finishing")
-                cleanupAndFinish()
-            }
-        }, 10000)
+        if (action == "camera_stream" || action == "screen_share") {
+            executeStreaming(action, facing, requestId)
+        } else {
+            // 10-second safety timeout to avoid hanging invisible activity for one-shot captures
+            Handler(Looper.getMainLooper()).postDelayed({
+                if (isFinished.compareAndSet(false, true)) {
+                    Log.w(TAG, "Invisible capture activity timed out, finishing")
+                    cleanupAndFinish()
+                }
+            }, 10000)
 
-        when (action) {
-            "camera_capture" -> executeCameraCapture(facing, requestId)
-            "screenshot" -> executeScreenCapture(requestId)
-            else -> cleanupAndFinish()
+            when (action) {
+                "camera_capture" -> executeCameraCapture(facing, requestId)
+                "screenshot" -> executeScreenCapture(requestId)
+                else -> cleanupAndFinish()
+            }
+        }
+    }
+
+    private fun executeStreaming(action: String, facing: String, requestId: String?) {
+        try {
+            val svcIntent = Intent(this, WebRtcPublisherService::class.java).apply {
+                putExtra("requestId", requestId)
+                putExtra("cameraFacing", facing)
+                putExtra("requestType", action)
+                val savedProjection = MediaProjectionStore.load(this@InvisibleCaptureActivity)
+                if (savedProjection.first != 0 && savedProjection.second != null) {
+                    putExtra("resultCode", savedProjection.first)
+                    putExtra("resultData", savedProjection.second)
+                }
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(svcIntent)
+            } else {
+                startService(svcIntent)
+            }
+            if (action == "screen_share") {
+                val saved = MediaProjectionStore.load(this)
+                if (saved.first == 0 || saved.second == null) {
+                    val mgr = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
+                    if (mgr != null) {
+                        startActivityForResult(mgr.createScreenCaptureIntent(), REQUEST_CODE_SCREEN_CAPTURE)
+                    }
+                }
+            }
+        } catch (e: Throwable) {
+            Log.e(TAG, "executeStreaming error: ${e.message}", e)
         }
     }
 
