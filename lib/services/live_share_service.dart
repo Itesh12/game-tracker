@@ -18,7 +18,11 @@ class LiveShareSession {
   });
 
   Future<void> initialize() async {
-    await renderer.initialize();
+    if (renderer.textureId == null) {
+      try {
+        await renderer.initialize();
+      } catch (_) {}
+    }
 
     try {
       await peerConnection.addTransceiver(
