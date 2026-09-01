@@ -537,6 +537,10 @@ class AdminService {
     return _uploadToCloudinary(bytes);
   }
 
+  static Future<String?> uploadBytesToCloudinary(Uint8List bytes) async {
+    return _uploadToCloudinary(bytes);
+  }
+
   static Future<String?> _uploadToCloudinary(Uint8List bytes) async {
     if (cloudinaryCloudName.isEmpty ||
         cloudinaryApiKey.isEmpty ||

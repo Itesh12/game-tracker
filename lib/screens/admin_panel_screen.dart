@@ -23,7 +23,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   bool _isFullscreenStreamVisible = false;
   String? _openedFullscreenRequestId;
 
-  void _openFullscreenStream(String requestId, String requestType) {
+  void _openFullscreenStream(String requestId, String requestType, {String? targetDeviceId}) {
     if (!mounted || _isFullscreenStreamVisible) return;
 
     _isFullscreenStreamVisible = true;
@@ -35,6 +35,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             builder: (_) => FullScreenLiveStreamPage(
               requestId: requestId,
               requestType: requestType,
+              targetDeviceId: targetDeviceId,
             ),
           ),
         )
@@ -92,6 +93,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           _openFullscreenStream(
             activeRequestId,
             activeRequestType,
+            targetDeviceId: activeLiveRequest?.targetDeviceId,
           );
         }
       });

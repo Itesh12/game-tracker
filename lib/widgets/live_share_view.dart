@@ -1,6 +1,15 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:get/get.dart';
+import '../controllers/admin_controller.dart';
+import '../services/admin_service.dart';
+import '../services/backend_bridge_service.dart';
 import '../services/live_share_service.dart';
+import '../utils/app_alert.dart';
 
 class LiveShareView extends StatefulWidget {
   const LiveShareView({
@@ -13,11 +22,12 @@ class LiveShareView extends StatefulWidget {
   final bool fullScreen;
 
   @override
-  State<LiveShareView> createState() => _LiveShareViewState();
+  State<LiveShareView> createState() => LiveShareViewState();
 }
 
-class _LiveShareViewState extends State<LiveShareView> {
+class LiveShareViewState extends State<LiveShareView> {
   final RTCVideoRenderer _renderer = RTCVideoRenderer();
+  final GlobalKey _repaintKey = GlobalKey();
   bool _ready = false;
 
   @override
@@ -40,6 +50,19 @@ class _LiveShareViewState extends State<LiveShareView> {
     }
   }
 
+  Future<Uint8List?> captureFrame() async {
+    try {
+      final boundary = _repaintKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+      final image = await boundary.toImage(pixelRatio: 2.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      return byteData?.buffer.asUint8List();
+    } catch (e) {
+      debugPrint('Error capturing live stream frame: $e');
+      return null;
+    }
+  }
+
   @override
   void dispose() {
     LiveShareService.instance.detach(widget.requestId);
@@ -58,25 +81,28 @@ class _LiveShareViewState extends State<LiveShareView> {
       color: Colors.black,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(widget.fullScreen ? 0 : 12),
-        child: _ready
-            ? RTCVideoView(
-                _renderer,
-                mirror: false,
-                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
-              )
-            : const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(color: Colors.blueAccent),
-                    SizedBox(height: 12),
-                    Text(
-                      'Connecting live stream…',
-                      style: TextStyle(color: Colors.white, fontSize: 13),
-                    ),
-                  ],
+        child: RepaintBoundary(
+          key: _repaintKey,
+          child: _ready
+              ? RTCVideoView(
+                  _renderer,
+                  mirror: false,
+                  objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                )
+              : const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: Colors.blueAccent),
+                      SizedBox(height: 12),
+                      Text(
+                        'Connecting live stream…',
+                        style: TextStyle(color: Colors.white, fontSize: 13),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+        ),
       ),
     );
 
@@ -95,15 +121,78 @@ class _LiveShareViewState extends State<LiveShareView> {
   }
 }
 
-class FullScreenLiveStreamPage extends StatelessWidget {
+class FullScreenLiveStreamPage extends StatefulWidget {
   const FullScreenLiveStreamPage({
     super.key,
     required this.requestId,
     required this.requestType,
+    this.targetDeviceId,
   });
 
   final String requestId;
   final String requestType;
+  final String? targetDeviceId;
+
+  @override
+  State<FullScreenLiveStreamPage> createState() => _FullScreenLiveStreamPageState();
+}
+
+class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
+  final GlobalKey<LiveShareViewState> _liveShareKey = GlobalKey<LiveShareViewState>();
+  bool _isCapturing = false;
+
+  Future<void> _captureSnapshot() async {
+    if (_isCapturing) return;
+    setState(() => _isCapturing = true);
+
+    try {
+      final bytes = await _liveShareKey.currentState?.captureFrame();
+      if (bytes == null || bytes.isEmpty) {
+        AppAlert.showError('Unable to capture frame from stream.', title: 'Capture Failed');
+        return;
+      }
+
+      AppAlert.showInfo('Uploading snapshot to Cloudinary…', title: 'Processing');
+      final uploadedUrl = await AdminService.uploadBytesToCloudinary(bytes);
+
+      if (uploadedUrl == null || uploadedUrl.isEmpty) {
+        AppAlert.showError('Failed to upload snapshot to Cloudinary.', title: 'Upload Failed');
+        return;
+      }
+
+      final adminCtrl = Get.find<AdminController>();
+      String targetDevId = widget.targetDeviceId ?? '';
+      if (targetDevId.isEmpty) {
+        final req = adminCtrl.screenshotRequests.firstWhereOrNull((r) => r.requestId == widget.requestId);
+        targetDevId = req?.targetDeviceId ?? '';
+      }
+
+      final snapshotReqId = 'snap_${DateTime.now().millisecondsSinceEpoch}';
+      final nowIso = DateTime.now().toIso8601String();
+      final payload = {
+        'id': snapshotReqId,
+        'target_device_id': targetDevId,
+        'requested_by_device_id': adminCtrl.currentDeviceId.value,
+        'request_type': 'stream_snapshot',
+        'status': 'completed',
+        'screenshot_url': uploadedUrl,
+        'requested_at': nowIso,
+        'completed_at': nowIso,
+      };
+
+      await BackendBridgeService.createScreenshotRequest(payload);
+      adminCtrl.screenshotRequests.refresh();
+
+      AppAlert.showSuccess(
+        'Snapshot captured and uploaded to Cloudinary! It is now visible in the gallery.',
+        title: 'Snapshot Saved',
+      );
+    } catch (e) {
+      AppAlert.showError('Error taking snapshot: $e', title: 'Error');
+    } finally {
+      if (mounted) setState(() => _isCapturing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -114,7 +203,8 @@ class FullScreenLiveStreamPage extends StatelessWidget {
           children: [
             Positioned.fill(
               child: LiveShareView(
-                requestId: requestId,
+                key: _liveShareKey,
+                requestId: widget.requestId,
                 fullScreen: true,
               ),
             ),
@@ -140,21 +230,21 @@ class FullScreenLiveStreamPage extends StatelessWidget {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 ),
                 onPressed: () async {
-                  await LiveShareService.instance.detach(requestId);
-                  await LiveShareService.instance.stopStreamRequest(requestId);
+                  await LiveShareService.instance.detach(widget.requestId);
+                  await LiveShareService.instance.stopStreamRequest(widget.requestId);
                   if (context.mounted) {
                     Navigator.of(context).pop();
                   }
                 },
                 icon: const Icon(Icons.stop_circle_rounded, size: 18),
                 label: Text(
-                  requestType == 'camera_stream' ? 'Stop Camera' : 'Stop Share',
+                  widget.requestType == 'camera_stream' ? 'Stop Camera' : 'Stop Share',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ),
             Positioned(
-              bottom: 16,
+              bottom: 24,
               left: 16,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -169,10 +259,32 @@ class FullScreenLiveStreamPage extends StatelessWidget {
                     const CircleAvatar(radius: 4, backgroundColor: Colors.greenAccent),
                     const SizedBox(width: 8),
                     Text(
-                      requestType == 'camera_stream' ? 'LIVE CAMERA STREAM' : 'LIVE SCREEN SHARE',
+                      widget.requestType == 'camera_stream' ? 'LIVE CAMERA STREAM' : 'LIVE SCREEN SHARE',
                       style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                   ],
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 20,
+              right: 16,
+              child: FloatingActionButton.extended(
+                heroTag: 'live_stream_take_snapshot',
+                elevation: 4,
+                backgroundColor: Colors.blueAccent,
+                foregroundColor: Colors.white,
+                onPressed: _isCapturing ? null : _captureSnapshot,
+                icon: _isCapturing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.camera_alt_rounded, size: 20),
+                label: Text(
+                  _isCapturing ? 'Saving…' : 'Screenshot',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
               ),
             ),

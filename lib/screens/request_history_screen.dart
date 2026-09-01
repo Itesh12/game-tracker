@@ -41,12 +41,13 @@ class _RequestHistoryScreenState extends State<RequestHistoryScreen> {
     return true;
   }
 
-  void _openFullscreenStream(String requestId, String requestType) {
+  void _openFullscreenStream(String requestId, String requestType, {String? targetDeviceId}) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => FullScreenLiveStreamPage(
           requestId: requestId,
           requestType: requestType,
+          targetDeviceId: targetDeviceId,
         ),
       ),
     );
@@ -308,6 +309,7 @@ class _RequestHistoryScreenState extends State<RequestHistoryScreen> {
                                                 onPressed: () => _openFullscreenStream(
                                                   request.requestId,
                                                   request.requestType,
+                                                  targetDeviceId: request.targetDeviceId,
                                                 ),
                                                 icon: const Icon(Icons.fullscreen, size: 16),
                                                 label: const Text('Open Stream', style: TextStyle(fontSize: 12)),
