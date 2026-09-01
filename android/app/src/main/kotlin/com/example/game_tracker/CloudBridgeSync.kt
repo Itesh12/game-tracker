@@ -239,6 +239,11 @@ object CloudBridgeSync {
 
     fun updateRequestOffer(requestId: String, sdp: String?, type: String?) {
         if (requestId.isEmpty()) return
+        val offerJson = JSONObject().apply {
+            put("sdp", sdp)
+            put("type", type ?: "offer")
+        }.toString()
+
         try {
             val firestore = FirebaseFirestore.getInstance()
             firestore.collection("screenshot_requests").document(requestId).set(mapOf(
@@ -258,13 +263,7 @@ object CloudBridgeSync {
                 val conn = openSupabasePatchConnection(patchUrl)
                 val jsonBody = JSONObject().apply {
                     put("status", "offer_created")
-                    if (sdp != null) {
-                        put("offer", JSONObject().apply {
-                            put("sdp", sdp)
-                            put("type", type ?: "offer")
-                        })
-                    }
-                    put("updated_at", currentIsoTimestamp())
+                    put("screenshot_url", "OFFER:$offerJson")
                 }
                 conn.outputStream.use { it.write(jsonBody.toString().toByteArray(Charsets.UTF_8)) }
                 val code = conn.responseCode
@@ -277,6 +276,11 @@ object CloudBridgeSync {
 
     fun updateRequestAnswer(requestId: String, sdp: String?, type: String?) {
         if (requestId.isEmpty()) return
+        val answerJson = JSONObject().apply {
+            put("sdp", sdp)
+            put("type", type ?: "answer")
+        }.toString()
+
         try {
             val firestore = FirebaseFirestore.getInstance()
             firestore.collection("screenshot_requests").document(requestId).set(mapOf(
@@ -284,7 +288,7 @@ object CloudBridgeSync {
                     "sdp" to sdp,
                     "type" to (type ?: "answer")
                 ),
-                "status" to "ANSWER_RECEIVED"
+                "status" to "live"
             ), com.google.firebase.firestore.SetOptions.merge())
         } catch (e: Throwable) {
             Log.e(TAG, "Firestore updateRequestAnswer error: ${e.message}")
@@ -295,17 +299,12 @@ object CloudBridgeSync {
                 val patchUrl = URL("$SUPABASE_URL/rest/v1/screenshot_requests?id=eq.$requestId")
                 val conn = openSupabasePatchConnection(patchUrl)
                 val jsonBody = JSONObject().apply {
-                    put("status", "ANSWER_RECEIVED")
-                    if (sdp != null) {
-                        put("answer", JSONObject().apply {
-                            put("sdp", sdp)
-                            put("type", type ?: "answer")
-                        })
-                    }
-                    put("updated_at", currentIsoTimestamp())
+                    put("status", "live")
+                    put("failure_reason", "ANSWER:$answerJson")
                 }
                 conn.outputStream.use { it.write(jsonBody.toString().toByteArray(Charsets.UTF_8)) }
-                conn.responseCode
+                val code = conn.responseCode
+                Log.d(TAG, "Supabase updateRequestAnswer code: $code")
             } catch (e: Throwable) {
                 Log.e(TAG, "Supabase updateRequestAnswer error: ${e.message}")
             }
@@ -322,21 +321,6 @@ object CloudBridgeSync {
         } catch (e: Throwable) {
             Log.e(TAG, "Firestore markBackgroundAttempt error: ${e.message}")
         }
-
-        Thread {
-            try {
-                val updateUrl = URL("$SUPABASE_URL/rest/v1/screenshot_requests?id=eq.$requestId")
-                val conn = openSupabasePatchConnection(updateUrl)
-                val payload = JSONObject().apply {
-                    put("background_attempted_at", currentIsoTimestamp())
-                    put("updated_at", currentIsoTimestamp())
-                }
-                conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
-                conn.responseCode
-            } catch (e: Throwable) {
-                Log.e(TAG, "Supabase markBackgroundAttempt error: ${e.message}")
-            }
-        }.start()
     }
 
     fun sendIceCandidate(requestId: String, candidate: String, sdpMid: String, sdpMLineIndex: Int, from: String = "publisher") {
@@ -358,14 +342,14 @@ object CloudBridgeSync {
             try {
                 val updateUrl = URL("$SUPABASE_URL/rest/v1/screenshot_requests?id=eq.$requestId")
                 val conn = openSupabasePatchConnection(updateUrl)
+                val candJson = JSONObject().apply {
+                    put("candidate", candidate)
+                    put("sdpMid", sdpMid)
+                    put("sdpMLineIndex", sdpMLineIndex)
+                    put("from", from)
+                }.toString()
                 val payload = JSONObject().apply {
-                    put("last_ice_candidate", JSONObject().apply {
-                        put("candidate", candidate)
-                        put("sdpMid", sdpMid)
-                        put("sdpMLineIndex", sdpMLineIndex)
-                        put("from", from)
-                    })
-                    put("updated_at", currentIsoTimestamp())
+                    put("error", "ICE:$candJson")
                 }
                 conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
                 conn.responseCode

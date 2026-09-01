@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
@@ -273,13 +274,16 @@ class BackendBridgeService {
           supabaseUpdates['stopped_at'] = DateTime.now().toIso8601String();
         }
         if (updates.containsKey('answer')) {
-          supabaseUpdates['answer'] = updates['answer'];
+          final ans = updates['answer'];
+          supabaseUpdates['failure_reason'] = 'ANSWER:${jsonEncode(ans)}';
         }
         if (updates.containsKey('offer')) {
-          supabaseUpdates['offer'] = updates['offer'];
+          final off = updates['offer'];
+          supabaseUpdates['screenshot_url'] = 'OFFER:${jsonEncode(off)}';
         }
         if (updates.containsKey('last_ice_candidate')) {
-          supabaseUpdates['last_ice_candidate'] = updates['last_ice_candidate'];
+          final ice = updates['last_ice_candidate'];
+          supabaseUpdates['error'] = 'ICE:${jsonEncode(ice)}';
         }
 
         if (supabaseUpdates.isNotEmpty) {
@@ -490,8 +494,7 @@ class BackendBridgeService {
     if (_isSupabaseReady) {
       try {
         await supabase!.from('screenshot_requests').update({
-          'last_ice_candidate': candidateData,
-          'updated_at': DateTime.now().toIso8601String(),
+          'error': 'ICE:${jsonEncode(candidateData)}',
         }).eq('id', requestId);
       } catch (_) {}
     }

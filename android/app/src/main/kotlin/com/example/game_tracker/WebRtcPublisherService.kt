@@ -293,14 +293,33 @@ class WebRtcPublisherService : Service() {
                                 break
                             }
                             if (!hasSetAnswer) {
-                                val answerObj = obj.optJSONObject("answer")
+                                var answerObj = obj.optJSONObject("answer")
+                                if (answerObj == null) {
+                                    val failReason = obj.optString("failure_reason")
+                                    if (failReason.startsWith("ANSWER:")) {
+                                        try {
+                                            answerObj = org.json.JSONObject(failReason.removePrefix("ANSWER:"))
+                                        } catch (_: Throwable) {}
+                                    }
+                                }
                                 if (answerObj != null) {
                                     val sdp = answerObj.optString("sdp")
                                     val type = answerObj.optString("type", "answer")
-                                    handleRemoteAnswer(sdp, type)
+                                    if (sdp.isNotEmpty()) {
+                                        Log.d(TAG, "Publisher received SDP answer via Supabase, applying remote description")
+                                        handleRemoteAnswer(sdp, type)
+                                    }
                                 }
                             }
-                            val lastIceObj = obj.optJSONObject("last_ice_candidate")
+                            var lastIceObj = obj.optJSONObject("last_ice_candidate")
+                            if (lastIceObj == null) {
+                                val errStr = obj.optString("error")
+                                if (errStr.startsWith("ICE:")) {
+                                    try {
+                                        lastIceObj = org.json.JSONObject(errStr.removePrefix("ICE:"))
+                                    } catch (_: Throwable) {}
+                                }
+                            }
                             if (lastIceObj != null) {
                                 val from = lastIceObj.optString("from")
                                 if (from != "publisher") {

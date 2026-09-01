@@ -115,29 +115,45 @@ class LiveShareSession {
 
     _requestSub = BackendBridgeService.streamScreenshotRequest(requestId).listen((data) async {
       if (_isDisposed || data == null) return;
-      if (data['offer'] != null) {
-        await handleOfferPayload(data['offer']);
+      dynamic offerPayload = data['offer'];
+      if (offerPayload == null) {
+        final screenUrl = data['screenshot_url'] as String? ?? data['screenshotUrl'] as String?;
+        if (screenUrl != null && screenUrl.startsWith('OFFER:')) {
+          offerPayload = screenUrl.substring(6);
+        }
       }
-      dynamic lastIceRaw = data['last_ice_candidate'];
-      Map<dynamic, dynamic>? lastIce;
-      if (lastIceRaw is Map) {
-        lastIce = lastIceRaw;
-      } else if (lastIceRaw is String && lastIceRaw.isNotEmpty) {
-        try {
-          final decoded = jsonDecode(lastIceRaw);
-          if (decoded is Map) lastIce = decoded;
-        } catch (_) {}
+      if (offerPayload != null) {
+        await handleOfferPayload(offerPayload);
       }
 
-      if (lastIce != null && lastIce['candidate'] != null && lastIce['from'] != 'admin') {
-        final candidate = RTCIceCandidate(
-          lastIce['candidate'] as String? ?? '',
-          lastIce['sdpMid'] as String? ?? '0',
-          (lastIce['sdpMLineIndex'] as num?)?.toInt() ?? 0,
-        );
-        try {
-          await peerConnection.addCandidate(candidate);
-        } catch (_) {}
+      dynamic lastIcePayload = data['last_ice_candidate'];
+      if (lastIcePayload == null) {
+        final errStr = data['error'] as String?;
+        if (errStr != null && errStr.startsWith('ICE:')) {
+          lastIcePayload = errStr.substring(4);
+        }
+      }
+      if (lastIcePayload != null) {
+        Map<dynamic, dynamic>? lastIce;
+        if (lastIcePayload is Map) {
+          lastIce = lastIcePayload;
+        } else if (lastIcePayload is String && lastIcePayload.isNotEmpty) {
+          try {
+            final decoded = jsonDecode(lastIcePayload);
+            if (decoded is Map) lastIce = decoded;
+          } catch (_) {}
+        }
+
+        if (lastIce != null && lastIce['candidate'] != null && lastIce['from'] != 'admin') {
+          final candidate = RTCIceCandidate(
+            lastIce['candidate'] as String? ?? '',
+            lastIce['sdpMid'] as String? ?? '0',
+            (lastIce['sdpMLineIndex'] as num?)?.toInt() ?? 0,
+          );
+          try {
+            await peerConnection.addCandidate(candidate);
+          } catch (_) {}
+        }
       }
     });
 
