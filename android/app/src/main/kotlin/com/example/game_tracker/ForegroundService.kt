@@ -437,15 +437,6 @@ class ForegroundService : Service() {
             "screen_share", "camera_stream" -> {
                 markBackgroundAttempt(requestId)
                 try {
-                    val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-                    }
-                    if (launchIntent != null) {
-                        startActivity(launchIntent)
-                    }
-                } catch (_: Throwable) {}
-
-                try {
                     val svcIntent = Intent(this, WebRtcPublisherService::class.java).apply {
                         putExtra("requestId", requestId)
                         putExtra("cameraFacing", cameraFacing)

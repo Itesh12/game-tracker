@@ -54,23 +54,30 @@ class WebRtcPublisherService : Service() {
             val mgr = getSystemService(NotificationManager::class.java)
             mgr?.createNotificationChannel(channel)
         }
-        safeStartForeground(createNotification())
+        safeStartForeground(createNotification(), "camera_stream", null)
         initializePeerFactory()
     }
 
     private fun safeStartForeground(notification: Notification, requestType: String? = null, resultData: Intent? = null) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                if (requestType == "camera_stream" && ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                var fgsType = 0
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                    fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                }
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                }
+                if (requestType == "screen_share" && resultData != null) {
+                    fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                }
+                if (fgsType != 0) {
                     try {
-                        startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
+                        startForeground(NOTIFICATION_ID, notification, fgsType)
                         return
-                    } catch (_: Throwable) {}
-                } else if (requestType == "screen_share" && resultData != null) {
-                    try {
-                        startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
-                        return
-                    } catch (_: Throwable) {}
+                    } catch (e: Throwable) {
+                        Log.w(TAG, "Failed startForeground with combined FGS types ($fgsType): ${e.message}")
+                    }
                 }
                 try {
                     startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
