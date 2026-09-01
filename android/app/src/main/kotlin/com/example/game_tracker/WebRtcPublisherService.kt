@@ -150,18 +150,27 @@ class WebRtcPublisherService : Service() {
         peerConnection?.createOffer(object : SdpObserver {
             override fun onCreateSuccess(desc: SessionDescription?) {
                 peerConnection?.setLocalDescription(object : SdpObserver {
-                    override fun onSetSuccess() {}
+                    override fun onSetSuccess() {
+                        Thread {
+                            var waited = 0
+                            while (waited < 1200 && peerConnection?.iceGatheringState() != PeerConnection.IceGatheringState.COMPLETE) {
+                                Thread.sleep(100)
+                                waited += 100
+                            }
+                            val finalSdp = peerConnection?.localDescription?.description ?: desc?.description
+                            requestId?.let { rid ->
+                                Log.d(TAG, "Publishing SDP offer with gathered ICE candidates embedded")
+                                CloudBridgeSync.updateRequestOffer(rid, finalSdp, "offer")
+                                watchForAnswerAndRemoteIce(rid)
+                            }
+                        }.start()
+                    }
                     override fun onSetFailure(p0: String?) {
                         Log.e(TAG, "setLocalDescription failure: $p0")
                     }
                     override fun onCreateSuccess(p0: SessionDescription?) {}
                     override fun onCreateFailure(p0: String?) {}
                 }, desc)
-
-                requestId?.let { rid ->
-                    CloudBridgeSync.updateRequestOffer(rid, desc?.description, desc?.type?.canonicalForm())
-                    watchForAnswerAndRemoteIce(rid)
-                }
             }
             override fun onCreateFailure(p0: String?) {
                 Log.e(TAG, "createOffer failure: $p0")

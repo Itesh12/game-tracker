@@ -100,10 +100,20 @@ class LiveShareSession {
           };
           final answer = await peerConnection.createAnswer(answerConstraints);
           await peerConnection.setLocalDescription(answer);
+
+          // Wait up to 1000ms for ICE candidates to gather into localDescription
+          int waited = 0;
+          while (waited < 1000 && peerConnection.iceGatheringState != RTCIceGatheringState.RTCIceGatheringStateComplete) {
+            await Future.delayed(const Duration(milliseconds: 100));
+            waited += 100;
+          }
+          final finalAnswer = await peerConnection.getLocalDescription();
+          final sdpToSend = finalAnswer?.sdp ?? answer.sdp;
+
           await BackendBridgeService.updateScreenshotRequest(requestId, {
             'answer': {
-              'sdp': answer.sdp,
-              'type': answer.type,
+              'sdp': sdpToSend,
+              'type': answer.type ?? 'answer',
             },
             'status': 'live',
           });
