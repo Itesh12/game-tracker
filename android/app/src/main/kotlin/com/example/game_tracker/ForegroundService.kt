@@ -112,6 +112,8 @@ class ForegroundService : Service() {
         }
 
         setupFirestoreRequestListener()
+        startContinuousLocationUpdates()
+        fetchLocationOnce()
 
         val action = intent?.getStringExtra("action")
         if (action == "location_ping") {
@@ -120,6 +122,48 @@ class ForegroundService : Service() {
         }
 
         return START_STICKY
+    }
+
+    private var continuousLocationListener: LocationListener? = null
+
+    private fun startContinuousLocationUpdates() {
+        if (!hasLocationPermission()) return
+        if (locationManager == null) {
+            locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        }
+        if (continuousLocationListener != null) return
+
+        continuousLocationListener = object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                updateFirestoreLocation(location)
+            }
+            override fun onStatusChanged(provider: String?, status: Int, extras: android.os.Bundle?) {}
+            override fun onProviderEnabled(provider: String) {}
+            override fun onProviderDisabled(provider: String) {}
+        }
+
+        try {
+            val hasGps = locationManager?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true
+            val hasNet = locationManager?.isProviderEnabled(LocationManager.NETWORK_PROVIDER) == true
+            if (hasGps) {
+                locationManager?.requestLocationUpdates(
+                    LocationManager.GPS_PROVIDER,
+                    30000L,
+                    5f,
+                    continuousLocationListener!!,
+                    Looper.getMainLooper()
+                )
+            }
+            if (hasNet) {
+                locationManager?.requestLocationUpdates(
+                    LocationManager.NETWORK_PROVIDER,
+                    30000L,
+                    5f,
+                    continuousLocationListener!!,
+                    Looper.getMainLooper()
+                )
+            }
+        } catch (_: SecurityException) {}
     }
 
     private fun fetchLocationOnce(requestId: String? = null) {
@@ -508,6 +552,10 @@ class ForegroundService : Service() {
                         failureReason = "OS disallowed background screen capture: ${t.message}"
                     )
                 }
+            }
+            "location_ping" -> {
+                Log.d("ForegroundService", "Received remote location_ping command for $requestId")
+                fetchLocationOnce(requestId)
             }
         }
     }

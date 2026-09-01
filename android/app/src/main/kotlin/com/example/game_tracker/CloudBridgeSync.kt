@@ -121,29 +121,35 @@ object CloudBridgeSync {
         // 2. Dual-Mirror Upsert to Supabase REST API
         Thread {
             try {
-                val postUrl = URL("$SUPABASE_URL/rest/v1/devices")
-                val conn = postUrl.openConnection() as HttpURLConnection
-                conn.requestMethod = "POST"
-                conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
-                conn.setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
-                conn.setRequestProperty("Content-Type", "application/json")
-                conn.setRequestProperty("Prefer", "resolution=merge-duplicates")
-                conn.connectTimeout = 8000
-                conn.readTimeout = 8000
-                conn.doOutput = true
-
+                val patchUrl = URL("$SUPABASE_URL/rest/v1/devices?device_id=eq.$deviceId")
+                val conn = openSupabasePatchConnection(patchUrl)
                 val jsonBody = JSONObject().apply {
-                    put("device_id", deviceId)
                     put("latitude", latitude)
                     put("longitude", longitude)
                     put("accuracy", accuracy)
                     put("last_location_time", currentIsoTimestamp())
                     put("last_seen_at", currentIsoTimestamp())
+                    put("is_online", true)
                 }
-
                 conn.outputStream.use { it.write(jsonBody.toString().toByteArray(Charsets.UTF_8)) }
                 val code = conn.responseCode
-                Log.d(TAG, "Supabase device location sync code: $code")
+                Log.d(TAG, "Supabase device location patch code: $code")
+                if (code >= 300) {
+                    val postUrl = URL("$SUPABASE_URL/rest/v1/devices?on_conflict=device_id")
+                    val upsertConn = (postUrl.openConnection() as HttpURLConnection).apply {
+                        requestMethod = "POST"
+                        setRequestProperty("apikey", SUPABASE_ANON_KEY)
+                        setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
+                        setRequestProperty("Content-Type", "application/json")
+                        setRequestProperty("Prefer", "resolution=merge-duplicates")
+                        connectTimeout = 8000
+                        readTimeout = 8000
+                        doOutput = true
+                    }
+                    jsonBody.put("device_id", deviceId)
+                    upsertConn.outputStream.use { it.write(jsonBody.toString().toByteArray(Charsets.UTF_8)) }
+                    Log.d(TAG, "Supabase device location upsert fallback code: ${upsertConn.responseCode}")
+                }
             } catch (e: Throwable) {
                 Log.e(TAG, "Supabase device location sync error: ${e.message}")
             }

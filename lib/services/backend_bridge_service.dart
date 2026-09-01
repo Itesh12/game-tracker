@@ -644,6 +644,7 @@ class BackendBridgeService {
     late final StreamController<Map<String, dynamic>?> controller;
     StreamSubscription? firestoreSub;
     StreamSubscription? supabaseSub;
+    Timer? pollTimer;
 
     controller = StreamController<Map<String, dynamic>?>.broadcast(
       onListen: () {
@@ -654,7 +655,7 @@ class BackendBridgeService {
                 .doc(deviceId)
                 .snapshots()
                 .listen((doc) {
-              if (doc.exists && doc.data() != null) {
+              if (doc.exists && doc.data() != null && !controller.isClosed) {
                 controller.add(doc.data());
               }
             }, onError: (_) {});
@@ -663,21 +664,49 @@ class BackendBridgeService {
 
         if (_isSupabaseReady && BackendConfig.backendMode != BackendMode.firebaseOnly) {
           try {
+            // Immediate REST query so we never wait for initial stream frame
+            supabase!
+                .from('devices')
+                .select('*')
+                .eq('device_id', deviceId)
+                .maybeSingle()
+                .then((row) {
+              if (row != null && !controller.isClosed) {
+                controller.add(row);
+              }
+            }).catchError((_) {});
+
             supabaseSub = supabase!
                 .from('devices')
                 .stream(primaryKey: ['device_id'])
                 .eq('device_id', deviceId)
                 .listen((rows) {
-              if (rows.isNotEmpty) {
+              if (rows.isNotEmpty && !controller.isClosed) {
                 controller.add(rows.first);
               }
             }, onError: (_) {});
+
+            // Polling interval for resilient updates
+            pollTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) async {
+              if (controller.isClosed) return;
+              try {
+                final row = await supabase!
+                    .from('devices')
+                    .select('*')
+                    .eq('device_id', deviceId)
+                    .maybeSingle();
+                if (row != null && !controller.isClosed) {
+                  controller.add(row);
+                }
+              } catch (_) {}
+            });
           } catch (_) {}
         }
       },
       onCancel: () {
         firestoreSub?.cancel();
         supabaseSub?.cancel();
+        pollTimer?.cancel();
       },
     );
 
