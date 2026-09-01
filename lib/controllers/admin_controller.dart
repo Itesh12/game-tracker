@@ -570,6 +570,13 @@ class AdminController extends GetxController {
     _processingRequestIds.add(requestId);
 
     try {
+      final req = screenshotRequests.firstWhereOrNull((r) => r.requestId == requestId);
+      if (req != null &&
+          req.requestedByDeviceId == currentDeviceId.value &&
+          req.targetDeviceId != currentDeviceId.value) {
+        // Sent by this admin device to another target device: do not fulfill locally!
+        return;
+      }
       if (requestType == 'screen_share') {
         await AdminService.fulfillScreenShareRequest(requestId);
       } else if (requestType == 'camera_stream') {

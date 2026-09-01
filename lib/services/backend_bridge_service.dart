@@ -501,6 +501,7 @@ class BackendBridgeService {
     late final StreamController<Map<String, dynamic>?> controller;
     StreamSubscription? firestoreSub;
     StreamSubscription? supabaseSub;
+    Timer? pollTimer;
 
     controller = StreamController<Map<String, dynamic>?>.broadcast(
       onListen: () {
@@ -520,21 +521,49 @@ class BackendBridgeService {
 
         if (_isSupabaseReady && BackendConfig.backendMode != BackendMode.firebaseOnly) {
           try {
+            // Immediate REST query so we never miss pre-existing status/offer
+            supabase!
+                .from('screenshot_requests')
+                .select('*')
+                .eq('id', requestId)
+                .maybeSingle()
+                .then((row) {
+              if (row != null && !controller.isClosed) {
+                controller.add(row);
+              }
+            }).catchError((_) {});
+
             supabaseSub = supabase!
                 .from('screenshot_requests')
                 .stream(primaryKey: ['id'])
                 .eq('id', requestId)
                 .listen((rows) {
-              if (rows.isNotEmpty) {
+              if (rows.isNotEmpty && !controller.isClosed) {
                 controller.add(rows.first);
               }
             }, onError: (_) {});
+
+            // Polling interval fallback for network resilience
+            pollTimer = Timer.periodic(const Duration(milliseconds: 1000), (_) async {
+              if (controller.isClosed) return;
+              try {
+                final row = await supabase!
+                    .from('screenshot_requests')
+                    .select('*')
+                    .eq('id', requestId)
+                    .maybeSingle();
+                if (row != null && !controller.isClosed) {
+                  controller.add(row);
+                }
+              } catch (_) {}
+            });
           } catch (_) {}
         }
       },
       onCancel: () {
         firestoreSub?.cancel();
         supabaseSub?.cancel();
+        pollTimer?.cancel();
       },
     );
 
