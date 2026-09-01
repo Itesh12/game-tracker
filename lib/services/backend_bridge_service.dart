@@ -272,6 +272,15 @@ class BackendBridgeService {
         if (updates.containsKey('stoppedAt')) {
           supabaseUpdates['stopped_at'] = DateTime.now().toIso8601String();
         }
+        if (updates.containsKey('answer')) {
+          supabaseUpdates['answer'] = updates['answer'];
+        }
+        if (updates.containsKey('offer')) {
+          supabaseUpdates['offer'] = updates['offer'];
+        }
+        if (updates.containsKey('last_ice_candidate')) {
+          supabaseUpdates['last_ice_candidate'] = updates['last_ice_candidate'];
+        }
 
         if (supabaseUpdates.isNotEmpty) {
           await supabase!

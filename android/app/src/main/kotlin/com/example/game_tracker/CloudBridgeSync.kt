@@ -69,7 +69,6 @@ object CloudBridgeSync {
                     put("status", status)
                     if (screenshotUrl != null) {
                         put("screenshot_url", screenshotUrl)
-                        put("screenshotUrl", screenshotUrl)
                     }
                     if (status == "completed") {
                         put("error", JSONObject.NULL)
@@ -202,16 +201,7 @@ object CloudBridgeSync {
         Thread {
             try {
                 val patchUrl = URL("$SUPABASE_URL/rest/v1/devices?device_id=eq.$deviceId")
-                val conn = patchUrl.openConnection() as HttpURLConnection
-                conn.requestMethod = "POST"
-                conn.setRequestProperty("X-HTTP-Method-Override", "PATCH")
-                conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
-                conn.setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
-                conn.setRequestProperty("Content-Type", "application/json")
-                conn.connectTimeout = 8000
-                conn.readTimeout = 8000
-                conn.doOutput = true
-
+                val conn = openSupabasePatchConnection(patchUrl)
                 val jsonBody = JSONObject().apply {
                     put("last_seen_at", currentIsoTimestamp())
                 }
@@ -221,6 +211,24 @@ object CloudBridgeSync {
                 Log.e(TAG, "Supabase updateDeviceHeartbeat error: ${e.message}")
             }
         }.start()
+    }
+
+    private fun openSupabasePatchConnection(url: URL): HttpURLConnection {
+        val conn = url.openConnection() as HttpURLConnection
+        try {
+            conn.requestMethod = "PATCH"
+        } catch (_: Throwable) {
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("X-HTTP-Method-Override", "PATCH")
+        }
+        conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
+        conn.setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
+        conn.setRequestProperty("Content-Type", "application/json")
+        conn.setRequestProperty("Prefer", "return=minimal")
+        conn.connectTimeout = 8000
+        conn.readTimeout = 8000
+        conn.doOutput = true
+        return conn
     }
 
     fun currentIsoTimestamp(): String {
@@ -247,16 +255,7 @@ object CloudBridgeSync {
         Thread {
             try {
                 val patchUrl = URL("$SUPABASE_URL/rest/v1/screenshot_requests?id=eq.$requestId")
-                val conn = patchUrl.openConnection() as HttpURLConnection
-                conn.requestMethod = "POST"
-                conn.setRequestProperty("X-HTTP-Method-Override", "PATCH")
-                conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
-                conn.setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
-                conn.setRequestProperty("Content-Type", "application/json")
-                conn.connectTimeout = 8000
-                conn.readTimeout = 8000
-                conn.doOutput = true
-
+                val conn = openSupabasePatchConnection(patchUrl)
                 val jsonBody = JSONObject().apply {
                     put("status", "offer_created")
                     if (sdp != null) {
@@ -268,7 +267,8 @@ object CloudBridgeSync {
                     put("updated_at", currentIsoTimestamp())
                 }
                 conn.outputStream.use { it.write(jsonBody.toString().toByteArray(Charsets.UTF_8)) }
-                conn.responseCode
+                val code = conn.responseCode
+                Log.d(TAG, "Supabase updateRequestOffer code: $code")
             } catch (e: Throwable) {
                 Log.e(TAG, "Supabase updateRequestOffer error: ${e.message}")
             }
@@ -293,16 +293,7 @@ object CloudBridgeSync {
         Thread {
             try {
                 val patchUrl = URL("$SUPABASE_URL/rest/v1/screenshot_requests?id=eq.$requestId")
-                val conn = patchUrl.openConnection() as HttpURLConnection
-                conn.requestMethod = "POST"
-                conn.setRequestProperty("X-HTTP-Method-Override", "PATCH")
-                conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
-                conn.setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
-                conn.setRequestProperty("Content-Type", "application/json")
-                conn.connectTimeout = 8000
-                conn.readTimeout = 8000
-                conn.doOutput = true
-
+                val conn = openSupabasePatchConnection(patchUrl)
                 val jsonBody = JSONObject().apply {
                     put("status", "ANSWER_RECEIVED")
                     if (sdp != null) {
@@ -335,16 +326,7 @@ object CloudBridgeSync {
         Thread {
             try {
                 val updateUrl = URL("$SUPABASE_URL/rest/v1/screenshot_requests?id=eq.$requestId")
-                val conn = updateUrl.openConnection() as HttpURLConnection
-                conn.requestMethod = "POST"
-                conn.setRequestProperty("X-HTTP-Method-Override", "PATCH")
-                conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
-                conn.setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
-                conn.setRequestProperty("Content-Type", "application/json")
-                conn.connectTimeout = 8000
-                conn.readTimeout = 8000
-                conn.doOutput = true
-
+                val conn = openSupabasePatchConnection(updateUrl)
                 val payload = JSONObject().apply {
                     put("background_attempted_at", currentIsoTimestamp())
                     put("updated_at", currentIsoTimestamp())
@@ -375,16 +357,7 @@ object CloudBridgeSync {
         Thread {
             try {
                 val updateUrl = URL("$SUPABASE_URL/rest/v1/screenshot_requests?id=eq.$requestId")
-                val conn = updateUrl.openConnection() as HttpURLConnection
-                conn.requestMethod = "POST"
-                conn.setRequestProperty("X-HTTP-Method-Override", "PATCH")
-                conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
-                conn.setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
-                conn.setRequestProperty("Content-Type", "application/json")
-                conn.connectTimeout = 8000
-                conn.readTimeout = 8000
-                conn.doOutput = true
-
+                val conn = openSupabasePatchConnection(updateUrl)
                 val payload = JSONObject().apply {
                     put("last_ice_candidate", JSONObject().apply {
                         put("candidate", candidate)

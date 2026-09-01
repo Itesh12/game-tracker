@@ -98,7 +98,20 @@ class LiveShareSession {
 
     _requestSub = BackendBridgeService.streamScreenshotRequest(requestId).listen((data) async {
       if (_isDisposed || data == null) return;
-      await handleOfferPayload(data['offer']);
+      if (data['offer'] != null) {
+        await handleOfferPayload(data['offer']);
+      }
+      final lastIce = data['last_ice_candidate'];
+      if (lastIce is Map && lastIce['candidate'] != null && lastIce['from'] != 'admin') {
+        final candidate = RTCIceCandidate(
+          lastIce['candidate'] as String? ?? '',
+          lastIce['sdpMid'] as String? ?? '0',
+          (lastIce['sdpMLineIndex'] as num?)?.toInt() ?? 0,
+        );
+        try {
+          await peerConnection.addCandidate(candidate);
+        } catch (_) {}
+      }
     });
 
     _iceSub = BackendBridgeService.streamIceCandidates(requestId).listen((candidateList) async {
