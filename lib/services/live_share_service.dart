@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'backend_bridge_service.dart';
 
@@ -69,8 +71,19 @@ class LiveShareSession {
 
     bool hasSetOffer = false;
 
-    Future<void> handleOfferPayload(dynamic offer) async {
-      if (!hasSetOffer && offer is Map && offer['sdp'] != null) {
+    Future<void> handleOfferPayload(dynamic offerRaw) async {
+      if (hasSetOffer || offerRaw == null) return;
+      Map<dynamic, dynamic>? offer;
+      if (offerRaw is Map) {
+        offer = offerRaw;
+      } else if (offerRaw is String && offerRaw.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(offerRaw);
+          if (decoded is Map) offer = decoded;
+        } catch (_) {}
+      }
+
+      if (offer != null && offer['sdp'] != null) {
         hasSetOffer = true;
         try {
           final remoteDescription = RTCSessionDescription(
@@ -95,7 +108,7 @@ class LiveShareSession {
             'status': 'live',
           });
         } catch (e) {
-          // ignore duplicate state transition
+          debugPrint('Error handling offer payload: $e');
         }
       }
     }
@@ -105,8 +118,18 @@ class LiveShareSession {
       if (data['offer'] != null) {
         await handleOfferPayload(data['offer']);
       }
-      final lastIce = data['last_ice_candidate'];
-      if (lastIce is Map && lastIce['candidate'] != null && lastIce['from'] != 'admin') {
+      dynamic lastIceRaw = data['last_ice_candidate'];
+      Map<dynamic, dynamic>? lastIce;
+      if (lastIceRaw is Map) {
+        lastIce = lastIceRaw;
+      } else if (lastIceRaw is String && lastIceRaw.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(lastIceRaw);
+          if (decoded is Map) lastIce = decoded;
+        } catch (_) {}
+      }
+
+      if (lastIce != null && lastIce['candidate'] != null && lastIce['from'] != 'admin') {
         final candidate = RTCIceCandidate(
           lastIce['candidate'] as String? ?? '',
           lastIce['sdpMid'] as String? ?? '0',
