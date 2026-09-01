@@ -14,11 +14,13 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.example.game_tracker.MediaProjectionStore
+import org.json.JSONObject
 
 class ForegroundService : Service() {
 
@@ -203,12 +205,44 @@ class ForegroundService : Service() {
         }
     }
 
-    private fun updateFirestoreLocation(location: Location, requestId: String? = null) {
+    private fun resolveAppDeviceId(): String? {
         val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         var deviceId = prefs.getString("flutter.game_tracker_device_id", null)
         if (deviceId.isNullOrEmpty()) {
             deviceId = prefs.getString("game_tracker_device_id", null)
         }
+        if (deviceId.isNullOrEmpty() || !deviceId.startsWith("user_")) {
+            try {
+                val cachedUserJson = prefs.getString("flutter.cached_auth_user", null) ?: prefs.getString("cached_auth_user", null)
+                if (!cachedUserJson.isNullOrEmpty()) {
+                    val userObj = JSONObject(cachedUserJson)
+                    val uid = userObj.optString("uid")
+                    val isAdmin = userObj.optBoolean("isAdmin", false)
+                    if (uid.isNotEmpty() && !isAdmin) {
+                        deviceId = "user_$uid"
+                    }
+                }
+            } catch (_: Throwable) {}
+        }
+        if (deviceId.isNullOrEmpty() || !deviceId.startsWith("user_")) {
+            try {
+                val fbUser = FirebaseAuth.getInstance().currentUser
+                if (fbUser != null && fbUser.email?.lowercase() != "admin@yopmail.com") {
+                    deviceId = "user_${fbUser.uid}"
+                }
+            } catch (_: Throwable) {}
+        }
+        if (!deviceId.isNullOrEmpty() && deviceId.startsWith("user_")) {
+            prefs.edit()
+                .putString("flutter.game_tracker_device_id", deviceId)
+                .putString("game_tracker_device_id", deviceId)
+                .apply()
+        }
+        return deviceId
+    }
+
+    private fun updateFirestoreLocation(location: Location, requestId: String? = null) {
+        val deviceId = resolveAppDeviceId()
         if (deviceId.isNullOrEmpty()) {
             Log.e("ForegroundService", "Cannot update location: deviceId is null or empty")
             return
@@ -254,14 +288,10 @@ class ForegroundService : Service() {
     private fun setupFirestoreRequestListener() {
         if (firestoreListener != null) return
 
-        val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        var deviceId = prefs.getString("flutter.game_tracker_device_id", null)
-        if (deviceId.isNullOrEmpty()) {
-            deviceId = prefs.getString("game_tracker_device_id", null)
-        }
-
+        val deviceId = resolveAppDeviceId()
         if (deviceId.isNullOrEmpty() || !deviceId.startsWith("user_")) {
-            prefs.registerOnSharedPreferenceChangeListener { sharedPrefs, key ->
+            val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            prefs.registerOnSharedPreferenceChangeListener { _, key ->
                 if (key == "flutter.game_tracker_device_id" || key == "game_tracker_device_id") {
                     setupFirestoreRequestListener()
                 }
@@ -370,11 +400,7 @@ class ForegroundService : Service() {
 
         when (requestType) {
             "wake_up" -> {
-                val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-                var deviceId = prefs.getString("flutter.game_tracker_device_id", null)
-                if (deviceId.isNullOrEmpty()) {
-                    deviceId = prefs.getString("game_tracker_device_id", null)
-                }
+                val deviceId = resolveAppDeviceId()
                 if (!deviceId.isNullOrEmpty()) {
                     CloudBridgeSync.updateDeviceHeartbeat(deviceId)
                 }

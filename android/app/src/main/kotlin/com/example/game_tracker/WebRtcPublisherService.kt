@@ -143,6 +143,10 @@ class WebRtcPublisherService : Service() {
         createPeerConnection()
         startLocalCapture(requestType, cameraFacing, resultData)
 
+        val sdpConstraints = MediaConstraints().apply {
+            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "false"))
+            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "false"))
+        }
         peerConnection?.createOffer(object : SdpObserver {
             override fun onCreateSuccess(desc: SessionDescription?) {
                 peerConnection?.setLocalDescription(object : SdpObserver {
@@ -165,7 +169,7 @@ class WebRtcPublisherService : Service() {
             }
             override fun onSetSuccess() {}
             override fun onSetFailure(p0: String?) {}
-        }, MediaConstraints())
+        }, sdpConstraints)
 
         return START_STICKY
     }

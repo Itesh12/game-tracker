@@ -33,6 +33,12 @@ class AdminService {
     if (savedId != null && savedId.startsWith('user_')) {
       return savedId;
     }
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null && currentUser.email?.toLowerCase() != AuthService.adminEmail) {
+      final id = 'user_${currentUser.uid}';
+      await prefs.setString(deviceIdPref, id);
+      return id;
+    }
     return '';
   }
 

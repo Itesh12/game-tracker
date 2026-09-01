@@ -20,6 +20,13 @@ class LiveShareSession {
   Future<void> initialize() async {
     await renderer.initialize();
 
+    try {
+      await peerConnection.addTransceiver(
+        kind: RTCRtpMediaType.RTCRtpMediaTypeVideo,
+        init: RTCRtpTransceiverInit(direction: TransceiverDirection.RecvOnly),
+      );
+    } catch (_) {}
+
     peerConnection.onTrack = (event) async {
       if (event.track.kind == 'video') {
         try {

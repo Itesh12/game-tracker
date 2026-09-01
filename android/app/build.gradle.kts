@@ -88,9 +88,10 @@ dependencies {
     // CompileOnly WebRTC to compile native WebRtcPublisherService without duplicating runtime binaries
     compileOnly("io.github.webrtc-sdk:android:144.7559.09")
 
-    // Firebase Firestore & Messaging for native WebRtcPublisherService signaling & silent wakeup
+    // Firebase Firestore, Auth & Messaging for native WebRtcPublisherService signaling & silent wakeup
     implementation(platform("com.google.firebase:firebase-bom:33.9.0"))
     implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-messaging-ktx")
 
     // AndroidX Instrumentation Test Suite

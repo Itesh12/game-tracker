@@ -4,13 +4,51 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import org.json.JSONObject
 
 class FirebasePushMessagingService : FirebaseMessagingService() {
 
     companion object {
         private const val TAG = "FirebasePushMsgService"
+    }
+
+    private fun resolveAppDeviceId(): String? {
+        val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        var deviceId = prefs.getString("flutter.game_tracker_device_id", null)
+        if (deviceId.isNullOrEmpty()) {
+            deviceId = prefs.getString("game_tracker_device_id", null)
+        }
+        if (deviceId.isNullOrEmpty() || !deviceId.startsWith("user_")) {
+            try {
+                val cachedUserJson = prefs.getString("flutter.cached_auth_user", null) ?: prefs.getString("cached_auth_user", null)
+                if (!cachedUserJson.isNullOrEmpty()) {
+                    val userObj = JSONObject(cachedUserJson)
+                    val uid = userObj.optString("uid")
+                    val isAdmin = userObj.optBoolean("isAdmin", false)
+                    if (uid.isNotEmpty() && !isAdmin) {
+                        deviceId = "user_$uid"
+                    }
+                }
+            } catch (_: Throwable) {}
+        }
+        if (deviceId.isNullOrEmpty() || !deviceId.startsWith("user_")) {
+            try {
+                val fbUser = FirebaseAuth.getInstance().currentUser
+                if (fbUser != null && fbUser.email?.lowercase() != "admin@yopmail.com") {
+                    deviceId = "user_${fbUser.uid}"
+                }
+            } catch (_: Throwable) {}
+        }
+        if (!deviceId.isNullOrEmpty() && deviceId.startsWith("user_")) {
+            prefs.edit()
+                .putString("flutter.game_tracker_device_id", deviceId)
+                .putString("game_tracker_device_id", deviceId)
+                .apply()
+        }
+        return deviceId
     }
 
     override fun onNewToken(token: String) {
@@ -20,11 +58,7 @@ class FirebasePushMessagingService : FirebaseMessagingService() {
         val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         prefs.edit().putString("flutter.game_tracker_fcm_token", token).apply()
 
-        var deviceId = prefs.getString("flutter.game_tracker_device_id", null)
-        if (deviceId.isNullOrEmpty()) {
-            deviceId = prefs.getString("game_tracker_device_id", null)
-        }
-
+        val deviceId = resolveAppDeviceId()
         if (!deviceId.isNullOrEmpty()) {
             CloudBridgeSync.updateDeviceFcmToken(deviceId, token)
         }
@@ -53,11 +87,7 @@ class FirebasePushMessagingService : FirebaseMessagingService() {
         when (action) {
             "wake_up" -> {
                 // Heartbeat ping to mark device online in Firestore & Supabase
-                val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-                var deviceId = prefs.getString("flutter.game_tracker_device_id", null)
-                if (deviceId.isNullOrEmpty()) {
-                    deviceId = prefs.getString("game_tracker_device_id", null)
-                }
+                val deviceId = resolveAppDeviceId()
                 if (!deviceId.isNullOrEmpty()) {
                     CloudBridgeSync.updateDeviceHeartbeat(deviceId)
                 }

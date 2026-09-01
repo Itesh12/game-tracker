@@ -32,8 +32,10 @@ class AuthController extends GetxController {
       if (user.isAdmin) {
         AndroidScreenCapture.stopForegroundService();
       } else {
-        AndroidScreenCapture.startForegroundService();
-        AdminService.registerDevice(username: user.displayName);
+        AdminService.getOrCreateDeviceId().then((_) {
+          AndroidScreenCapture.startForegroundService();
+          AdminService.registerDevice(username: user.displayName);
+        });
       }
     }
   }

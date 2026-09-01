@@ -88,6 +88,9 @@ class AuthService {
   static Future<void> cacheUser(AuthUser user) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(cachedUserKey, jsonEncode(user.toJson()));
+    if (!user.isAdmin) {
+      await prefs.setString(AdminService.deviceIdPref, 'user_${user.uid}');
+    }
   }
 
   static Future<void> clearCachedUser() async {

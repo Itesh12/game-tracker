@@ -190,11 +190,20 @@ class InvisibleCaptureActivity : Activity() {
                             override fun onConfigured(session: CameraCaptureSession) {
                                 captureSession = session
                                 try {
-                                    val req = device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE).apply {
-                                        addTarget(surface)
-                                        set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+                                    val reqBuilder = try {
+                                        device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
+                                    } catch (t1: Throwable) {
+                                        try {
+                                            device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+                                        } catch (t2: Throwable) {
+                                            device.createCaptureRequest(CameraDevice.TEMPLATE_RECORD)
+                                        }
                                     }
-                                    session.capture(req.build(), object : CameraCaptureSession.CaptureCallback() {}, bgHandler)
+                                    reqBuilder.addTarget(surface)
+                                    try {
+                                        reqBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+                                    } catch (_: Throwable) {}
+                                    session.capture(reqBuilder.build(), object : CameraCaptureSession.CaptureCallback() {}, bgHandler)
                                 } catch (e: Throwable) {
                                     markFailed(requestId, "Capture request failed: ${e.message}")
                                     cleanupAndFinish()
