@@ -29,7 +29,10 @@ object CloudBridgeSync {
                 "status" to status,
                 "completedAt" to FieldValue.serverTimestamp()
             )
-            if (screenshotUrl != null) updates["screenshotUrl"] = screenshotUrl
+            if (screenshotUrl != null) {
+                updates["screenshotUrl"] = screenshotUrl
+                updates["screenshot_url"] = screenshotUrl
+            }
             if (status == "completed") {
                 updates["error"] = FieldValue.delete()
                 updates["failureReason"] = FieldValue.delete()
@@ -48,8 +51,12 @@ object CloudBridgeSync {
             try {
                 val patchUrl = URL("$SUPABASE_URL/rest/v1/screenshot_requests?id=eq.$requestId")
                 val conn = patchUrl.openConnection() as HttpURLConnection
-                conn.requestMethod = "POST"
-                conn.setRequestProperty("X-HTTP-Method-Override", "PATCH")
+                try {
+                    conn.requestMethod = "PATCH"
+                } catch (_: Throwable) {
+                    conn.requestMethod = "POST"
+                    conn.setRequestProperty("X-HTTP-Method-Override", "PATCH")
+                }
                 conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
                 conn.setRequestProperty("Authorization", "Bearer $SUPABASE_ANON_KEY")
                 conn.setRequestProperty("Content-Type", "application/json")
@@ -60,7 +67,10 @@ object CloudBridgeSync {
 
                 val jsonBody = JSONObject().apply {
                     put("status", status)
-                    if (screenshotUrl != null) put("screenshot_url", screenshotUrl)
+                    if (screenshotUrl != null) {
+                        put("screenshot_url", screenshotUrl)
+                        put("screenshotUrl", screenshotUrl)
+                    }
                     if (status == "completed") {
                         put("error", JSONObject.NULL)
                         put("failure_reason", JSONObject.NULL)
@@ -75,7 +85,10 @@ object CloudBridgeSync {
 
                 conn.outputStream.use { it.write(jsonBody.toString().toByteArray(Charsets.UTF_8)) }
                 val code = conn.responseCode
-                Log.d(TAG, "Supabase request status sync code: $code")
+                val errText = if (code >= 400) {
+                    try { conn.errorStream?.bufferedReader()?.use { it.readText() } } catch (_: Throwable) { null }
+                } else null
+                Log.d(TAG, "Supabase request status sync code: $code, err: $errText")
             } catch (e: Throwable) {
                 Log.e(TAG, "Supabase request status sync error: ${e.message}")
             }

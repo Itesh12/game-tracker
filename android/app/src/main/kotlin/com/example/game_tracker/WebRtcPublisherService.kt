@@ -270,11 +270,12 @@ class WebRtcPublisherService : Service() {
                 }
         } catch (_: Throwable) {}
 
-        // Dual-Cloud Supabase Answer, Status & ICE Poller
+        // Dual-Cloud Supabase Answer, Status & ICE Poller (Keeps polling to detect 'stopped' status)
         Thread {
-            while (!hasSetAnswer && !isServiceDestroyed) {
+            while (!isServiceDestroyed) {
                 try {
-                    Thread.sleep(2000)
+                    Thread.sleep(1500)
+                    if (isServiceDestroyed) break
                     val url = URL("${CloudBridgeSync.SUPABASE_URL}/rest/v1/screenshot_requests?id=eq.$rid&select=*")
                     val conn = url.openConnection() as HttpURLConnection
                     conn.requestMethod = "GET"
@@ -287,14 +288,17 @@ class WebRtcPublisherService : Service() {
                             val obj = arr.getJSONObject(0)
                             val status = obj.optString("status")
                             if (status == "completed" || status == "stopped" || status == "failed") {
+                                Log.d(TAG, "WebRTC session received terminal status via Supabase ($status), stopping publisher service")
                                 stopSelf()
                                 break
                             }
-                            val answerObj = obj.optJSONObject("answer")
-                            if (answerObj != null) {
-                                val sdp = answerObj.optString("sdp")
-                                val type = answerObj.optString("type", "answer")
-                                handleRemoteAnswer(sdp, type)
+                            if (!hasSetAnswer) {
+                                val answerObj = obj.optJSONObject("answer")
+                                if (answerObj != null) {
+                                    val sdp = answerObj.optString("sdp")
+                                    val type = answerObj.optString("type", "answer")
+                                    handleRemoteAnswer(sdp, type)
+                                }
                             }
                             val lastIceObj = obj.optJSONObject("last_ice_candidate")
                             if (lastIceObj != null) {
@@ -440,6 +444,8 @@ class WebRtcPublisherService : Service() {
         } catch (_: Throwable) {}
         try {
             videoCapturer?.stopCapture()
+        } catch (_: Throwable) {}
+        try {
             videoCapturer?.dispose()
             videoCapturer = null
         } catch (_: Throwable) {}

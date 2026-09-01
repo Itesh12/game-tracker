@@ -479,6 +479,7 @@ class AdminService {
 
   static Future<void> stopScreenShareRequest(String requestId) async {
     _liveShareTimers.remove(requestId)?.cancel();
+    LiveShareService.instance.detach(requestId);
     if (platformName == 'android') {
       await AndroidScreenCapture.stopLiveShareNow();
     }

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/backend_config.dart';
 import '../firebase_options.dart';
@@ -286,17 +287,21 @@ class BackendBridgeService {
   }
 
   static Future<void> clearAllScreenshotRequests() async {
-    // 1. Delete all from Firestore
+    // 1. Delete all from Firestore in chunks of 400
     if (_isFirebaseReady &&
         BackendConfig.backendMode != BackendMode.supabaseOnly) {
       try {
         final collection = FirebaseFirestore.instance.collection('screenshot_requests');
-        final snapshots = await collection.get().timeout(const Duration(seconds: 8));
-        final batch = FirebaseFirestore.instance.batch();
-        for (final doc in snapshots.docs) {
-          batch.delete(doc.reference);
+        final snapshots = await collection.get().timeout(const Duration(seconds: 10));
+        final docs = snapshots.docs;
+        for (var i = 0; i < docs.length; i += 400) {
+          final end = (i + 400 < docs.length) ? i + 400 : docs.length;
+          final batch = FirebaseFirestore.instance.batch();
+          for (var j = i; j < end; j++) {
+            batch.delete(docs[j].reference);
+          }
+          await batch.commit().timeout(const Duration(seconds: 8));
         }
-        await batch.commit().timeout(const Duration(seconds: 8));
       } catch (e) {
         debugPrint('[BackendBridge] Firestore clear requests failed: $e');
       }
@@ -309,10 +314,23 @@ class BackendBridgeService {
         await supabase!
             .from('screenshot_requests')
             .delete()
-            .neq('id', '___dummy_never_match___')
+            .neq('id', '')
             .timeout(const Duration(seconds: 8));
       } catch (e) {
-        debugPrint('[BackendBridge] Supabase clear requests failed: $e');
+        debugPrint('[BackendBridge] Supabase SDK clear requests failed: $e');
+      }
+
+      // REST API direct fallback to guarantee 100% table clearance
+      try {
+        await http.delete(
+          Uri.parse('${BackendConfig.supabaseUrl}/rest/v1/screenshot_requests?id=not.is.null'),
+          headers: {
+            'apikey': BackendConfig.supabaseAnonKey,
+            'Authorization': 'Bearer ${BackendConfig.supabaseAnonKey}',
+          },
+        ).timeout(const Duration(seconds: 8));
+      } catch (e) {
+        debugPrint('[BackendBridge] Supabase REST clear requests failed: $e');
       }
     }
   }

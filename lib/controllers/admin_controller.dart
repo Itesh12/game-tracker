@@ -389,7 +389,7 @@ class AdminController extends GetxController {
     _requestsSubscription?.cancel();
     _requestsSubscription = AdminService.watchAllRequests().listen(
       (snapshot) {
-        _handleRequestListUpdate(
+        _handleFirestoreUpdate(
           snapshot.docs.map(ScreenshotRequestItem.fromSnapshot).toList(),
         );
       },
@@ -407,7 +407,7 @@ class AdminController extends GetxController {
             .stream(primaryKey: ['id'])
             .listen(
           (rows) {
-            _handleRequestListUpdate(
+            _handleSupabaseUpdate(
               rows.map(ScreenshotRequestItem.fromMap).toList(),
             );
           },
@@ -421,30 +421,50 @@ class AdminController extends GetxController {
     }
   }
 
-  final Map<String, ScreenshotRequestItem> _allRequestsMap = {};
+  final Map<String, ScreenshotRequestItem> _firestoreRequestsMap = {};
+  final Map<String, ScreenshotRequestItem> _supabaseRequestsMap = {};
 
-  void _handleRequestListUpdate(List<ScreenshotRequestItem> incomingList) {
-    for (final incoming in incomingList) {
-      if (incoming.requestId.isEmpty) continue;
-      final existing = _allRequestsMap[incoming.requestId];
+  void _handleFirestoreUpdate(List<ScreenshotRequestItem> list) {
+    _firestoreRequestsMap.clear();
+    for (final item in list) {
+      if (item.requestId.isNotEmpty) {
+        _firestoreRequestsMap[item.requestId] = item;
+      }
+    }
+    _rebuildRequestsList();
+  }
+
+  void _handleSupabaseUpdate(List<ScreenshotRequestItem> list) {
+    _supabaseRequestsMap.clear();
+    for (final item in list) {
+      if (item.requestId.isNotEmpty) {
+        _supabaseRequestsMap[item.requestId] = item;
+      }
+    }
+    _rebuildRequestsList();
+  }
+
+  void _rebuildRequestsList() {
+    final Map<String, ScreenshotRequestItem> merged = {};
+    for (final entry in _firestoreRequestsMap.entries) {
+      merged[entry.key] = entry.value;
+    }
+    for (final entry in _supabaseRequestsMap.entries) {
+      final existing = merged[entry.key];
       if (existing == null) {
-        _allRequestsMap[incoming.requestId] = incoming;
+        merged[entry.key] = entry.value;
       } else {
-        // Prevent stale stream updates from downgrading terminal or active states
-        final isExistingAdvanced = existing.status == 'stopped' ||
-            existing.status == 'completed' ||
+        final isExistingAdvanced = existing.status == 'completed' ||
+            existing.status == 'stopped' ||
             existing.status == 'failed' ||
             existing.status == 'live';
-        final isIncomingStale = incoming.status == 'pending';
-
-        if (isExistingAdvanced && isIncomingStale) {
-          continue;
+        if (!isExistingAdvanced || entry.value.status != 'pending') {
+          merged[entry.key] = entry.value;
         }
-        _allRequestsMap[incoming.requestId] = incoming;
       }
     }
 
-    final mergedList = _allRequestsMap.values.toList();
+    final mergedList = merged.values.toList();
     mergedList.sort((a, b) {
       final aTime = a.requestedAt?.millisecondsSinceEpoch ?? 0;
       final bTime = b.requestedAt?.millisecondsSinceEpoch ?? 0;
@@ -452,10 +472,12 @@ class AdminController extends GetxController {
     });
 
     screenshotRequests.value = mergedList;
+    screenshotRequests.refresh();
   }
 
   Future<void> clearAllRequests() async {
-    _allRequestsMap.clear();
+    _firestoreRequestsMap.clear();
+    _supabaseRequestsMap.clear();
     screenshotRequests.value = [];
     screenshotRequests.refresh();
     await BackendBridgeService.clearAllScreenshotRequests();
