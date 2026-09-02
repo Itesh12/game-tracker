@@ -16,6 +16,27 @@ object MediaProjectionStore {
     var cachedResultData: Intent? = null
     @Volatile
     var activeMediaProjection: MediaProjection? = null
+    @Volatile
+    var activeVirtualDisplay: android.hardware.display.VirtualDisplay? = null
+    @Volatile
+    var activeImageReader: android.media.ImageReader? = null
+
+    fun clear() {
+        try {
+            activeVirtualDisplay?.release()
+        } catch (_: Throwable) {}
+        activeVirtualDisplay = null
+
+        try {
+            activeImageReader?.close()
+        } catch (_: Throwable) {}
+        activeImageReader = null
+
+        try {
+            activeMediaProjection?.stop()
+        } catch (_: Throwable) {}
+        activeMediaProjection = null
+    }
 
     fun save(context: Context, resultCode: Int, data: Intent) {
         cachedResultCode = resultCode

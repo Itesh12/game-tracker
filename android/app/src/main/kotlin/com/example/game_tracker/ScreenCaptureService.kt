@@ -11,6 +11,7 @@ import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.media.Image
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
@@ -161,25 +162,39 @@ class ScreenCaptureService : Service() {
             val height = metrics.heightPixels
             val density = metrics.densityDpi
 
-            imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
+            var reader = MediaProjectionStore.activeImageReader
+            var vDisplay = MediaProjectionStore.activeVirtualDisplay
 
-            virtualDisplay = mediaProjection?.createVirtualDisplay(
-                "screencap",
-                width,
-                height,
-                density,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                imageReader?.surface,
-                null,
-                handler
-            )
+            if (reader == null || vDisplay == null) {
+                val newReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
+                val newDisplay = mediaProjection?.createVirtualDisplay(
+                    "screencap",
+                    width,
+                    height,
+                    density,
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                    newReader.surface,
+                    null,
+                    handler
+                )
 
-            if (virtualDisplay == null) {
-                Log.e(TAG, "VirtualDisplay creation returned null")
-                markFailed(requestId, "Failed to create VirtualDisplay")
-                cleanup()
-                stopSelf()
-                return
+                if (newDisplay == null) {
+                    Log.e(TAG, "VirtualDisplay creation returned null")
+                    markFailed(requestId, "Failed to create VirtualDisplay")
+                    cleanup()
+                    stopSelf()
+                    return
+                }
+
+                reader = newReader
+                vDisplay = newDisplay
+                imageReader = newReader
+                virtualDisplay = newDisplay
+                MediaProjectionStore.activeImageReader = newReader
+                MediaProjectionStore.activeVirtualDisplay = newDisplay
+            } else {
+                imageReader = reader
+                virtualDisplay = vDisplay
             }
 
             // Safety timeout: If no image is captured within 6 seconds, abort gracefully
@@ -194,19 +209,7 @@ class ScreenCaptureService : Service() {
             }
             mainHandler.postDelayed(timeoutRunnable, 6000)
 
-            imageReader?.setOnImageAvailableListener({ reader ->
-                if (!isCaptured.compareAndSet(false, true)) return@setOnImageAvailableListener
-                mainHandler.removeCallbacks(timeoutRunnable)
-
-                val image = reader.acquireLatestImage()
-                if (image == null) {
-                    Log.e(TAG, "Acquired image is null")
-                    markFailed(requestId, "Acquired screen frame is null")
-                    cleanup()
-                    stopSelf()
-                    return@setOnImageAvailableListener
-                }
-
+            fun handleCapturedImage(image: Image) {
                 try {
                     val plane = image.planes[0]
                     val buffer = plane.buffer
@@ -235,6 +238,9 @@ class ScreenCaptureService : Service() {
                     // Upload directly to Cloudinary and update Firebase & Supabase
                     if (!requestId.isNullOrEmpty()) {
                         CloudinaryUploader.uploadFile(file) { uploadedUrl, uploadError ->
+                            try {
+                                file.delete()
+                            } catch (_: Throwable) {}
                             if (!uploadedUrl.isNullOrEmpty()) {
                                 CloudBridgeSync.updateRequestStatus(
                                     requestId = requestId,
@@ -245,6 +251,10 @@ class ScreenCaptureService : Service() {
                                 markFailed(requestId, uploadError ?: "Background screen capture upload failed")
                             }
                         }
+                    } else {
+                        try {
+                            file.delete()
+                        } catch (_: Throwable) {}
                     }
                 } catch (e: Throwable) {
                     Log.e(TAG, "Error saving screen capture: ${e.message}", e)
@@ -253,7 +263,28 @@ class ScreenCaptureService : Service() {
                     cleanup()
                     stopSelf()
                 }
-            }, handler)
+            }
+
+            val immediateImage = reader.acquireLatestImage()
+            if (immediateImage != null && isCaptured.compareAndSet(false, true)) {
+                mainHandler.removeCallbacks(timeoutRunnable)
+                handleCapturedImage(immediateImage)
+            } else {
+                reader.setOnImageAvailableListener({ r ->
+                    if (!isCaptured.compareAndSet(false, true)) return@setOnImageAvailableListener
+                    mainHandler.removeCallbacks(timeoutRunnable)
+
+                    val image = r.acquireLatestImage()
+                    if (image == null) {
+                        Log.e(TAG, "Acquired image is null")
+                        markFailed(requestId, "Acquired screen frame is null")
+                        cleanup()
+                        stopSelf()
+                        return@setOnImageAvailableListener
+                    }
+                    handleCapturedImage(image)
+                }, handler)
+            }
 
         } catch (e: Throwable) {
             Log.e(TAG, "captureAndSaveOnce error: ${e.message}", e)
@@ -276,10 +307,6 @@ class ScreenCaptureService : Service() {
 
     private fun cleanup() {
         try {
-            virtualDisplay?.release()
-            virtualDisplay = null
-            imageReader?.close()
-            imageReader = null
             handlerThread?.quitSafely()
             handlerThread = null
             handler = null
