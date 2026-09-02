@@ -87,7 +87,12 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "requestCapturePermission" -> {
                     val mProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as android.media.projection.MediaProjectionManager
-                    val permIntent = mProjectionManager.createScreenCaptureIntent()
+                    val permIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        val config = android.media.projection.MediaProjectionConfig.createConfigForDefaultDisplay()
+                        mProjectionManager.createScreenCaptureIntent(config)
+                    } else {
+                        mProjectionManager.createScreenCaptureIntent()
+                    }
                     startActivityForResult(permIntent, SCREEN_CAPTURE_REQUEST_CODE)
                     result.success(true)
                 }

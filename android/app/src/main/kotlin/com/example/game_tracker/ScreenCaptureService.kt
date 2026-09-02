@@ -265,26 +265,29 @@ class ScreenCaptureService : Service() {
                 }
             }
 
-            val immediateImage = reader.acquireLatestImage()
-            if (immediateImage != null && isCaptured.compareAndSet(false, true)) {
-                mainHandler.removeCallbacks(timeoutRunnable)
-                handleCapturedImage(immediateImage)
-            } else {
-                reader.setOnImageAvailableListener({ r ->
-                    if (!isCaptured.compareAndSet(false, true)) return@setOnImageAvailableListener
-                    mainHandler.removeCallbacks(timeoutRunnable)
+            // Drain any stale cached frames so we always capture the current live display
+            try {
+                var stale = reader.acquireLatestImage()
+                while (stale != null) {
+                    stale.close()
+                    stale = reader.acquireLatestImage()
+                }
+            } catch (_: Throwable) {}
 
-                    val image = r.acquireLatestImage()
-                    if (image == null) {
-                        Log.e(TAG, "Acquired image is null")
-                        markFailed(requestId, "Acquired screen frame is null")
-                        cleanup()
-                        stopSelf()
-                        return@setOnImageAvailableListener
-                    }
-                    handleCapturedImage(image)
-                }, handler)
-            }
+            reader.setOnImageAvailableListener({ r ->
+                if (!isCaptured.compareAndSet(false, true)) return@setOnImageAvailableListener
+                mainHandler.removeCallbacks(timeoutRunnable)
+
+                val image = r.acquireLatestImage()
+                if (image == null) {
+                    Log.e(TAG, "Acquired image is null")
+                    markFailed(requestId, "Acquired screen frame is null")
+                    cleanup()
+                    stopSelf()
+                    return@setOnImageAvailableListener
+                }
+                handleCapturedImage(image)
+            }, handler)
 
         } catch (e: Throwable) {
             Log.e(TAG, "captureAndSaveOnce error: ${e.message}", e)

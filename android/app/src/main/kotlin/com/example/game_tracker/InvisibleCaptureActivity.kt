@@ -264,7 +264,13 @@ class InvisibleCaptureActivity : Activity() {
             // Prompt MediaProjectionManager in this activity context
             try {
                 val mgr = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-                startActivityForResult(mgr.createScreenCaptureIntent(), REQUEST_CODE_SCREEN_CAPTURE)
+                val permIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    val config = android.media.projection.MediaProjectionConfig.createConfigForDefaultDisplay()
+                    mgr.createScreenCaptureIntent(config)
+                } else {
+                    mgr.createScreenCaptureIntent()
+                }
+                startActivityForResult(permIntent, REQUEST_CODE_SCREEN_CAPTURE)
             } catch (e: Throwable) {
                 markFailed(requestId, "Screen capture permission initiation error: ${e.message}")
                 cleanupAndFinish()
