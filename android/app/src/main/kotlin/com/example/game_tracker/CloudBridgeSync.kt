@@ -127,9 +127,8 @@ object CloudBridgeSync {
                     put("latitude", latitude)
                     put("longitude", longitude)
                     put("accuracy", accuracy)
-                    put("last_location_time", currentIsoTimestamp())
+                    put("last_location_time", timestamp)
                     put("last_seen_at", currentIsoTimestamp())
-                    put("is_online", true)
                 }
                 conn.outputStream.use { it.write(jsonBody.toString().toByteArray(Charsets.UTF_8)) }
                 val code = conn.responseCode

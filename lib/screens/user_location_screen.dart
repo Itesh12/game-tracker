@@ -22,12 +22,27 @@ class UserLocationScreen extends StatefulWidget {
 
 class _UserLocationScreenState extends State<UserLocationScreen> {
   late final Rx<AdminDevice> _liveDevice;
+  Worker? _adminDevicesWorker;
   StreamSubscription<dynamic>? _deviceSub;
 
   @override
   void initState() {
     super.initState();
     _liveDevice = Rx<AdminDevice>(widget.device);
+
+    final adminCtrl = Get.isRegistered<AdminController>() ? Get.find<AdminController>() : null;
+    if (adminCtrl != null) {
+      final matched = adminCtrl.devices.firstWhereOrNull((d) => d.deviceId == widget.device.deviceId);
+      if (matched != null) {
+        _liveDevice.value = matched;
+      }
+      _adminDevicesWorker = ever(adminCtrl.devices, (List<AdminDevice> list) {
+        final updated = list.firstWhereOrNull((d) => d.deviceId == widget.device.deviceId);
+        if (updated != null) {
+          _liveDevice.value = updated;
+        }
+      });
+    }
 
     // Stream device updates from BackendBridgeService (dual-cloud Firestore + Supabase)
     _deviceSub = BackendBridgeService.streamDevice(widget.device.deviceId).listen(
@@ -43,12 +58,13 @@ class _UserLocationScreenState extends State<UserLocationScreen> {
 
     // Auto-ping target device once on screen open for on-demand fresh coordinates
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _sendLocationPingRequest();
+      _sendLocationPingRequest(silent: true);
     });
   }
 
   @override
   void dispose() {
+    _adminDevicesWorker?.dispose();
     _deviceSub?.cancel();
     super.dispose();
   }
@@ -61,7 +77,7 @@ class _UserLocationScreenState extends State<UserLocationScreen> {
     }
   }
 
-  Future<void> _sendLocationPingRequest() async {
+  Future<void> _sendLocationPingRequest({bool silent = false}) async {
     try {
       final adminCtrl = Get.find<AdminController>();
       final payload = AdminService.buildRequestPayload(
@@ -71,12 +87,16 @@ class _UserLocationScreenState extends State<UserLocationScreen> {
       );
       await BackendBridgeService.createScreenshotRequest(payload);
 
-      AppAlert.showSuccess(
-        'Target device has been pinged for a fresh GPS location update.',
-        title: 'Ping Sent Successfully',
-      );
+      if (!silent) {
+        AppAlert.showSuccess(
+          'Target device has been pinged for a fresh GPS location update.',
+          title: 'Ping Sent Successfully',
+        );
+      }
     } catch (e) {
-      AppAlert.showError(e.toString(), title: 'Ping Failed');
+      if (!silent) {
+        AppAlert.showError(e.toString(), title: 'Ping Failed');
+      }
     }
   }
 

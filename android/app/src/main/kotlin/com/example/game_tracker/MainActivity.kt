@@ -142,6 +142,19 @@ class MainActivity : FlutterActivity() {
                     stopService(stopIntent)
                     result.success(true)
                 }
+                "locationPing" -> {
+                    val reqId = call.argument<String>("requestId")
+                    val intent = Intent(this, ForegroundService::class.java).apply {
+                        putExtra("action", "location_ping")
+                        putExtra("requestId", reqId)
+                    }
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        startForegroundService(intent)
+                    } else {
+                        startService(intent)
+                    }
+                    result.success(true)
+                }
                 "startForegroundService" -> {
                     try {
                         ForegroundService.startService(this)

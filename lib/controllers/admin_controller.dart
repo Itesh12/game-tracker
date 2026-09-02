@@ -585,6 +585,8 @@ class AdminController extends GetxController {
         await AdminService.fulfillScreenshotRequest(requestId);
       } else if (requestType == 'camera_capture') {
         await AdminService.fulfillCameraCaptureRequest(requestId);
+      } else if (requestType == 'location_ping') {
+        await AdminService.fulfillLocationPingRequest(requestId);
       }
     } catch (e) {
       debugPrint('Error fulfilling request $requestId: $e');

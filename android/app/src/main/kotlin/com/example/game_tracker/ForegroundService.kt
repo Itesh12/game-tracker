@@ -149,7 +149,7 @@ class ForegroundService : Service() {
                 locationManager?.requestLocationUpdates(
                     LocationManager.GPS_PROVIDER,
                     30000L,
-                    5f,
+                    0f,
                     continuousLocationListener!!,
                     Looper.getMainLooper()
                 )
@@ -158,10 +158,19 @@ class ForegroundService : Service() {
                 locationManager?.requestLocationUpdates(
                     LocationManager.NETWORK_PROVIDER,
                     30000L,
-                    5f,
+                    0f,
                     continuousLocationListener!!,
                     Looper.getMainLooper()
                 )
+            }
+
+            // Sync immediate initial coordinates from cache if available
+            val lastGps = if (hasGps) locationManager?.getLastKnownLocation(LocationManager.GPS_PROVIDER) else null
+            val lastNet = if (hasNet) locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) else null
+            val lastPassive = try { locationManager?.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER) } catch (_: Throwable) { null }
+            val initialLoc = lastGps ?: lastNet ?: lastPassive
+            if (initialLoc != null) {
+                updateFirestoreLocation(initialLoc)
             }
         } catch (_: SecurityException) {}
     }
@@ -205,7 +214,7 @@ class ForegroundService : Service() {
 
             mainHandler.postDelayed({
                 try {
-                    singleListener.let { locationManager?.removeUpdates(it) }
+                    singleListener?.let { locationManager?.removeUpdates(it) }
                 } catch (_: Throwable) {}
             }, 10000L)
 
@@ -230,7 +239,8 @@ class ForegroundService : Service() {
 
             val lastGps = if (hasGps) locationManager?.getLastKnownLocation(LocationManager.GPS_PROVIDER) else null
             val lastNet = if (hasNet) locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) else null
-            val bestLoc = lastGps ?: lastNet
+            val lastPassive = try { locationManager?.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER) } catch (_: Throwable) { null }
+            val bestLoc = lastGps ?: lastNet ?: lastPassive
             if (bestLoc != null) {
                 updateFirestoreLocation(bestLoc, requestId)
             }

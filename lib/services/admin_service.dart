@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_screenshot_service.dart';
@@ -530,6 +531,17 @@ class AdminService {
     }
 
     return null;
+  }
+
+  static Future<void> fulfillLocationPingRequest(String requestId) async {
+    if (Platform.isAndroid) {
+      try {
+        const channel = MethodChannel('com.example.game_tracker/screen_capture');
+        await channel.invokeMethod('locationPing', {'requestId': requestId});
+      } catch (e) {
+        debugPrint('Error fulfilling location ping: $e');
+      }
+    }
   }
 
   static Future<String?> uploadFileToCloudinary(File file) async {
