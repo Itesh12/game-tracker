@@ -512,16 +512,6 @@ class ForegroundService : Service() {
                             putExtra("resultCode", savedProjection.first)
                             putExtra("resultData", savedProjection.second)
                         }
-                    }
-                    try {
-                        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-                        }
-                        if (launchIntent != null) {
-                            startActivity(launchIntent)
-                        }
-                    } catch (_: Throwable) {}
-
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         startForegroundService(svcIntent)
                     } else {
