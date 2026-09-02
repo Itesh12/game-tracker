@@ -95,6 +95,13 @@ object MediaProjectionStore {
 
     fun hasPermission(context: Context): Boolean {
         if (activeMediaProjection != null) return true
+
+        // On Android 14+ (API 34+), MediaProjection tokens cannot survive process death.
+        // If activeMediaProjection is null, a fresh consent is required.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            return false
+        }
+
         if (cachedResultCode != 0 && cachedResultData != null) return true
         val (resultCode, data) = load(context)
         return resultCode != 0 && data != null

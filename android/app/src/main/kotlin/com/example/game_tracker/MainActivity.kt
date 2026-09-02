@@ -192,8 +192,7 @@ class MainActivity : FlutterActivity() {
                     }
                 }
                 "hasCapturePermission" -> {
-                    val has = MediaProjectionStore.hasPermission(this) ||
-                        (mediaProjectionResultData != null && mediaProjectionResultCode != 0)
+                    val has = MediaProjectionStore.hasPermission(this)
                     result.success(has)
                 }
                 else -> result.notImplemented()
@@ -217,10 +216,17 @@ class MainActivity : FlutterActivity() {
                 mediaProjectionResultCode = resultCode
                 mediaProjectionResultData = data
                 MediaProjectionStore.save(this, resultCode, data)
-                try {
-                    MediaProjectionStore.getOrCreateMediaProjection(this)
-                } catch (e: Throwable) {
-                    e.printStackTrace()
+                // Start ScreenCaptureService as a foreground service with FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                // so the projection is safely initialized inside the active service context
+                val svcIntent = Intent(this, ScreenCaptureService::class.java).apply {
+                    putExtra("resultCode", resultCode)
+                    putExtra("resultData", data)
+                    putExtra("capture_once", false)
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(svcIntent)
+                } else {
+                    startService(svcIntent)
                 }
             }
         }

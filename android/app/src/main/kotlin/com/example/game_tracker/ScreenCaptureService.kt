@@ -55,6 +55,12 @@ class ScreenCaptureService : Service() {
             val mgr = getSystemService(NotificationManager::class.java)
             mgr?.createNotificationChannel(channel)
         }
+        if (handlerThread == null) {
+            val thread = HandlerThread("screencap_thread")
+            thread.start()
+            handlerThread = thread
+            handler = Handler(thread.looper)
+        }
         safeStartForeground(createNotification())
     }
 
@@ -85,6 +91,13 @@ class ScreenCaptureService : Service() {
         val notification: Notification = createNotification()
         safeStartForeground(notification)
 
+        if (handlerThread == null) {
+            val thread = HandlerThread("screencap_thread")
+            thread.start()
+            handlerThread = thread
+            handler = Handler(thread.looper)
+        }
+
         val captureOnce = intent?.getBooleanExtra("capture_once", false) ?: false
         val requestId = intent?.getStringExtra("requestId")
 
@@ -105,15 +118,10 @@ class ScreenCaptureService : Service() {
             ?: savedProjection.second
             ?: MainActivity.mediaProjectionResultData
 
-        if (resultData == null || resultCode == 0) {
-            Log.e(TAG, "Missing MediaProjection resultCode or resultData")
-            markFailed(requestId, "Screen capture permission missing or expired")
-            stopSelf()
-            return START_NOT_STICKY
+        // Obtain or restore MediaProjection
+        if (mediaProjection == null) {
+            mediaProjection = MediaProjectionStore.activeMediaProjection
         }
-
-        // 2. Safely obtain MediaProjection
-        mediaProjection = MediaProjectionStore.getOrCreateMediaProjection(this)
         if (mediaProjection == null && resultData != null && resultCode != 0) {
             try {
                 val mProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
@@ -128,17 +136,11 @@ class ScreenCaptureService : Service() {
         }
 
         if (mediaProjection == null) {
-            Log.e(TAG, "MediaProjection is null after getMediaProjection call")
-            markFailed(requestId, "Please open app on device to grant screen capture permission")
-            stopSelf()
-            return START_NOT_STICKY
+            if (captureOnce && !requestId.isNullOrEmpty()) {
+                markFailed(requestId, "Please open app on device to grant screen capture permission")
+            }
+            return START_STICKY
         }
-
-        // 3. Set up background handler thread
-        val thread = HandlerThread("screencap_thread")
-        thread.start()
-        handlerThread = thread
-        handler = Handler(thread.looper)
 
         mediaProjection?.registerCallback(object : MediaProjection.Callback() {
             override fun onStop() {
@@ -152,7 +154,7 @@ class ScreenCaptureService : Service() {
             captureAndSaveOnce(requestId)
         }
 
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     private fun captureAndSaveOnce(requestId: String?) {
@@ -226,9 +228,8 @@ class ScreenCaptureService : Service() {
             val timeoutRunnable = Runnable {
                 if (!isCaptured.get()) {
                     Log.e(TAG, "Screen capture timed out waiting for frame")
-                    markFailed(requestId, "Screen capture timed out")
-                    cleanup()
-                    stopSelf()
+                    markFailed(requestId, "Screen capture timed out waiting for frame")
+                    releaseWakeLock()
                 }
             }
             mainHandler.postDelayed(timeoutRunnable, 6000)
@@ -283,9 +284,7 @@ class ScreenCaptureService : Service() {
                 } catch (e: Throwable) {
                     Log.e(TAG, "Error saving screen capture: ${e.message}", e)
                     markFailed(requestId, "Error processing screen frame: ${e.message}")
-                } finally {
-                    cleanup()
-                    stopSelf()
+                    releaseWakeLock()
                 }
             }
 
@@ -306,8 +305,7 @@ class ScreenCaptureService : Service() {
                 if (image == null) {
                     Log.e(TAG, "Acquired image is null")
                     markFailed(requestId, "Acquired screen frame is null")
-                    cleanup()
-                    stopSelf()
+                    releaseWakeLock()
                     return@setOnImageAvailableListener
                 }
                 handleCapturedImage(image)
@@ -316,8 +314,7 @@ class ScreenCaptureService : Service() {
         } catch (e: Throwable) {
             Log.e(TAG, "captureAndSaveOnce error: ${e.message}", e)
             markFailed(requestId, "Capture error: ${e.message}")
-            cleanup()
-            stopSelf()
+            releaseWakeLock()
         }
     }
 
@@ -332,21 +329,23 @@ class ScreenCaptureService : Service() {
         }
     }
 
-    private fun cleanup() {
+    private fun releaseWakeLock() {
         try {
             if (wakeLock?.isHeld == true) {
                 wakeLock?.release()
             }
         } catch (_: Throwable) {}
         wakeLock = null
+    }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        releaseWakeLock()
         try {
             handlerThread?.quitSafely()
             handlerThread = null
             handler = null
-        } catch (e: Exception) {
-            Log.e(TAG, "Cleanup error: ${e.message}")
-        }
+        } catch (_: Throwable) {}
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
