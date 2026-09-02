@@ -512,6 +512,8 @@ class ForegroundService : Service() {
                             putExtra("resultCode", savedProjection.first)
                             putExtra("resultData", savedProjection.second)
                         }
+                    }
+
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         startForegroundService(svcIntent)
                     } else {
