@@ -178,6 +178,33 @@ class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
 
   bool _isSpeakerOn = true;
 
+  @override
+  void initState() {
+    super.initState();
+    _checkInitialAudioOutput();
+  }
+
+  Future<void> _checkInitialAudioOutput() async {
+    try {
+      final devices = await Helper.audiooutputs;
+      final hasHeadphones = devices.any((d) {
+        final label = (d.label).toLowerCase();
+        final id = (d.deviceId).toLowerCase();
+        return label.contains('head') ||
+            label.contains('bluetooth') ||
+            label.contains('wired') ||
+            id.contains('head') ||
+            id.contains('bluetooth') ||
+            id.contains('wired');
+      });
+      if (hasHeadphones && mounted) {
+        setState(() {
+          _isSpeakerOn = false;
+        });
+      }
+    } catch (_) {}
+  }
+
   void _toggleAudioOutput() {
     AppFeedback.buttonPress();
     setState(() {

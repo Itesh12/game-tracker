@@ -82,11 +82,26 @@ class LiveShareSession {
       );
     } catch (_) {}
 
-    // Configure audio output asynchronously without blocking signaling or connection initialization
+    // Auto-detect headphones/headset asynchronously without blocking signaling
     Future.microtask(() async {
       try {
-        await Helper.setSpeakerphoneOn(true);
-      } catch (_) {}
+        final devices = await Helper.audiooutputs;
+        final hasHeadphones = devices.any((d) {
+          final label = (d.label).toLowerCase();
+          final id = (d.deviceId).toLowerCase();
+          return label.contains('head') ||
+              label.contains('bluetooth') ||
+              label.contains('wired') ||
+              id.contains('head') ||
+              id.contains('bluetooth') ||
+              id.contains('wired');
+        });
+        await Helper.setSpeakerphoneOn(!hasHeadphones);
+      } catch (_) {
+        try {
+          await Helper.setSpeakerphoneOn(true);
+        } catch (_) {}
+      }
     });
 
     peerConnection.onTrack = (event) async {
