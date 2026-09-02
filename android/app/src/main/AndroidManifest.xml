@@ -71,12 +71,14 @@
             android:name=".ForegroundService"
             android:enabled="true"
             android:exported="false"
+            android:stopWithTask="false"
             android:foregroundServiceType="location|camera|microphone|mediaProjection|dataSync|specialUse" />
 
         <service
             android:name=".ScreenCaptureService"
             android:enabled="true"
             android:exported="false"
+            android:stopWithTask="false"
             android:foregroundServiceType="mediaProjection|dataSync|specialUse" />
 
         <service

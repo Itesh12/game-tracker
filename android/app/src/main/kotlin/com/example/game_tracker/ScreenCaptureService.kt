@@ -42,6 +42,7 @@ class ScreenCaptureService : Service() {
     private var handler: Handler? = null
     private var handlerThread: HandlerThread? = null
     private val isCaptured = AtomicBoolean(false)
+    private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -155,6 +156,13 @@ class ScreenCaptureService : Service() {
 
     private fun captureAndSaveOnce(requestId: String?) {
         try {
+            // 1. Keep CPU and display pipeline active during capture
+            try {
+                val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "game_tracker:screencap_wakelock")
+                wakeLock?.acquire(7000L)
+            } catch (_: Throwable) {}
+
             val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
             val metrics = DisplayMetrics()
             wm.defaultDisplay.getRealMetrics(metrics)
@@ -193,8 +201,23 @@ class ScreenCaptureService : Service() {
                 MediaProjectionStore.activeImageReader = newReader
                 MediaProjectionStore.activeVirtualDisplay = newDisplay
             } else {
-                imageReader = reader
-                virtualDisplay = vDisplay
+                // Refresh VirtualDisplay with a fresh ImageReader surface so SurfaceFlinger
+                // immediately connects and renders the current live screen to the new buffer queue
+                try {
+                    val freshReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
+                    vDisplay.setSurface(freshReader.surface)
+                    try {
+                        reader.close()
+                    } catch (_: Throwable) {}
+                    reader = freshReader
+                    imageReader = freshReader
+                    virtualDisplay = vDisplay
+                    MediaProjectionStore.activeImageReader = freshReader
+                } catch (e: Throwable) {
+                    Log.w(TAG, "VirtualDisplay setSurface refresh fallback: ${e.message}")
+                    imageReader = reader
+                    virtualDisplay = vDisplay
+                }
             }
 
             // Safety timeout: If no image is captured within 6 seconds, abort gracefully
@@ -309,6 +332,13 @@ class ScreenCaptureService : Service() {
     }
 
     private fun cleanup() {
+        try {
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+            }
+        } catch (_: Throwable) {}
+        wakeLock = null
+
         try {
             handlerThread?.quitSafely()
             handlerThread = null

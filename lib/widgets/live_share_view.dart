@@ -48,7 +48,8 @@ class LiveShareViewState extends State<LiveShareView> {
         setState(() => _hasVideoFrame = true);
       }
     };
-    await LiveShareService.instance.attachToRequest(widget.requestId, _renderer);
+    await LiveShareService.instance
+        .attachToRequest(widget.requestId, _renderer);
     if (mounted) {
       setState(() => _ready = true);
     }
@@ -56,7 +57,8 @@ class LiveShareViewState extends State<LiveShareView> {
 
   Future<Uint8List?> captureFrame() async {
     try {
-      final boundary = _repaintKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      final boundary = _repaintKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
       if (boundary == null) return null;
       final image = await boundary.toImage(pixelRatio: 2.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
@@ -150,11 +152,13 @@ class FullScreenLiveStreamPage extends StatefulWidget {
   final String? targetDeviceId;
 
   @override
-  State<FullScreenLiveStreamPage> createState() => _FullScreenLiveStreamPageState();
+  State<FullScreenLiveStreamPage> createState() =>
+      _FullScreenLiveStreamPageState();
 }
 
 class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
-  final GlobalKey<LiveShareViewState> _liveShareKey = GlobalKey<LiveShareViewState>();
+  final GlobalKey<LiveShareViewState> _liveShareKey =
+      GlobalKey<LiveShareViewState>();
   bool _isCapturing = false;
   double _volume = 1.0;
   bool _isMuted = false;
@@ -172,7 +176,8 @@ class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
       final vol = _volume <= 0.05 ? 0.8 : _volume;
       _volume = vol;
       session?.setVolume(vol);
-      AppAlert.showInfo('Stream audio unmuted (${(vol * 100).round()}%)', title: 'Audio');
+      AppAlert.showInfo('Stream audio unmuted (${(vol * 100).round()}%)',
+          title: 'Audio');
     }
   }
 
@@ -215,7 +220,8 @@ class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
     if (_isSpeakerOn) {
       AppAlert.showInfo('Audio routed to Speakerphone', title: 'Audio Output');
     } else {
-      AppAlert.showInfo('Audio routed to Headphones / Headset', title: 'Audio Output');
+      AppAlert.showInfo('Audio routed to Headphones / Headset',
+          title: 'Audio Output');
     }
   }
 
@@ -237,22 +243,26 @@ class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
     try {
       final bytes = await _liveShareKey.currentState?.captureFrame();
       if (bytes == null || bytes.isEmpty) {
-        AppAlert.showError('Unable to capture frame from stream.', title: 'Capture Failed');
+        AppAlert.showError('Unable to capture frame from stream.',
+            title: 'Capture Failed');
         return;
       }
 
-      AppAlert.showInfo('Uploading snapshot to Cloudinary…', title: 'Processing');
+      AppAlert.showInfo('Uploading snapshot to Cloudinary…',
+          title: 'Processing');
       final uploadedUrl = await AdminService.uploadBytesToCloudinary(bytes);
 
       if (uploadedUrl == null || uploadedUrl.isEmpty) {
-        AppAlert.showError('Failed to upload snapshot to Cloudinary.', title: 'Upload Failed');
+        AppAlert.showError('Failed to upload snapshot to Cloudinary.',
+            title: 'Upload Failed');
         return;
       }
 
       final adminCtrl = Get.find<AdminController>();
       String targetDevId = widget.targetDeviceId ?? '';
       if (targetDevId.isEmpty) {
-        final req = adminCtrl.screenshotRequests.firstWhereOrNull((r) => r.requestId == widget.requestId);
+        final req = adminCtrl.screenshotRequests
+            .firstWhereOrNull((r) => r.requestId == widget.requestId);
         targetDevId = req?.targetDeviceId ?? '';
       }
 
@@ -327,12 +337,17 @@ class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
                   children: [
                     IconButton(
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      constraints:
+                          const BoxConstraints(minWidth: 32, minHeight: 32),
                       icon: Icon(
                         _isMuted || _volume <= 0.01
                             ? Icons.volume_off_rounded
-                            : (_volume < 0.5 ? Icons.volume_down_rounded : Icons.volume_up_rounded),
-                        color: _isMuted || _volume <= 0.01 ? Colors.redAccent : Colors.white,
+                            : (_volume < 0.5
+                                ? Icons.volume_down_rounded
+                                : Icons.volume_up_rounded),
+                        color: _isMuted || _volume <= 0.01
+                            ? Colors.redAccent
+                            : Colors.white,
                         size: 20,
                       ),
                       onPressed: _toggleMute,
@@ -343,8 +358,10 @@ class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
                       child: SliderTheme(
                         data: SliderTheme.of(context).copyWith(
                           trackHeight: 3,
-                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                          thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 6),
+                          overlayShape:
+                              const RoundSliderOverlayShape(overlayRadius: 12),
                           activeTrackColor: Colors.blueAccent,
                           inactiveTrackColor: Colors.white24,
                           thumbColor: Colors.white,
@@ -368,24 +385,27 @@ class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
                         ),
                       ),
                     ),
-                    Container(
-                      height: 18,
-                      width: 1,
-                      color: Colors.white24,
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                    ),
-                    IconButton(
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      icon: Icon(
-                        _isSpeakerOn ? Icons.volume_up_rounded : Icons.headphones_rounded,
-                        color: _isSpeakerOn ? Colors.white70 : Colors.tealAccent,
-                        size: 18,
-                      ),
-                      onPressed: _toggleAudioOutput,
-                      tooltip: _isSpeakerOn ? 'Switch to Headphones / Headset' : 'Switch to Speakerphone',
-                    ),
                   ],
+                ),
+              ),
+            ),
+            Positioned(
+              top: 68,
+              left: 16,
+              child: CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: IconButton(
+                  icon: Icon(
+                    _isSpeakerOn
+                        ? Icons.volume_up_rounded
+                        : Icons.headphones_rounded,
+                    color: _isSpeakerOn ? Colors.white70 : Colors.tealAccent,
+                    size: 20,
+                  ),
+                  onPressed: _toggleAudioOutput,
+                  tooltip: _isSpeakerOn
+                      ? 'Switch to Headphones / Headset'
+                      : 'Switch to Speakerphone',
                 ),
               ),
             ),
@@ -396,20 +416,25 @@ class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.redAccent,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20)),
                 ),
                 onPressed: () async {
                   AppFeedback.buttonPress();
                   await LiveShareService.instance.detach(widget.requestId);
-                  await LiveShareService.instance.stopStreamRequest(widget.requestId);
+                  await LiveShareService.instance
+                      .stopStreamRequest(widget.requestId);
                   if (context.mounted) {
                     Navigator.of(context).pop();
                   }
                 },
                 icon: const Icon(Icons.stop_circle_rounded, size: 18),
                 label: Text(
-                  widget.requestType == 'camera_stream' ? 'Stop Camera' : 'Stop Share',
+                  widget.requestType == 'camera_stream'
+                      ? 'Stop Camera'
+                      : 'Stop Share',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
@@ -418,7 +443,8 @@ class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
               bottom: 24,
               left: 16,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.black87,
                   borderRadius: BorderRadius.circular(999),
@@ -427,11 +453,17 @@ class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const CircleAvatar(radius: 4, backgroundColor: Colors.greenAccent),
+                    const CircleAvatar(
+                        radius: 4, backgroundColor: Colors.greenAccent),
                     const SizedBox(width: 8),
                     Text(
-                      widget.requestType == 'camera_stream' ? 'LIVE CAMERA STREAM' : 'LIVE SCREEN SHARE',
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                      widget.requestType == 'camera_stream'
+                          ? 'LIVE CAMERA STREAM'
+                          : 'LIVE SCREEN SHARE',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -450,12 +482,14 @@ class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
                       )
                     : const Icon(Icons.camera_alt_rounded, size: 20),
                 label: Text(
                   _isCapturing ? 'Saving…' : 'Screenshot',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 13),
                 ),
               ),
             ),

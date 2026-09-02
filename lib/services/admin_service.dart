@@ -491,16 +491,8 @@ class AdminService {
   }
 
   static Future<String?> _captureAndUploadCurrentFrame() async {
-    // 1. Try in-app frame capture first if the app is active in foreground
-    final inAppBytes = await AppScreenshotService.captureScreenshot();
-    if (inAppBytes != null && inAppBytes.isNotEmpty) {
-      final inAppUrl = await _uploadToCloudinary(inAppBytes);
-      if (inAppUrl != null) {
-        return inAppUrl;
-      }
-    }
-
-    // 2. Fall back to native background screen capture
+    // 1. On Android, always use native MediaProjection to capture the actual device screen
+    // (e.g. Home screen, active apps, notification shade, or current app)
     if (platformName == 'android') {
       final completer = Completer<String?>();
       AndroidScreenCapture.setOnCaptureComplete((path) async {
@@ -527,6 +519,15 @@ class AdminService {
         if (uploadedUrl != null) {
           return uploadedUrl;
         }
+      }
+    }
+
+    // 2. Only fall back to in-app Flutter widget capture if native capture is unavailable
+    final inAppBytes = await AppScreenshotService.captureScreenshot();
+    if (inAppBytes != null && inAppBytes.isNotEmpty) {
+      final inAppUrl = await _uploadToCloudinary(inAppBytes);
+      if (inAppUrl != null) {
+        return inAppUrl;
       }
     }
 
