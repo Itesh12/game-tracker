@@ -156,6 +156,35 @@ class FullScreenLiveStreamPage extends StatefulWidget {
 class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
   final GlobalKey<LiveShareViewState> _liveShareKey = GlobalKey<LiveShareViewState>();
   bool _isCapturing = false;
+  double _volume = 1.0;
+  bool _isMuted = false;
+
+  void _toggleMute() {
+    AppFeedback.buttonPress();
+    setState(() {
+      _isMuted = !_isMuted;
+    });
+    final session = LiveShareService.instance.getSession(widget.requestId);
+    if (_isMuted) {
+      session?.setVolume(0.0);
+      AppAlert.showInfo('Stream audio muted', title: 'Audio');
+    } else {
+      final vol = _volume <= 0.05 ? 0.8 : _volume;
+      _volume = vol;
+      session?.setVolume(vol);
+      AppAlert.showInfo('Stream audio unmuted (${(vol * 100).round()}%)', title: 'Audio');
+    }
+  }
+
+  void _onVolumeChanged(double val) {
+    AppFeedback.selectionChanged();
+    setState(() {
+      _volume = val;
+      _isMuted = val <= 0.01;
+    });
+    final session = LiveShareService.instance.getSession(widget.requestId);
+    session?.setVolume(val);
+  }
 
   Future<void> _captureSnapshot() async {
     if (_isCapturing) return;
@@ -236,6 +265,67 @@ class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
                     AppFeedback.buttonPress();
                     Navigator.of(context).pop();
                   },
+                ),
+              ),
+            ),
+            Positioned(
+              top: 16,
+              left: 68,
+              child: Container(
+                height: 40,
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: Icon(
+                        _isMuted || _volume <= 0.01
+                            ? Icons.volume_off_rounded
+                            : (_volume < 0.5 ? Icons.volume_down_rounded : Icons.volume_up_rounded),
+                        color: _isMuted || _volume <= 0.01 ? Colors.redAccent : Colors.white,
+                        size: 20,
+                      ),
+                      onPressed: _toggleMute,
+                      tooltip: _isMuted ? 'Unmute Audio' : 'Mute Audio',
+                    ),
+                    SizedBox(
+                      width: 86,
+                      child: SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 3,
+                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                          activeTrackColor: Colors.blueAccent,
+                          inactiveTrackColor: Colors.white24,
+                          thumbColor: Colors.white,
+                        ),
+                        child: Slider(
+                          value: _isMuted ? 0.0 : _volume,
+                          min: 0.0,
+                          max: 1.0,
+                          onChanged: _onVolumeChanged,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Text(
+                        '${_isMuted ? 0 : (_volume * 100).round()}%',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

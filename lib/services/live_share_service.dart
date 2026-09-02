@@ -12,6 +12,45 @@ class LiveShareSession {
   late final StreamSubscription<List<Map<String, dynamic>>> _iceSub;
   bool _isDisposed = false;
   MediaStream? _localStream;
+  MediaStreamTrack? _remoteAudioTrack;
+  double _volume = 1.0;
+  bool _isMuted = false;
+
+  MediaStreamTrack? get remoteAudioTrack => _remoteAudioTrack;
+  double get volume => _volume;
+  bool get isMuted => _isMuted;
+
+  Future<void> setVolume(double vol) async {
+    _volume = vol.clamp(0.0, 1.0);
+    _isMuted = _volume == 0.0;
+    _remoteAudioTrack?.enabled = !_isMuted;
+    if (_remoteAudioTrack != null) {
+      try {
+        await Helper.setVolume(_volume, _remoteAudioTrack!);
+      } catch (_) {}
+    }
+  }
+
+  Future<void> toggleMute() async {
+    if (_isMuted) {
+      _isMuted = false;
+      if (_volume <= 0.05) _volume = 0.8;
+      _remoteAudioTrack?.enabled = true;
+      if (_remoteAudioTrack != null) {
+        try {
+          await Helper.setVolume(_volume, _remoteAudioTrack!);
+        } catch (_) {}
+      }
+    } else {
+      _isMuted = true;
+      _remoteAudioTrack?.enabled = false;
+      if (_remoteAudioTrack != null) {
+        try {
+          await Helper.setVolume(0.0, _remoteAudioTrack!);
+        } catch (_) {}
+      }
+    }
+  }
 
   LiveShareSession({
     required this.requestId,
@@ -56,9 +95,13 @@ class LiveShareSession {
           } catch (_) {}
         }
       } else if (event.track.kind == 'audio') {
+        _remoteAudioTrack = event.track;
         try {
-          event.track.enabled = true;
+          event.track.enabled = !_isMuted;
           await Helper.setSpeakerphoneOn(true);
+          if (!_isMuted && _volume > 0) {
+            await Helper.setVolume(_volume, event.track);
+          }
         } catch (_) {}
       }
     };
@@ -69,7 +112,11 @@ class LiveShareSession {
           track.enabled = true;
         }
         for (final track in stream.getAudioTracks()) {
-          track.enabled = true;
+          _remoteAudioTrack = track;
+          track.enabled = !_isMuted;
+          if (!_isMuted && _volume > 0) {
+            Helper.setVolume(_volume, track);
+          }
         }
       } catch (_) {}
       renderer.srcObject = stream;
@@ -333,6 +380,8 @@ class LiveShareService {
 
   final Map<String, LiveShareSession> _sessions = {};
   final Map<String, LiveSharePublisherSession> _publishers = {};
+
+  LiveShareSession? getSession(String requestId) => _sessions[requestId];
 
   Future<void> attachToRequest(String requestId, RTCVideoRenderer renderer) async {
     await detach(requestId);
