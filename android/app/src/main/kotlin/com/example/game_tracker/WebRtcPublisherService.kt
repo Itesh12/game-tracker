@@ -15,6 +15,8 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import org.webrtc.*
+import org.webrtc.audio.AudioDeviceModule
+import org.webrtc.audio.JavaAudioDeviceModule
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.ListenerRegistration
@@ -87,6 +89,8 @@ class WebRtcPublisherService : Service() {
         }
     }
 
+    private var audioDeviceModule: AudioDeviceModule? = null
+
     private fun initializePeerFactory() {
         try {
             eglBase = EglBase.create()
@@ -94,10 +98,19 @@ class WebRtcPublisherService : Service() {
             PeerConnectionFactory.initialize(options)
             val encoderFactory = DefaultVideoEncoderFactory(eglBase?.eglBaseContext, true, true)
             val decoderFactory = DefaultVideoDecoderFactory(eglBase?.eglBaseContext)
+
+            val adm = JavaAudioDeviceModule.builder(this)
+                .setUseHardwareAcousticEchoCanceler(true)
+                .setUseHardwareNoiseSuppressor(true)
+                .createAudioDeviceModule()
+            audioDeviceModule = adm
+
             peerConnectionFactory = PeerConnectionFactory.builder()
+                .setAudioDeviceModule(adm)
                 .setVideoEncoderFactory(encoderFactory)
                 .setVideoDecoderFactory(decoderFactory)
                 .createPeerConnectionFactory()
+            Log.d(TAG, "PeerConnectionFactory initialized with JavaAudioDeviceModule successfully")
         } catch (e: Throwable) {
             Log.e(TAG, "Error initializing PeerConnectionFactory: ${e.message}", e)
         }
@@ -612,6 +625,10 @@ class WebRtcPublisherService : Service() {
         try {
             peerConnectionFactory?.dispose()
             peerConnectionFactory = null
+        } catch (e: Exception) {}
+        try {
+            audioDeviceModule?.release()
+            audioDeviceModule = null
         } catch (e: Exception) {}
         try {
             eglBase?.release()

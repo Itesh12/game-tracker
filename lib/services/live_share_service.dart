@@ -99,9 +99,6 @@ class LiveShareSession {
         try {
           event.track.enabled = !_isMuted;
           await Helper.setSpeakerphoneOn(true);
-          if (!_isMuted && _volume > 0) {
-            await Helper.setVolume(_volume, event.track);
-          }
         } catch (_) {}
       }
     };
@@ -114,9 +111,9 @@ class LiveShareSession {
         for (final track in stream.getAudioTracks()) {
           _remoteAudioTrack = track;
           track.enabled = !_isMuted;
-          if (!_isMuted && _volume > 0) {
-            Helper.setVolume(_volume, track);
-          }
+          try {
+            Helper.setSpeakerphoneOn(true);
+          } catch (_) {}
         }
       } catch (_) {}
       renderer.srcObject = stream;
