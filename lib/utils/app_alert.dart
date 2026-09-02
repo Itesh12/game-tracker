@@ -1,6 +1,7 @@
 import 'package:alert_info/alert_info.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'app_feedback.dart';
 
 class AppAlert {
   AppAlert._();
@@ -30,6 +31,15 @@ class AppAlert {
 
     _lastMessage = displayText;
     _lastAlertTime = now;
+
+    // Tactile vibration feedback on event/alert
+    if (typeInfo == TypeInfo.error) {
+      AppFeedback.error();
+    } else if (typeInfo == TypeInfo.success) {
+      AppFeedback.success();
+    } else {
+      AppFeedback.eventFired();
+    }
 
     final targetContext = context ?? Get.overlayContext ?? Get.context;
     if (targetContext == null) {

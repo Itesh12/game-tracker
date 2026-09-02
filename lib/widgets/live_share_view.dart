@@ -10,6 +10,7 @@ import '../services/admin_service.dart';
 import '../services/backend_bridge_service.dart';
 import '../services/live_share_service.dart';
 import '../utils/app_alert.dart';
+import '../utils/app_feedback.dart';
 
 class LiveShareView extends StatefulWidget {
   const LiveShareView({
@@ -143,6 +144,7 @@ class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
 
   Future<void> _captureSnapshot() async {
     if (_isCapturing) return;
+    AppFeedback.buttonPress();
     setState(() => _isCapturing = true);
 
     try {
@@ -215,7 +217,10 @@ class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
                 backgroundColor: Colors.black54,
                 child: IconButton(
                   icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () {
+                    AppFeedback.buttonPress();
+                    Navigator.of(context).pop();
+                  },
                 ),
               ),
             ),
@@ -230,6 +235,7 @@ class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 ),
                 onPressed: () async {
+                  AppFeedback.buttonPress();
                   await LiveShareService.instance.detach(widget.requestId);
                   await LiveShareService.instance.stopStreamRequest(widget.requestId);
                   if (context.mounted) {

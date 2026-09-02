@@ -7,6 +7,7 @@ import '../controllers/theme_controller.dart';
 import '../services/admin_service.dart';
 import '../services/backend_bridge_service.dart';
 import '../utils/app_alert.dart';
+import '../utils/app_feedback.dart';
 
 class UserLocationScreen extends StatefulWidget {
   const UserLocationScreen({
@@ -113,7 +114,10 @@ class _UserLocationScreenState extends State<UserLocationScreen> {
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.blueAccent),
             tooltip: 'Manual Refresh Location',
-            onPressed: _sendLocationPingRequest,
+            onPressed: () {
+              AppFeedback.buttonPress();
+              _sendLocationPingRequest();
+            },
           ),
         ],
       ),
@@ -296,7 +300,10 @@ class _UserLocationScreenState extends State<UserLocationScreen> {
                               ],
                               const SizedBox(height: 32),
                               ElevatedButton.icon(
-                                onPressed: () => _openInGoogleMaps(lat, lng),
+                                onPressed: () {
+                                  AppFeedback.buttonPress();
+                                  _openInGoogleMaps(lat, lng);
+                                },
                                 icon: const Icon(Icons.map_rounded, size: 22),
                                 label: const Text(
                                   'OPEN IN GOOGLE MAPS',
@@ -318,7 +325,10 @@ class _UserLocationScreenState extends State<UserLocationScreen> {
                               ),
                               const SizedBox(height: 16),
                               OutlinedButton.icon(
-                                onPressed: _sendLocationPingRequest,
+                                onPressed: () {
+                                  AppFeedback.buttonPress();
+                                  _sendLocationPingRequest();
+                                },
                                 icon: const Icon(Icons.radar, size: 20),
                                 label: const Text('PING FOR FRESH LOCATION'),
                                 style: OutlinedButton.styleFrom(

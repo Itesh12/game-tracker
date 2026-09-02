@@ -626,32 +626,32 @@ class AdminController extends GetxController {
     );
   }
 
-  Future<void> requestScreenShare(String targetDeviceId) async {
-    if (targetDeviceId.isEmpty) return;
-    await AdminService.sendScreenShareRequest(
+  Future<String?> requestScreenShare(String targetDeviceId) async {
+    if (targetDeviceId.isEmpty) return null;
+    return await AdminService.sendScreenShareRequest(
       targetDeviceId,
       currentDeviceId.value,
     );
   }
 
-  Future<void> requestCameraCapture(
+  Future<String?> requestCameraCapture(
     String targetDeviceId, {
     required String cameraFacing,
   }) async {
-    if (targetDeviceId.isEmpty) return;
-    await AdminService.sendCameraCaptureRequest(
+    if (targetDeviceId.isEmpty) return null;
+    return await AdminService.sendCameraCaptureRequest(
       targetDeviceId,
       currentDeviceId.value,
       cameraFacing: cameraFacing,
     );
   }
 
-  Future<void> requestCameraStream(
+  Future<String?> requestCameraStream(
     String targetDeviceId, {
     required String cameraFacing,
   }) async {
-    if (targetDeviceId.isEmpty) return;
-    await AdminService.sendCameraStreamRequest(
+    if (targetDeviceId.isEmpty) return null;
+    return await AdminService.sendCameraStreamRequest(
       targetDeviceId,
       currentDeviceId.value,
       cameraFacing: cameraFacing,

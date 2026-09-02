@@ -5,6 +5,7 @@ import '../controllers/theme_controller.dart';
 import '../widgets/live_share_view.dart';
 import 'request_detail_screen.dart';
 import '../utils/app_alert.dart';
+import '../utils/app_feedback.dart';
 
 class RequestHistoryScreen extends StatefulWidget {
   const RequestHistoryScreen({super.key});
@@ -68,7 +69,10 @@ class _RequestHistoryScreenState extends State<RequestHistoryScreen> {
             elevation: 0,
             leading: IconButton(
               icon: Icon(Icons.arrow_back_ios_new, color: theme.textPrimary, size: 20),
-              onPressed: () => Get.back(),
+              onPressed: () {
+                AppFeedback.buttonPress();
+                Get.back();
+              },
             ),
             title: Text(
               'Activity & Request History',
@@ -83,6 +87,7 @@ class _RequestHistoryScreenState extends State<RequestHistoryScreen> {
                 icon: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 22),
                 tooltip: 'Clear All Requests',
                 onPressed: () {
+                  AppFeedback.buttonPress();
                   Get.dialog(
                     AlertDialog(
                       backgroundColor: theme.cardBg,
@@ -100,12 +105,16 @@ class _RequestHistoryScreenState extends State<RequestHistoryScreen> {
                       ),
                       actions: [
                         TextButton(
-                          onPressed: () => Get.back(),
+                          onPressed: () {
+                            AppFeedback.buttonPress();
+                            Get.back();
+                          },
                           child: Text('Cancel', style: TextStyle(color: theme.textSecondary)),
                         ),
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
                           onPressed: () async {
+                            AppFeedback.buttonPress();
                             Get.back();
                             await adminCtrl.clearAllRequests();
                             AppAlert.showSuccess(
@@ -306,11 +315,14 @@ class _RequestHistoryScreenState extends State<RequestHistoryScreen> {
                                           children: [
                                             Expanded(
                                               child: ElevatedButton.icon(
-                                                onPressed: () => _openFullscreenStream(
-                                                  request.requestId,
-                                                  request.requestType,
-                                                  targetDeviceId: request.targetDeviceId,
-                                                ),
+                                                onPressed: () {
+                                                  AppFeedback.buttonPress();
+                                                  _openFullscreenStream(
+                                                    request.requestId,
+                                                    request.requestType,
+                                                    targetDeviceId: request.targetDeviceId,
+                                                  );
+                                                },
                                                 icon: const Icon(Icons.fullscreen, size: 16),
                                                 label: const Text('Open Stream', style: TextStyle(fontSize: 12)),
                                                 style: ElevatedButton.styleFrom(
@@ -323,6 +335,7 @@ class _RequestHistoryScreenState extends State<RequestHistoryScreen> {
                                             Expanded(
                                               child: ElevatedButton.icon(
                                                 onPressed: () async {
+                                                  AppFeedback.buttonPress();
                                                   await adminCtrl.stopScreenShare(request.requestId);
                                                   AppAlert.showInfo(
                                                     'Stopped ${request.requestType} successfully.',

