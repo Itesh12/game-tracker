@@ -37,6 +37,10 @@ class LiveShareSession {
       );
     } catch (_) {}
 
+    try {
+      await Helper.setSpeakerphoneOn(true);
+    } catch (_) {}
+
     peerConnection.onTrack = (event) async {
       if (event.track.kind == 'video') {
         try {
@@ -54,6 +58,7 @@ class LiveShareSession {
       } else if (event.track.kind == 'audio') {
         try {
           event.track.enabled = true;
+          await Helper.setSpeakerphoneOn(true);
         } catch (_) {}
       }
     };

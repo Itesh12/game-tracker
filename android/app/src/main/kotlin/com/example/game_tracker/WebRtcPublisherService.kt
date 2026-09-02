@@ -268,6 +268,32 @@ class WebRtcPublisherService : Service() {
         }
     }
 
+    private fun ensureAudioTrack(): AudioTrack? {
+        if (localAudioTrack != null) {
+            return localAudioTrack
+        }
+        try {
+            val hasRecordAudio = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+            if (hasRecordAudio) {
+                val audioConstraints = MediaConstraints().apply {
+                    mandatory.add(MediaConstraints.KeyValuePair("googEchoCancellation", "true"))
+                    mandatory.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
+                    mandatory.add(MediaConstraints.KeyValuePair("googHighpassFilter", "true"))
+                    mandatory.add(MediaConstraints.KeyValuePair("googNoiseSuppression", "true"))
+                }
+                audioSource = peerConnectionFactory?.createAudioSource(audioConstraints)
+                localAudioTrack = peerConnectionFactory?.createAudioTrack("ARDAMSa0", audioSource)
+                localAudioTrack?.setEnabled(true)
+                Log.d(TAG, "WebRTC audio track initialized successfully")
+            } else {
+                Log.w(TAG, "RECORD_AUDIO permission not granted; streaming video only")
+            }
+        } catch (e: Throwable) {
+            Log.w(TAG, "Failed to initialize WebRTC audio track: ${e.message}")
+        }
+        return localAudioTrack
+    }
+
     private fun reconnectPeerConnection(epoch: Long) {
         val rid = requestId ?: return
         Log.d(TAG, "Reconnecting WebRTC PeerConnection for viewer session (epoch=$epoch)...")
@@ -283,23 +309,24 @@ class WebRtcPublisherService : Service() {
         // Re-create PeerConnection with fresh ICE agent
         createPeerConnection()
 
-        // Re-attach existing continuous video track
+        // 1. Re-attach existing continuous video track FIRST (Strict Transceiver Index 0)
         localVideoTrack?.let { vTrack ->
             try {
                 vTrack.setEnabled(true)
                 peerConnection?.addTrack(vTrack, listOf("ARDAMS"))
-                Log.d(TAG, "Re-attached local video track to fresh PeerConnection")
+                Log.d(TAG, "Re-attached local video track to fresh PeerConnection (Transceiver Index 0)")
             } catch (e: Throwable) {
                 Log.e(TAG, "Error re-attaching video track: ${e.message}", e)
             }
         }
 
-        // Re-attach existing continuous audio track
-        localAudioTrack?.let { aTrack ->
+        // 2. Re-attach existing continuous audio track SECOND (Strict Transceiver Index 1)
+        val aTrack = ensureAudioTrack()
+        aTrack?.let { track ->
             try {
-                aTrack.setEnabled(true)
-                peerConnection?.addTrack(aTrack, listOf("ARDAMS"))
-                Log.d(TAG, "Re-attached local audio track to fresh PeerConnection")
+                track.setEnabled(true)
+                peerConnection?.addTrack(track, listOf("ARDAMS"))
+                Log.d(TAG, "Re-attached local audio track to fresh PeerConnection (Transceiver Index 1)")
             } catch (e: Throwable) {
                 Log.e(TAG, "Error re-attaching audio track: ${e.message}", e)
             }
@@ -511,26 +538,16 @@ class WebRtcPublisherService : Service() {
                 peerConnection?.addTrack(localVideoTrack, listOf("ARDAMS"))
             }
 
-            // Initialize and add local audio track safely without blocking video
-            try {
-                val hasRecordAudio = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-                if (hasRecordAudio) {
-                    val audioConstraints = MediaConstraints().apply {
-                        mandatory.add(MediaConstraints.KeyValuePair("googEchoCancellation", "true"))
-                        mandatory.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
-                        mandatory.add(MediaConstraints.KeyValuePair("googHighpassFilter", "true"))
-                        mandatory.add(MediaConstraints.KeyValuePair("googNoiseSuppression", "true"))
-                    }
-                    audioSource = peerConnectionFactory?.createAudioSource(audioConstraints)
-                    localAudioTrack = peerConnectionFactory?.createAudioTrack("ARDAMSa0", audioSource)
-                    localAudioTrack?.setEnabled(true)
-                    peerConnection?.addTrack(localAudioTrack, listOf("ARDAMS"))
-                    Log.d(TAG, "Audio track added to WebRTC stream successfully")
-                } else {
-                    Log.w(TAG, "RECORD_AUDIO permission not granted; streaming video only")
+            // Initialize and add local audio track safely without blocking video (Strict Transceiver Index 1)
+            val aTrack = ensureAudioTrack()
+            if (aTrack != null) {
+                try {
+                    aTrack.setEnabled(true)
+                    peerConnection?.addTrack(aTrack, listOf("ARDAMS"))
+                    Log.d(TAG, "Audio track added to WebRTC stream successfully (Transceiver Index 1)")
+                } catch (e: Throwable) {
+                    Log.w(TAG, "Failed to attach audio track to stream: ${e.message}")
                 }
-            } catch (e: Throwable) {
-                Log.w(TAG, "Failed to initialize WebRTC audio track: ${e.message}")
             }
         } catch (e: Throwable) {
             Log.e(TAG, "startLocalCapture exception: ${e.message}", e)
