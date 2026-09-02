@@ -192,8 +192,7 @@ class ScreenCaptureService : Service() {
                 if (newDisplay == null) {
                     Log.e(TAG, "VirtualDisplay creation returned null")
                     markFailed(requestId, "Failed to create VirtualDisplay")
-                    cleanup()
-                    stopSelf()
+                    releaseWakeLock()
                     return
                 }
 
