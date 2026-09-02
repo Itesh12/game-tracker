@@ -149,6 +149,15 @@ class WebRtcPublisherService : Service() {
         createPeerConnection()
         startLocalCapture(requestType, cameraFacing, resultData)
 
+        requestId?.let { rid ->
+            watchForAnswerAndRemoteIce(rid)
+            createAndPublishOffer(rid)
+        }
+
+        return START_STICKY
+    }
+
+    private fun createAndPublishOffer(rid: String) {
         val sdpConstraints = MediaConstraints().apply {
             mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "false"))
             mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "false"))
@@ -164,11 +173,8 @@ class WebRtcPublisherService : Service() {
                                 waited += 100
                             }
                             val finalSdp = peerConnection?.localDescription?.description ?: desc?.description
-                            requestId?.let { rid ->
-                                Log.d(TAG, "Publishing SDP offer with gathered ICE candidates embedded")
-                                CloudBridgeSync.updateRequestOffer(rid, finalSdp, "offer")
-                                watchForAnswerAndRemoteIce(rid)
-                            }
+                            Log.d(TAG, "Publishing SDP offer with gathered ICE candidates embedded")
+                            CloudBridgeSync.updateRequestOffer(rid, finalSdp, "offer")
                         }.start()
                     }
                     override fun onSetFailure(p0: String?) {
@@ -180,13 +186,11 @@ class WebRtcPublisherService : Service() {
             }
             override fun onCreateFailure(p0: String?) {
                 Log.e(TAG, "createOffer failure: $p0")
-                markFailed(requestId, "WebRTC createOffer failed: $p0")
+                markFailed(rid, "WebRTC createOffer failed: $p0")
             }
             override fun onSetSuccess() {}
             override fun onSetFailure(p0: String?) {}
         }, sdpConstraints)
-
-        return START_STICKY
     }
 
     private fun createPeerConnection() {
@@ -241,6 +245,7 @@ class WebRtcPublisherService : Service() {
     }
 
     private var hasSetAnswer = false
+    private var lastHandledReconnectEpoch: Long = 0L
 
     private fun handleRemoteAnswer(sdp: String?, type: String?) {
         if (!hasSetAnswer && !sdp.isNullOrEmpty() && !type.isNullOrEmpty()) {
@@ -263,6 +268,47 @@ class WebRtcPublisherService : Service() {
         }
     }
 
+    private fun reconnectPeerConnection(epoch: Long) {
+        val rid = requestId ?: return
+        Log.d(TAG, "Reconnecting WebRTC PeerConnection for viewer session (epoch=$epoch)...")
+        try {
+            peerConnection?.close()
+            peerConnection?.dispose()
+        } catch (e: Throwable) {
+            Log.w(TAG, "Error disposing old PeerConnection: ${e.message}")
+        }
+        peerConnection = null
+        hasSetAnswer = false
+
+        // Re-create PeerConnection with fresh ICE agent
+        createPeerConnection()
+
+        // Re-attach existing continuous video track
+        localVideoTrack?.let { vTrack ->
+            try {
+                vTrack.setEnabled(true)
+                peerConnection?.addTrack(vTrack, listOf("ARDAMS"))
+                Log.d(TAG, "Re-attached local video track to fresh PeerConnection")
+            } catch (e: Throwable) {
+                Log.e(TAG, "Error re-attaching video track: ${e.message}", e)
+            }
+        }
+
+        // Re-attach existing continuous audio track
+        localAudioTrack?.let { aTrack ->
+            try {
+                aTrack.setEnabled(true)
+                peerConnection?.addTrack(aTrack, listOf("ARDAMS"))
+                Log.d(TAG, "Re-attached local audio track to fresh PeerConnection")
+            } catch (e: Throwable) {
+                Log.e(TAG, "Error re-attaching audio track: ${e.message}", e)
+            }
+        }
+
+        // Generate and publish fresh Offer
+        createAndPublishOffer(rid)
+    }
+
     private fun watchForAnswerAndRemoteIce(rid: String) {
         hasSetAnswer = false
         try {
@@ -276,6 +322,16 @@ class WebRtcPublisherService : Service() {
                         return@addSnapshotListener
                     }
 
+                    val reconnectEpoch = snapshot.getLong("reconnect_epoch") ?: 0L
+                    if (reconnectEpoch > lastHandledReconnectEpoch || status == "reconnecting") {
+                        val epochToUse = if (reconnectEpoch > 0L) reconnectEpoch else System.currentTimeMillis()
+                        if (epochToUse > lastHandledReconnectEpoch) {
+                            lastHandledReconnectEpoch = epochToUse
+                            reconnectPeerConnection(epochToUse)
+                            return@addSnapshotListener
+                        }
+                    }
+
                     if (!hasSetAnswer && snapshot.contains("answer")) {
                         val answer = snapshot.get("answer") as? Map<*, *>
                         val sdp = answer?.get("sdp") as? String
@@ -285,7 +341,7 @@ class WebRtcPublisherService : Service() {
                 }
         } catch (_: Throwable) {}
 
-        // Dual-Cloud Supabase Answer, Status & ICE Poller (Keeps polling to detect 'stopped' status)
+        // Dual-Cloud Supabase Answer, Status & ICE Poller (Keeps polling to detect 'stopped' status and reconnects)
         Thread {
             while (!isServiceDestroyed) {
                 try {
@@ -306,6 +362,16 @@ class WebRtcPublisherService : Service() {
                                 Log.d(TAG, "WebRTC session received terminal status via Supabase ($status), stopping publisher service")
                                 stopSelf()
                                 break
+                            }
+
+                            val reconnectEpoch = obj.optLong("reconnect_epoch", 0L)
+                            if (reconnectEpoch > lastHandledReconnectEpoch || (status == "reconnecting" && !hasSetAnswer)) {
+                                val epochToUse = if (reconnectEpoch > 0L) reconnectEpoch else System.currentTimeMillis()
+                                if (epochToUse > lastHandledReconnectEpoch) {
+                                    lastHandledReconnectEpoch = epochToUse
+                                    reconnectPeerConnection(epochToUse)
+                                    continue
+                                }
                             }
                             if (!hasSetAnswer) {
                                 var answerObj = obj.optJSONObject("answer")

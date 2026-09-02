@@ -80,10 +80,11 @@ class LiveShareSession {
       });
     };
 
-    bool hasSetOffer = false;
+    String? lastHandledOfferSdp;
 
-    Future<void> handleOfferPayload(dynamic offerRaw) async {
-      if (hasSetOffer || offerRaw == null) return;
+    Future<void> handleOfferPayload(dynamic offerRaw, String? status) async {
+      if (status == 'reconnecting') return;
+      if (offerRaw == null) return;
       Map<dynamic, dynamic>? offer;
       if (offerRaw is Map) {
         offer = offerRaw;
@@ -95,10 +96,12 @@ class LiveShareSession {
       }
 
       if (offer != null && offer['sdp'] != null) {
-        hasSetOffer = true;
+        final sdp = offer['sdp'] as String;
+        if (sdp == lastHandledOfferSdp) return;
+        lastHandledOfferSdp = sdp;
         try {
           final remoteDescription = RTCSessionDescription(
-            offer['sdp'] as String,
+            sdp,
             offer['type'] as String? ?? 'offer',
           );
           await peerConnection.setRemoteDescription(remoteDescription);
@@ -136,6 +139,7 @@ class LiveShareSession {
 
     _requestSub = BackendBridgeService.streamScreenshotRequest(requestId).listen((data) async {
       if (_isDisposed || data == null) return;
+      final status = data['status'] as String?;
       dynamic offerPayload = data['offer'];
       if (offerPayload == null) {
         final screenUrl = data['screenshot_url'] as String? ?? data['screenshotUrl'] as String?;
@@ -144,7 +148,7 @@ class LiveShareSession {
         }
       }
       if (offerPayload != null) {
-        await handleOfferPayload(offerPayload);
+        await handleOfferPayload(offerPayload, status);
       }
 
       dynamic lastIcePayload = data['last_ice_candidate'];
@@ -327,6 +331,29 @@ class LiveShareService {
 
   Future<void> attachToRequest(String requestId, RTCVideoRenderer renderer) async {
     await detach(requestId);
+
+    try {
+      final initialData = await BackendBridgeService.streamScreenshotRequest(requestId).first.timeout(
+        const Duration(milliseconds: 1500),
+        onTimeout: () => null,
+      );
+      final currentStatus = initialData?['status'] as String? ?? '';
+      final isAlreadyRunning = currentStatus == 'live' ||
+          currentStatus == 'active' ||
+          currentStatus == 'offer_created';
+
+      if (isAlreadyRunning) {
+        debugPrint('[LiveShareService] Stream $requestId is already active ($currentStatus). Signaling reconnection to publisher...');
+        await BackendBridgeService.updateScreenshotRequest(requestId, {
+          'status': 'reconnecting',
+          'reconnect_epoch': DateTime.now().millisecondsSinceEpoch,
+          'answer': null,
+        });
+      }
+    } catch (e) {
+      debugPrint('[LiveShareService] Error checking initial status for $requestId: $e');
+    }
+
     final configuration = <String, dynamic>{
       'iceServers': <Map<String, dynamic>>[
         {'urls': 'stun:stun.l.google.com:19302'},

@@ -30,6 +30,7 @@ class LiveShareViewState extends State<LiveShareView> {
   final RTCVideoRenderer _renderer = RTCVideoRenderer();
   final GlobalKey _repaintKey = GlobalKey();
   bool _ready = false;
+  bool _hasVideoFrame = false;
 
   @override
   void initState() {
@@ -43,7 +44,9 @@ class LiveShareViewState extends State<LiveShareView> {
       if (mounted) setState(() {});
     };
     _renderer.onFirstFrameRendered = () {
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() => _hasVideoFrame = true);
+      }
     };
     await LiveShareService.instance.attachToRequest(widget.requestId, _renderer);
     if (mounted) {
@@ -84,25 +87,37 @@ class LiveShareViewState extends State<LiveShareView> {
         borderRadius: BorderRadius.circular(widget.fullScreen ? 0 : 12),
         child: RepaintBoundary(
           key: _repaintKey,
-          child: _ready
-              ? RTCVideoView(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (_ready)
+                RTCVideoView(
                   _renderer,
                   mirror: false,
                   objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
-                )
-              : const Center(
-                  child: Column(
+                ),
+              if (!_hasVideoFrame)
+                Container(
+                  color: Colors.black,
+                  alignment: Alignment.center,
+                  child: const Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       CircularProgressIndicator(color: Colors.blueAccent),
-                      SizedBox(height: 12),
+                      SizedBox(height: 14),
                       Text(
                         'Connecting live stream…',
-                        style: TextStyle(color: Colors.white, fontSize: 13),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
                 ),
+            ],
+          ),
         ),
       ),
     );

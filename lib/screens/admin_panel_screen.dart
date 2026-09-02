@@ -413,51 +413,71 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  Expanded(
-                                     child: activeScreenShare != null
-                                         ? ElevatedButton.icon(
-                                             onPressed: isSelf
-                                                 ? null
-                                                 : () async {
-                                                     AppFeedback.buttonPress();
-                                                     await adminCtrl.stopScreenShare(activeScreenShare.requestId);
-                                                     AppAlert.showInfo(
-                                                       'Stopped live screen share for ${device.username}',
-                                                       title: 'Stream Stopped',
-                                                     );
-                                                   },
-                                             icon: const Icon(Icons.stop_circle_rounded, color: Colors.white),
-                                             label: const Text('Stop Share', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                             style: ElevatedButton.styleFrom(
-                                               backgroundColor: Colors.redAccent,
-                                             ),
-                                           )
-                                         : OutlinedButton.icon(
-                                             onPressed: isSelf
-                                                 ? null
-                                                 : () async {
-                                                     AppFeedback.buttonPress();
-                                                     final reqId = await adminCtrl.requestScreenShare(device.deviceId);
-                                                     AppAlert.showInfo(
-                                                       'A live share session was started for the selected device.',
-                                                       title: 'Live Share Requested',
-                                                     );
-                                                     if (reqId != null && reqId.isNotEmpty) {
-                                                       _openFullscreenStream(
-                                                         reqId,
-                                                         'screen_share',
-                                                         targetDeviceId: device.deviceId,
-                                                       );
-                                                     }
-                                                   },
-                                             icon: const Icon(Icons.screenshot_monitor),
-                                             label: const Text('Live Share'),
-                                             style: OutlinedButton.styleFrom(
-                                               foregroundColor: theme.blue,
-                                               side: BorderSide(color: theme.blue),
-                                             ),
-                                           ),
-                                   ),
+                                   Expanded(
+                                      child: activeScreenShare != null
+                                          ? Row(
+                                              children: [
+                                                Expanded(
+                                                  child: ElevatedButton.icon(
+                                                    onPressed: () {
+                                                      AppFeedback.buttonPress();
+                                                      _openFullscreenStream(
+                                                        activeScreenShare.requestId,
+                                                        'screen_share',
+                                                        targetDeviceId: device.deviceId,
+                                                      );
+                                                    },
+                                                    icon: const Icon(Icons.fullscreen, color: Colors.white, size: 16),
+                                                    label: const Text('View Share', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: theme.blue,
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                IconButton(
+                                                  onPressed: isSelf
+                                                      ? null
+                                                      : () async {
+                                                          AppFeedback.buttonPress();
+                                                          await adminCtrl.stopScreenShare(activeScreenShare.requestId);
+                                                          AppAlert.showInfo(
+                                                            'Stopped live screen share for ${device.username}',
+                                                            title: 'Stream Stopped',
+                                                          );
+                                                        },
+                                                  icon: const Icon(Icons.stop_circle_rounded, color: Colors.redAccent),
+                                                  tooltip: 'Stop Screen Share',
+                                                ),
+                                              ],
+                                            )
+                                          : OutlinedButton.icon(
+                                              onPressed: isSelf
+                                                  ? null
+                                                  : () async {
+                                                      AppFeedback.buttonPress();
+                                                      final reqId = await adminCtrl.requestScreenShare(device.deviceId);
+                                                      AppAlert.showInfo(
+                                                        'A live share session was started for the selected device.',
+                                                        title: 'Live Share Requested',
+                                                      );
+                                                      if (reqId != null && reqId.isNotEmpty) {
+                                                        _openFullscreenStream(
+                                                          reqId,
+                                                          'screen_share',
+                                                          targetDeviceId: device.deviceId,
+                                                        );
+                                                      }
+                                                    },
+                                              icon: const Icon(Icons.screenshot_monitor),
+                                              label: const Text('Live Share'),
+                                              style: OutlinedButton.styleFrom(
+                                                foregroundColor: theme.blue,
+                                                side: BorderSide(color: theme.blue),
+                                              ),
+                                            ),
+                                    ),
                                 ],
                               ),
                                const SizedBox(height: 8),
@@ -490,22 +510,42 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: activeCameraStream != null
-                                        ? ElevatedButton.icon(
-                                            onPressed: isSelf
-                                                ? null
-                                                : () async {
+                                        ? Row(
+                                            children: [
+                                              Expanded(
+                                                child: ElevatedButton.icon(
+                                                  onPressed: () {
                                                     AppFeedback.buttonPress();
-                                                    await adminCtrl.stopScreenShare(activeCameraStream.requestId);
-                                                    AppAlert.showInfo(
-                                                      'Stopped live camera stream for ${device.username}',
-                                                      title: 'Camera Stream Stopped',
+                                                    _openFullscreenStream(
+                                                      activeCameraStream.requestId,
+                                                      'camera_stream',
+                                                      targetDeviceId: device.deviceId,
                                                     );
                                                   },
-                                            icon: const Icon(Icons.stop_circle_rounded, color: Colors.white),
-                                            label: const Text('Stop Camera', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.redAccent,
-                                            ),
+                                                  icon: const Icon(Icons.videocam, color: Colors.white, size: 16),
+                                                  label: const Text('View Stream', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: Colors.green.shade600,
+                                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              IconButton(
+                                                onPressed: isSelf
+                                                    ? null
+                                                    : () async {
+                                                        AppFeedback.buttonPress();
+                                                        await adminCtrl.stopScreenShare(activeCameraStream.requestId);
+                                                        AppAlert.showInfo(
+                                                          'Stopped live camera stream for ${device.username}',
+                                                          title: 'Camera Stream Stopped',
+                                                        );
+                                                      },
+                                                icon: const Icon(Icons.stop_circle_rounded, color: Colors.redAccent),
+                                                tooltip: 'Stop Camera Stream',
+                                              ),
+                                            ],
                                           )
                                         : OutlinedButton.icon(
                                             onPressed: isSelf
