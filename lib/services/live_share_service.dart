@@ -77,7 +77,7 @@ class LiveShareSession {
     } catch (_) {}
 
     try {
-      await Helper.setSpeakerphoneOn(true);
+      await Helper.setSpeakerphoneOnButPreferBluetooth();
     } catch (_) {}
 
     peerConnection.onTrack = (event) async {
@@ -98,7 +98,7 @@ class LiveShareSession {
         _remoteAudioTrack = event.track;
         try {
           event.track.enabled = !_isMuted;
-          await Helper.setSpeakerphoneOn(true);
+          await Helper.setSpeakerphoneOnButPreferBluetooth();
         } catch (_) {}
       }
     };
@@ -112,7 +112,7 @@ class LiveShareSession {
           _remoteAudioTrack = track;
           track.enabled = !_isMuted;
           try {
-            Helper.setSpeakerphoneOn(true);
+            Helper.setSpeakerphoneOnButPreferBluetooth();
           } catch (_) {}
         }
       } catch (_) {}
