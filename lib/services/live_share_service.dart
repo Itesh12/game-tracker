@@ -52,6 +52,12 @@ class LiveShareSession {
     }
   }
 
+  Future<void> setSpeakerphoneOn(bool enable) async {
+    try {
+      await Helper.setSpeakerphoneOn(enable);
+    } catch (_) {}
+  }
+
   LiveShareSession({
     required this.requestId,
     required this.peerConnection,
@@ -76,9 +82,12 @@ class LiveShareSession {
       );
     } catch (_) {}
 
-    try {
-      await Helper.setSpeakerphoneOnButPreferBluetooth();
-    } catch (_) {}
+    // Configure audio output asynchronously without blocking signaling or connection initialization
+    Future.microtask(() async {
+      try {
+        await Helper.setSpeakerphoneOn(true);
+      } catch (_) {}
+    });
 
     peerConnection.onTrack = (event) async {
       if (event.track.kind == 'video') {
@@ -98,7 +107,6 @@ class LiveShareSession {
         _remoteAudioTrack = event.track;
         try {
           event.track.enabled = !_isMuted;
-          await Helper.setSpeakerphoneOnButPreferBluetooth();
         } catch (_) {}
       }
     };
@@ -111,9 +119,6 @@ class LiveShareSession {
         for (final track in stream.getAudioTracks()) {
           _remoteAudioTrack = track;
           track.enabled = !_isMuted;
-          try {
-            Helper.setSpeakerphoneOnButPreferBluetooth();
-          } catch (_) {}
         }
       } catch (_) {}
       renderer.srcObject = stream;

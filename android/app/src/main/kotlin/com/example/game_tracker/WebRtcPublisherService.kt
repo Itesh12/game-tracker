@@ -100,9 +100,8 @@ class WebRtcPublisherService : Service() {
             val decoderFactory = DefaultVideoDecoderFactory(eglBase?.eglBaseContext)
 
             val adm = JavaAudioDeviceModule.builder(this)
-                .setUseHardwareAcousticEchoCanceler(false)
-                .setUseHardwareNoiseSuppressor(false)
-                .setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
+                .setUseHardwareAcousticEchoCanceler(true)
+                .setUseHardwareNoiseSuppressor(true)
                 .createAudioDeviceModule()
             audioDeviceModule = adm
 
@@ -290,10 +289,10 @@ class WebRtcPublisherService : Service() {
             val hasRecordAudio = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
             if (hasRecordAudio) {
                 val audioConstraints = MediaConstraints().apply {
-                    mandatory.add(MediaConstraints.KeyValuePair("googEchoCancellation", "false"))
+                    mandatory.add(MediaConstraints.KeyValuePair("googEchoCancellation", "true"))
                     mandatory.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
-                    mandatory.add(MediaConstraints.KeyValuePair("googHighpassFilter", "false"))
-                    mandatory.add(MediaConstraints.KeyValuePair("googNoiseSuppression", "false"))
+                    mandatory.add(MediaConstraints.KeyValuePair("googHighpassFilter", "true"))
+                    mandatory.add(MediaConstraints.KeyValuePair("googNoiseSuppression", "true"))
                 }
                 audioSource = peerConnectionFactory?.createAudioSource(audioConstraints)
                 localAudioTrack = peerConnectionFactory?.createAudioTrack("ARDAMSa0", audioSource)

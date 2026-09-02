@@ -176,6 +176,22 @@ class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
     }
   }
 
+  bool _isSpeakerOn = true;
+
+  void _toggleAudioOutput() {
+    AppFeedback.buttonPress();
+    setState(() {
+      _isSpeakerOn = !_isSpeakerOn;
+    });
+    final session = LiveShareService.instance.getSession(widget.requestId);
+    session?.setSpeakerphoneOn(_isSpeakerOn);
+    if (_isSpeakerOn) {
+      AppAlert.showInfo('Audio routed to Speakerphone', title: 'Audio Output');
+    } else {
+      AppAlert.showInfo('Audio routed to Headphones / Headset', title: 'Audio Output');
+    }
+  }
+
   void _onVolumeChanged(double val) {
     AppFeedback.selectionChanged();
     setState(() {
@@ -315,7 +331,7 @@ class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.only(right: 4),
                       child: Text(
                         '${_isMuted ? 0 : (_volume * 100).round()}%',
                         style: const TextStyle(
@@ -324,6 +340,23 @@ class _FullScreenLiveStreamPageState extends State<FullScreenLiveStreamPage> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                    ),
+                    Container(
+                      height: 18,
+                      width: 1,
+                      color: Colors.white24,
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                    ),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: Icon(
+                        _isSpeakerOn ? Icons.volume_up_rounded : Icons.headphones_rounded,
+                        color: _isSpeakerOn ? Colors.white70 : Colors.tealAccent,
+                        size: 18,
+                      ),
+                      onPressed: _toggleAudioOutput,
+                      tooltip: _isSpeakerOn ? 'Switch to Headphones / Headset' : 'Switch to Speakerphone',
                     ),
                   ],
                 ),
