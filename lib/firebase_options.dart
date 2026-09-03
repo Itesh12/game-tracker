@@ -47,13 +47,13 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDMUv8iR6-rhCtfXRbKMbnKq1f03gPJ9wM',
-    appId: '1:699704230231:web:4fa4bf584a740456d2fe12',
-    messagingSenderId: '699704230231',
-    projectId: 'hikeitup-7e03c',
-    authDomain: 'hikeitup-7e03c.firebaseapp.com',
-    storageBucket: 'hikeitup-7e03c.firebasestorage.app',
-  );
+      apiKey: "AIzaSyDjYr3zjqu-m0FYGS8Ziwgl81VQ5OYlaX4",
+      authDomain: "hikeitup-7e03c.firebaseapp.com",
+      projectId: "hikeitup-7e03c",
+      storageBucket: "hikeitup-7e03c.firebasestorage.app",
+      messagingSenderId: "699704230231",
+      appId: "1:699704230231:web:024050bae92b31bbd2fe12",
+      measurementId: "G-E1ESK90WYZ");
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDMUv8iR6-rhCtfXRbKMbnKq1f03gPJ9wM',

@@ -57,7 +57,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (!kIsWeb && Platform.isAndroid) {
         final screenCaptureGranted = await AndroidScreenCapture.hasPermission();
         if (!screenCaptureGranted) {
-          final granted = await PermissionService.ensureScreenCapturePermission();
+          final granted =
+              await PermissionService.ensureScreenCapturePermission();
           if (granted) {
             await AdminService.registerDevice();
           }
@@ -261,8 +262,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               PermissionService.showMandatoryPermissionDialog(
                                 context,
                                 () async {
-                                  final loaded = await lController
-                                      .loadSavedGame();
+                                  final loaded =
+                                      await lController.loadSavedGame();
                                   if (loaded) {
                                     Get.to(() => const GameScreen());
                                   }
@@ -368,7 +369,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.wifi_tethering, color: theme.blue, size: 24),
+                                Icon(Icons.wifi_tethering,
+                                    color: theme.blue, size: 24),
                                 const SizedBox(width: 8),
                                 Text(
                                   'Online Multiplayer Hub',
@@ -383,18 +385,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             const SizedBox(height: 8),
                             Text(
                               'Play with friends online! Create a private room or join using a 6-digit invite code.',
-                              style: TextStyle(fontSize: 13, color: theme.textSecondary),
+                              style: TextStyle(
+                                  fontSize: 13, color: theme.textSecondary),
                             ),
                             const SizedBox(height: 16),
                             Row(
                               children: [
                                 Expanded(
                                   child: ElevatedButton.icon(
-                                    onPressed: () => _showCreateRoomDialog(context, theme),
+                                    onPressed: () =>
+                                        _showCreateRoomDialog(context, theme),
                                     icon: const Icon(Icons.add_box_rounded),
                                     label: const Text('CREATE ROOM'),
                                     style: ElevatedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 16),
                                       backgroundColor: theme.blue,
                                       foregroundColor: Colors.white,
                                       shape: RoundedRectangleBorder(
@@ -406,13 +411,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: OutlinedButton.icon(
-                                    onPressed: () => _showJoinRoomDialog(context, theme),
+                                    onPressed: () =>
+                                        _showJoinRoomDialog(context, theme),
                                     icon: const Icon(Icons.vpn_key_rounded),
                                     label: const Text('JOIN ROOM'),
                                     style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 16),
                                       foregroundColor: theme.blue,
-                                      side: BorderSide(color: theme.blue, width: 2),
+                                      side: BorderSide(
+                                          color: theme.blue, width: 2),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(14),
                                       ),
@@ -471,7 +479,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                             : theme.textPrimary,
                                         elevation: isSelected ? 4 : 0,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
                                           side: BorderSide(
                                             color: isSelected
                                                 ? theme.blue
@@ -529,12 +538,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                   controller: nameControllers[index],
                                   style: TextStyle(color: theme.textPrimary),
                                   decoration: InputDecoration(
-                                    labelText: selectedMode == GameMode.vsComputer && index > 0
-                                        ? 'Bot $index'
-                                        : 'Player ${index + 1} Name',
-                                    labelStyle: TextStyle(color: theme.textSecondary),
+                                    labelText:
+                                        selectedMode == GameMode.vsComputer &&
+                                                index > 0
+                                            ? 'Bot $index'
+                                            : 'Player ${index + 1} Name',
+                                    labelStyle:
+                                        TextStyle(color: theme.textSecondary),
                                     prefixIcon: Icon(
-                                      selectedMode == GameMode.vsComputer && index > 0
+                                      selectedMode == GameMode.vsComputer &&
+                                              index > 0
                                           ? Icons.smart_toy
                                           : Icons.person,
                                       color: colors[index % colors.length],
@@ -543,11 +556,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                     fillColor: theme.boardBg,
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: theme.gridLine),
+                                      borderSide:
+                                          BorderSide(color: theme.gridLine),
                                     ),
                                     enabledBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide(color: theme.gridLine),
+                                      borderSide:
+                                          BorderSide(color: theme.gridLine),
                                     ),
                                   ),
                                 ),
@@ -677,10 +692,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         builder: (context, setDlgState) {
           return AlertDialog(
             backgroundColor: theme.cardBg,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             title: Text(
               'Create Online Room',
-              style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  color: theme.textPrimary, fontWeight: FontWeight.bold),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -695,10 +712,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   controller: nameCtrl,
                   style: TextStyle(color: theme.textPrimary),
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.person, color: Colors.blueAccent),
+                    prefixIcon:
+                        const Icon(Icons.person, color: Colors.blueAccent),
                     filled: true,
                     fillColor: theme.boardBg,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -714,11 +733,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 4.0),
                         child: ElevatedButton(
-                          onPressed: () => setDlgState(() => roomMaxPlayers = count),
+                          onPressed: () =>
+                              setDlgState(() => roomMaxPlayers = count),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: isSel ? theme.blue : theme.boardBg,
-                            foregroundColor: isSel ? Colors.white : theme.textPrimary,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            foregroundColor:
+                                isSel ? Colors.white : theme.textPrimary,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                           child: Text('$count'),
                         ),
@@ -736,12 +758,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ElevatedButton(
                 onPressed: () async {
                   final name = nameCtrl.text.trim();
-                  final uid = Get.find<AuthController>().currentUser.value?.uid ??
-                      'uid_${DateTime.now().millisecondsSinceEpoch}';
+                  final uid =
+                      Get.find<AuthController>().currentUser.value?.uid ??
+                          'uid_${DateTime.now().millisecondsSinceEpoch}';
 
                   Get.back();
                   Get.dialog(
-                    const Center(child: CircularProgressIndicator(color: Colors.white)),
+                    const Center(
+                        child: CircularProgressIndicator(color: Colors.white)),
                     barrierDismissible: false,
                   );
 
@@ -754,7 +778,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       hostPhotoUrl: photoUrl,
                     );
                     Get.back();
-                    Get.to(() => RoomLobbyScreen(roomCode: code, currentUid: uid));
+                    Get.to(
+                        () => RoomLobbyScreen(roomCode: code, currentUid: uid));
                   } catch (e) {
                     Get.back();
                     AppAlert.showError(
@@ -787,7 +812,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Join Online Room',
-          style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.bold),
+          style:
+              TextStyle(color: theme.textPrimary, fontWeight: FontWeight.bold),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -813,7 +839,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 hintText: '581920',
                 filled: true,
                 fillColor: theme.boardBg,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
             const SizedBox(height: 12),
@@ -829,7 +856,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 prefixIcon: const Icon(Icons.person, color: Colors.blueAccent),
                 filled: true,
                 fillColor: theme.boardBg,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
           ],
@@ -856,7 +884,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
               Get.back();
               Get.dialog(
-                const Center(child: CircularProgressIndicator(color: Colors.white)),
+                const Center(
+                    child: CircularProgressIndicator(color: Colors.white)),
                 barrierDismissible: false,
               );
 
@@ -944,13 +973,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('1. Rolling a 6 earns a bonus roll and opens a token from base.'),
+              Text(
+                  '1. Rolling a 6 earns a bonus roll and opens a token from base.'),
               SizedBox(height: 6),
               Text('2. Rolling three 6s in a row forfeits your turn.'),
               SizedBox(height: 6),
-              Text('3. Landing on an opponent token captures it back to base and grants a bonus turn.'),
+              Text(
+                  '3. Landing on an opponent token captures it back to base and grants a bonus turn.'),
               SizedBox(height: 6),
-              Text('4. Safe tiles with star icons protect tokens from capture.'),
+              Text(
+                  '4. Safe tiles with star icons protect tokens from capture.'),
               SizedBox(height: 6),
               Text('5. First player to reach home with all 4 tokens wins!'),
             ],
