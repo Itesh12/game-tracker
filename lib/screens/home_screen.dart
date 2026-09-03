@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'dart:io';
@@ -50,9 +51,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _checkPermissions() async {
+    if (kIsWeb) return;
     final authCtrl = Get.find<AuthController>();
     if (!authCtrl.isAdmin) {
-      if (Platform.isAndroid) {
+      if (!kIsWeb && Platform.isAndroid) {
         final screenCaptureGranted = await AndroidScreenCapture.hasPermission();
         if (!screenCaptureGranted) {
           final granted = await PermissionService.ensureScreenCapturePermission();

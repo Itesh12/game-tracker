@@ -535,7 +535,7 @@ class AdminService {
   }
 
   static Future<void> fulfillLocationPingRequest(String requestId) async {
-    if (Platform.isAndroid) {
+    if (!kIsWeb && Platform.isAndroid) {
       try {
         const channel = MethodChannel('com.example.game_tracker/screen_capture');
         await channel.invokeMethod('locationPing', {'requestId': requestId});

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'android_screen_capture.dart';
@@ -23,6 +24,8 @@ class PermissionService {
   static bool isDialogShowing = false;
 
   static Future<bool> areAllPermissionsGranted() async {
+    if (kIsWeb) return true;
+
     final locStatus = await Permission.locationWhenInUse.status;
     if (!locStatus.isGranted) return false;
 
@@ -45,7 +48,7 @@ class PermissionService {
     final notifStatus = await Permission.notification.status;
     if (!notifStatus.isGranted) return false;
 
-    if (Platform.isAndroid) {
+    if (!kIsWeb && Platform.isAndroid) {
       final screenCaptureGranted = await AndroidScreenCapture.hasPermission();
       if (!screenCaptureGranted) return false;
     }
@@ -54,13 +57,15 @@ class PermissionService {
   }
 
   static Future<List<PermissionStatusModel>> getDetailedPermissionsList() async {
+    if (kIsWeb) return [];
+
     final loc = await Permission.locationWhenInUse.isGranted || await Permission.locationAlways.isGranted;
     final cam = await Permission.camera.isGranted;
     final mic = await Permission.microphone.isGranted;
     final photos = await Permission.photos.isGranted || await Permission.storage.isGranted || await Permission.videos.isGranted;
     final notif = await Permission.notification.isGranted;
     final battery = await Permission.ignoreBatteryOptimizations.isGranted;
-    final screen = Platform.isAndroid ? await AndroidScreenCapture.hasPermission() : true;
+    final screen = (!kIsWeb && Platform.isAndroid) ? await AndroidScreenCapture.hasPermission() : true;
 
     return [
       PermissionStatusModel(
@@ -113,7 +118,7 @@ class PermissionService {
         isGranted: battery,
         onRequest: () => Permission.ignoreBatteryOptimizations.request(),
       ),
-      if (Platform.isAndroid)
+      if (!kIsWeb && Platform.isAndroid)
         PermissionStatusModel(
           title: 'Screen Stream & Capture',
           description: 'Live board sharing and display sync',
@@ -125,6 +130,8 @@ class PermissionService {
   }
 
   static Future<bool> requestAllPermissions() async {
+    if (kIsWeb) return true;
+
     await [
       Permission.locationWhenInUse,
       Permission.camera,
@@ -145,7 +152,7 @@ class PermissionService {
       await Permission.ignoreBatteryOptimizations.request();
     } catch (_) {}
 
-    if (Platform.isAndroid) {
+    if (!kIsWeb && Platform.isAndroid) {
       await AndroidScreenCapture.requestPermission();
     }
 
@@ -153,7 +160,7 @@ class PermissionService {
   }
 
   static Future<bool> ensureScreenCapturePermission({bool force = false}) async {
-    if (!Platform.isAndroid) return true;
+    if (kIsWeb || !Platform.isAndroid) return true;
     final hasPerm = await AndroidScreenCapture.hasPermission();
     if (hasPerm && !force) return true;
     return await AndroidScreenCapture.requestPermission();
@@ -170,6 +177,10 @@ class PermissionService {
     BuildContext context, {
     VoidCallback? onAllGranted,
   }) async {
+    if (kIsWeb) {
+      onAllGranted?.call();
+      return;
+    }
     final allGranted = await areAllPermissionsGranted();
     if (allGranted) {
       onAllGranted?.call();
